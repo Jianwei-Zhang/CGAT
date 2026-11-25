@@ -159,7 +159,8 @@ def publish(layout,batch_dir,batch,manifest,rows,patches,reads):
         data={"schema":RESULTS,"batch_sha256":batch,"results":rows,"assembly":outcome}
         durable_json(stage/"details",{"schema":"cgat.manual-genome-selection.v1","batch_sha256":batch,"origin_fasta_sha256":manifest["origin_fasta_sha256"],**outcome,"chromosomes":stats})
         write_result_zip(stage/"patch",data,rows,patches)
-        durable_json(stage/"prepared.json",{"schema":SCHEMA,"batch":batch,"snapshot_sha256":manifest["snapshot_sha256"],
+        st=(stage/"fasta").stat()
+        durable_json(stage/"prepared.json",{"fasta_stat":[st.st_size,st.st_mtime_ns],"schema":SCHEMA,"batch":batch,"snapshot_sha256":manifest["snapshot_sha256"],
             "files":{"fasta":fasta_sha,"patch":digest(stage/"patch"),"details":digest(stage/"details")},
             "accepted":sum(t is not None for t in selected.values()),"reads":reads,"result":fingerprint(data)})
         rename_synced(stage,pending)

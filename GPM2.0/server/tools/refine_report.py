@@ -11,11 +11,11 @@ import tempfile
 from typing import Any
 
 try:
-    from render_manual_report import render_batch, render_overview, render_landing
+    from render_manual_report import render_batch
     from run_orchestration import sha256_file
     from workspace_migration import durable_json, rename_synced
 except ModuleNotFoundError:
-    from .render_manual_report import render_batch, render_overview, render_landing
+    from .render_manual_report import render_batch
     from .run_orchestration import sha256_file
     from .workspace_migration import durable_json, rename_synced
 
@@ -85,31 +85,20 @@ def automatic_overview_digest(path: Path) -> str:
 
 
 def merge_manual_overview(layout, current: str) -> str:
-    """Assemble relative links from our own index, not paths stored in JSON."""
+    """Replace only 08 from the current, owned batch records; leave the automatic HTML sealed."""
     index = _read_json(layout.path("06_report/manual_refinement.json"))
     if not index:
         return current
     batches = index.get("batches")
     if index.get("schema") != INDEX_SCHEMA or not isinstance(batches, list):
         raise ValueError("invalid manual refinement report index")
-    overview = layout.path("06_report/report.html")
-    entries = []
-    for record in batches:
-        batch = record["batch_sha256"]
-        if not isinstance(batch, str) or re.fullmatch(r"[a-f0-9]{64}", batch) is None:
-            raise ValueError("invalid manual refinement batch identity")
-        batch_dir = _batch_dir(layout, batch)
-        report = layout.path((batch_dir / "03_report/report.html").relative_to(layout.root).as_posix())
-        delivery = manual_patch_path(layout,batch)
-        links = {label: _relative(overview, target) for label, target in
-                 (("Batch report / 批次报告", report), ("Result bundle / 结果包", delivery))
-                 if not target.is_symlink() and target.is_file()}
-        entries.append({"summary": record, "links": links})
+    from report_overview_data import manual_batches
+    from render_manual_story import manual_card
     if not current:
         from report_overview_data import build_overview_view_model
         from render_overview_report import render_overview as render_workflow
-        current = render_workflow(build_overview_view_model(layout.root, mode="manual_only"))
-    return _with_manual_section(current, render_overview(entries))
+        return render_workflow(build_overview_view_model(layout.root))
+    return _with_manual_section(current,manual_card(manual_batches(layout),current))
 
 
 def _batch_dir(layout, batch):

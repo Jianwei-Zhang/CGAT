@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 
 from report_inventory import SHA, file_href, obj, physical, pickup, tree
-from report_gap_story import checked_json, gap_evidence, native_views
+from report_gap_story import baseline_lengths, checked_json, gap_evidence, native_views
 from report_lgz_data import collect, counts, safe_name
 from server_report_io import layout_descriptor
 from render_server_report import REPORT_PREVIEW_ROWS
@@ -22,8 +22,9 @@ BATCH = re.compile("[a-f0-9]{32}")
 OUTCOMES = ("closed", "partial", "unfilled", "rejected")
 
 
-def manual_batches(layout):
+def manual_batches(layout, verify_content=False):
     from refine_report import INDEX_SCHEMA, REPORT_SCHEMA, _batch_dir, manual_patch_path
+    from report_manual_story import collect_manual_story
 
     root = layout.root
     index = "06_report/manual_refinement.json"
@@ -41,6 +42,7 @@ def manual_batches(layout):
         home = _batch_dir(layout, batch).relative_to(root).as_posix() + "/03_report"
         patch = manual_patch_path(layout, batch).relative_to(root).as_posix()
         digest = None
+        summary = {}
         reads = []
         if file_href(root, home + "/summary.json"):
             summary = obj(root, home + "/summary.json")
@@ -74,6 +76,7 @@ def manual_batches(layout):
                 report_status=status,
                 completed_at=row.get("completed_at"),
                 result_counts=dict(result_counts),
+                story=collect_manual_story(layout,batch,_batch_dir(layout,batch),summary,owner,owned,verify_content),
                 report_href=file_href(root, home + "/report.html"),
                 summary_relpath=home + "/summary.json",
                 patch_relpath=patch,
@@ -246,6 +249,7 @@ def refinement(layout, batch):
         tools=[],
         by_chromosome=[],
         original_loci=[],
+        baseline_lengths={},
         comparison_href=None,
         best_tool=None,
         biological_accuracy_validated=False,
@@ -360,6 +364,9 @@ def refinement(layout, batch):
                 final = checked_json(layout, final_dir, "final_path.json", files)
                 if (prov.get("tool"), prov.get("run_id")) != (tool, run):
                     raise ValueError("committed tool evidence has different identity")
+                for chrom, size in baseline_lengths(final).items():
+                    if out['baseline_lengths'].setdefault(chrom,size)!=size:
+                        raise ValueError('published tools do not share original chromosome lengths')
                 decisions = gap_evidence(out["original_loci"], tool, prov, final)
                 job_views, global_view = native_views(layout, folder, summary,
                     journal["areas"]["report"]["new"]["files"], decisions)
@@ -440,7 +447,7 @@ def refinement(layout, batch):
 def build_overview_view_model(root, batch=None, *, mode=None, verify_content=False, generated_at=None):
     layout = WorkspaceLayout.detect(root)
     lgz = collect(layout)
-    manual = manual_batches(layout)
+    manual = manual_batches(layout, verify_content)
     if len(lgz["diagnostics"]) > 200:
         lgz["diagnostics"] = lgz["diagnostics"][:200]
     if batch is None and mode not in ("lgz_failed", "manual_only") and layout.version == 2:
@@ -462,7 +469,8 @@ def build_overview_view_model(root, batch=None, *, mode=None, verify_content=Fal
             )
         ref["by_chromosome"] = list(by_name.values())
     status = (batch or {}).get("status") or lgz.get("status")
-    if mode is None:
+    detect_mode = mode is None
+    if detect_mode:
         mode = (
             "full_pipeline"
             if batch and batch["tools"]
@@ -484,7 +492,12 @@ def build_overview_view_model(root, batch=None, *, mode=None, verify_content=Fal
         )
     from report_final_story import final_versions
     pickups = pickup(layout, batch, manual, verify_content)
-    finals = final_versions(layout, lgz, ref, batch, pickups, mode)
+    finals = final_versions(layout, lgz, ref, batch, pickups, mode, verify_content)
+    if detect_mode and mode=='manual_only' and lgz.get('final_fasta_sha256'):
+        # Older LGZ-only runs have no automatic-refinement completion. Preserve
+        # their verified baseline before appending 08, but never borrow stale q3.
+        finals=final_versions(layout,lgz,ref,batch,pickups,'lgz_only',verify_content)
+        if finals:mode='lgz_only'
     return dict(
         meta=dict(
             schema_version="cgat.report-overview.v1",

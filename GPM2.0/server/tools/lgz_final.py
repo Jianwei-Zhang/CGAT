@@ -80,7 +80,8 @@ def publish_baseline(root, lock):
         if digest(fasta) != binding["assembly_sha256"] or digest(final_file) != binding["final_path_sha256"]:
             raise ValueError("LGZ baseline changed during final staging")
     sync_tree(prepared)
-    record = {"schema": "cgat.lgz-baseline-publication", "state": "publishing", "binding": binding,
+    st=(prepared/"assembly.fa").stat()
+    record = {"fasta_stat":[st.st_size,st.st_mtime_ns], "schema": "cgat.lgz-baseline-publication", "state": "publishing", "binding": binding,
               "server_final_directory": str(layout.path("05_final")),
               "files": inventory(prepared), "prepared": prepared.relative_to(root).as_posix(),
               "backup": (home / "previous").relative_to(root).as_posix(), "previous": old}

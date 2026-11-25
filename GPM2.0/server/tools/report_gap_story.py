@@ -8,13 +8,19 @@ import hashlib
 import json
 import re
 
-from report_inventory import file_href, physical
+from report_inventory import SHA, file_href, physical
 from report_q0_tracks import label
 from run_orchestration import sha256_file
 
 
 PRIORITY = ("degap", "lrgapcloser", "tgsgapcloser", "quartet")
 NAMES = dict(zip(PRIORITY, ("DEGAP", "LR_Gapcloser", "TGS-GapCloser", "quarTeT")))
+
+
+def tool_order(name):
+    # A newly registered adapter follows the named priorities. It does not
+    # require a separate set of outcome categories or a native-report link.
+    return (PRIORITY.index(name) if name in PRIORITY else len(PRIORITY), name)
 
 
 def checked_json(layout, folder, name, files):
@@ -76,6 +82,38 @@ def source(r):
     return {"name": label(r["contig"]), "dataset": label(r["dataset"]), "strand": r["orientation"], "span": [a,b]}
 
 
+def degap_geometry(proof, before, output_bp):
+    """The admission writer verified the paired exteriors, not a full PAF.
+
+    Coordinates on the *full native candidate* differ from the materialized patch
+    and, for a family junction, also from the standalone integration FASTA.
+    Never attribute a parent's two anchors to an independently split child.
+    """
+    method=proof.get('method')
+    classic=('exact_anchors_gap_repair','exact_anchors_joint_repair','exact_anchors_gap_deletion','exact_anchors_overlap_closure')
+    if method not in (*classic,'sealed_family_overlap','sealed_family_junction') or not SHA.fullmatch(proof.get('candidate_sha256') or ''):
+        return None, []
+    if proof.get('parent_native_edit_id'):
+        original=source(proof.get('native_source'))
+        return (original['span'] if original else None), []
+    coords=proof['native_coordinates'];g0,g1=span([coords['gap_start']-1,coords['gap_end']]);L,R=coords['left_flank_len'],coords['right_flank_len']
+    a,b=proof['anchors']['left_bp'],proof['anchors']['right_bp']
+    if not all(type(k) is int and k>0 for k in (L,R,a,b)) or g0<L or g1-g0!=coords['gap_len']:
+        raise ValueError('invalid recorded DEGAP exterior')
+    if method in classic:
+        trim=before[1]-g1;bridge=output_bp-trim
+        if (before[0]!=g0 or a!=L or b!=R or trim<0 or trim and output_bp or
+                (trim>0)!=(method=='exact_anchors_overlap_closure') or L+R+bridge<max(L,R)):
+            raise ValueError('inconsistent DEGAP overlap or bridge')
+        right_at=L+bridge
+        pairs=[[[g0-L,g0],[0,L]],[[g1,g1+R],[right_at,right_at+R]]]
+    else:
+        if not (g0-L==before[0]-a and before[1]+b==g1+R):raise ValueError('inconsistent family exterior')
+        right_at=a+output_bp
+        pairs=[[[before[0]-a,before[0]],[0,a]],[[before[1],before[1]+b],[right_at,right_at+b]]]
+    return [a,a+output_bp], pairs
+
+
 def project_edit(e, known):
     # Old summaries can enumerate edits but omit the underlying geometry.
     if not all(k in e for k in ("chromosome", "start", "end", "output_start", "output_end", "replacement")):
@@ -116,8 +154,30 @@ def project_edit(e, known):
                 pair = [[y, y+width], [v, v+width]]
             else: continue
             if pair not in anchors: anchors.append(pair)
+    if e.get('tool')=='degap' and native is None:
+        native,anchors=degap_geometry(evidence,before,length)
     return dict(id=label(e["edit_id"]), gap_ids=list(ids), before=before, after=after, source=src,
                 native=native, anchors=anchors)
+
+
+def baseline_lengths(final):
+    """Recover full chromosome lengths from a committed, contiguous coordinate lift.
+
+    Useful when an old LGZ report is absent. A gap's last endpoint is *not* the
+    chromosome length and the published refined length is not the LGZ length.
+    """
+    out={}
+    for chrom in final.get('chromosomes',[]):
+        lifts=chrom.get('coordinate_lift');x=y=0
+        if not lifts: continue
+        for row in lifts:
+            a,b=span([row['baseline_start'],row['baseline_end']]);u,v=span([row['output_start'],row['output_end']],empty=True)
+            if (a,u)!=(x,y) or row['kind'] not in ('retained','replacement') or row['kind']=='retained' and b-a!=v-u:
+                raise ValueError('discontinuous published coordinate lift')
+            x,y=b,v
+        if y!=chrom['length']:raise ValueError('coordinate lift does not cover complete output')
+        out[label(chrom['chr'])]=x
+    return out
 
 
 def gap_evidence(rows, tool, prov, final):
@@ -161,4 +221,7 @@ def gap_evidence(rows, tool, prov, final):
 
 
 REASONS = {"incomplete_gap_kept_original", "native_change_not_bound_to_an_original_gap", "projected_gap_unchanged",
-           "native_anchor_absent", "native_anchor_not_unique", "gap_and_flank_cannot_be_separated"}
+           "native_anchor_absent", "native_anchor_not_unique", "gap_and_flank_cannot_be_separated",
+           "missing_native_candidate", "candidate_shorter_than_anchors", "native_anchors_do_not_reconstruct_baseline",
+           "native_junction_exterior_does_not_reconstruct_baseline", "native_integration_slice_disagrees_with_full_candidate",
+           "unproven_native_overlap", "overlap_crosses_another_gap", "candidate_has_no_filled_bases", "candidate_does_not_change_baseline"}

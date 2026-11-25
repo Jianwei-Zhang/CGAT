@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from report_gap_story import gap_evidence, native_views, checked_json
+from report_gap_story import degap_geometry, gap_evidence, native_views, checked_json
 from test_refinement_path import MemoryCatalog, baseline, segment, source, build, rp
 from workspace_layout import WorkspaceLayout
 
@@ -37,6 +37,13 @@ class GapStoryTests(unittest.TestCase):
         self.assertEqual(d['candidates'][0]['gap_ids'],ids);self.assertNotIn('n_positions',d)
         prov['gap_outcomes'][0]['status']='partial'
         with self.assertRaisesRegex(ValueError,'outcome mismatch'):gap_evidence(rows,'degap',prov,final)
+
+    def test_degap_paired_exteriors_use_full_candidate_axis_not_patch_axis(self):
+        def proof(method,a,b):return dict(method=method,candidate_sha256='a'*64,native_coordinates=dict(gap_start=7,gap_end=8,gap_len=2,left_flank_len=6,right_flank_len=6),anchors=dict(left_bp=a,right_bp=b))
+        self.assertEqual(degap_geometry(proof('exact_anchors_gap_repair',6,6),[6,8],4), ([6,10],[[[0,6],[0,6]],[[8,14],[10,16]]]))
+        self.assertEqual(degap_geometry(proof('exact_anchors_overlap_closure',6,6),[6,10],0), ([6,6],[[[0,6],[0,6]],[[8,14],[4,10]]]))
+        self.assertEqual(degap_geometry(proof('sealed_family_junction',5,5),[5,9],3), ([5,8],[[[0,5],[0,5]],[[9,14],[8,13]]]))
+        self.assertEqual(degap_geometry(dict(proof('exact_anchors_joint_repair',6,6),parent_native_edit_id='parent'),[6,8],2),(None,[]))
 
     def test_degap_only_native_job_global_or_missing_and_committed_bytes(self):
         with TemporaryDirectory() as temp:

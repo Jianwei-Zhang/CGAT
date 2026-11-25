@@ -122,7 +122,8 @@ class ReportOverviewTests(unittest.TestCase):
             self.assertTrue((out / f).is_file(), f)
         vm = json.loads((out / "overview_view_model.json").read_text())
         self.assertTrue(all(not r["href"] for r in vm["result_paths"]["quick_pickup"]))
-        self.assertIn("02_refinement/01_degap/report.html", (out / "report.html").read_text())
+        self.assertNotIn('href="02_refinement/01_degap/report.html"', (out / "report.html").read_text())
+        self.assertTrue((out / "02_refinement/01_degap/report.html").is_file())
         self.assertNotIn("../07_delivery", (out / "report.html").read_text())
         with self.assertRaises(ValueError):
             regenerate(self.root, self.root / "newreport")
@@ -145,6 +146,17 @@ class ReportOverviewTests(unittest.TestCase):
         before = automatic_overview_digest(page)
         text(page, _with_manual_section(page.read_text(), "new manual rows"))
         self.assertEqual(automatic_overview_digest(page), before)
+
+    def test_manual_after_verified_lgz_without_refinement_completion_keeps_06(self):
+        from refinement_commit import inventory
+        from render_overview_report import render_overview
+        from run_orchestration import sha256_file
+        workspace(self.root,'manual');layout=WorkspaceLayout.detect(self.root)
+        source=layout.path('metadata/grt_final_path.json');path=json.loads(source.read_text());fasta=layout.path(path['q4_relpath']);dest=layout.path('05_final/00_lgz');dest.mkdir(parents=True,exist_ok=True)
+        (dest/'assembly.fa').write_bytes(fasta.read_bytes());(dest/'final_path.json').write_bytes(source.read_bytes())
+        write_json(layout.path('.runtime/refinement/lgz_baseline.json'),dict(schema='cgat.lgz-baseline-publication',state='committed',binding={'assembly_sha256':sha256_file(fasta),'final_path_sha256':sha256_file(source)},files=inventory(dest)))
+        vm=build_overview_view_model(self.root);html=render_overview(vm)
+        self.assertEqual(vm['meta']['mode'],'lgz_only');self.assertLess(html.index('id="final-path"'),html.index('id="manual-refinement"'));self.assertNotIn('id="auto-refinement"',html)
 
     def test_tool_report_omits_private_reads_from_command_and_log(self):
         from test_refinement_reports import fixture
@@ -219,7 +231,8 @@ class ReportOverviewTests(unittest.TestCase):
         refresh_after_delivery(self.root, RUN, lock)
         self.assertTrue(validate_completion(self.root, RUN)[0])
         self.assertIsNone(write_automatic_index(l, completion))
-        self.assertIn("work.light.zip", page.read_text())
+        self.assertIn('id="final-path"',page.read_text())
+        self.assertFalse('href="../07_delivery' in page.read_text())
         self.assertFalse((self.root / "06_report/03_comparison").exists())
         after = json.loads(completion.read_text())
         self.assertEqual(after.pop("overview_files")["06_report/report.html"], automatic_overview_digest(page))
@@ -243,7 +256,8 @@ class ReportOverviewTests(unittest.TestCase):
         self.assertTrue(index.is_file())
         self.assertEqual(write_automatic_index(l, completion), index)
         self.assertTrue(validate_completion(self.root, RUN)[0])
-        self.assertIn("work.auto.patch.zip", l.path("06_report/report.html").read_text())
+        self.assertIn("work.degap.fa", l.path("06_report/report.html").read_text())
+        self.assertTrue(l.path("07_delivery/work.auto.patch.zip").is_file())
         for job in json.loads(index.read_text())["jobs"]:
             self.assertEqual(json.loads(l.path(job).read_text())["delivery_state"], "committed")
 

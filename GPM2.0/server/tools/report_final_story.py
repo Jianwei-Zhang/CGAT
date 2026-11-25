@@ -68,11 +68,18 @@ def recorded_output(server_directory, relative):
     return str(home / relative.removeprefix('05_final/')), True
 
 
-def supplied_version(layout, tool, receipt, files, final, *, quick, transaction, edits):
+def check_fasta(layout,relative,expected,receipt,verify_content=False):
+    path=physical(layout.root,relative)
+    if not SHA.fullmatch(expected or '') or not path.is_file():raise ValueError('published FASTA missing')
+    stamp=receipt.get('fasta_stat');st=path.stat()
+    if (verify_content or stamp and stamp!=[st.st_size,st.st_mtime_ns]) and sha256_file(path)!=expected:
+        raise ValueError('published FASTA differs from receipt')
+
+
+def supplied_version(layout, tool, receipt, files, final, *, quick, transaction, edits, verify_content=False):
     code = '00_lgz' if tool=='lgz' else TOOL_DIRECTORIES[tool]; folder=layout.relative('05_final/'+code)
     expected = files.get('assembly.fa'); detail = folder+'/assembly.fa'
-    if not SHA.fullmatch(expected or '') or sha256_file(physical(layout.root,detail)) != expected:
-        raise ValueError('published FASTA differs from receipt')
+    check_fasta(layout,detail,expected,receipt,verify_content)
     relative = detail
     if layout.result_prefix:
         public=f'05_final/{layout.result_prefix}.{tool}.fa'
@@ -86,14 +93,19 @@ def supplied_version(layout, tool, receipt, files, final, *, quick, transaction,
                 if not p.samefile(physical(layout.root,detail)) and sha256_file(p)!=expected: raise ValueError('public FASTA changed')
                 relative=public
     path, absolute = recorded_output(receipt.get('server_final_directory'), relative)
+    geometry_note=None
     try:
-        tracks=project_path(final,source_lengths(layout,folder,files),refined=tool!='lgz')
+        sizes=source_lengths(layout,folder,files)
+    except (KeyError,TypeError,ValueError,OSError):
+        sizes={};geometry_note='source_extents_unverified'
+    try:
+        tracks=project_path(final,sizes,refined=tool!='lgz')
     except (KeyError,TypeError,ValueError):
-        tracks=None  # Old jobs can have a committed FASTA but no complete track geometry.
-    return dict(tool=tool, fasta=path, absolute=absolute, sha256=expected, edits=edits, tracks=tracks)
+        tracks=None;geometry_note='incomplete_or_unverified_path'
+    return dict(tool=tool, fasta=path, absolute=absolute, sha256=expected, edits=edits, tracks=tracks, geometry_note=geometry_note)
 
 
-def final_versions(layout, lgz, ref, batch, pickup, mode):
+def final_versions(layout, lgz, ref, batch, pickup, mode, verify_content=False):
     if mode in ('lgz_failed','manual_only') or (batch or {}).get('status')=='invalidated': return []
     quick={r['label_key']:r for r in pickup if r['category']=='fasta'}
     if ref['tools']:
@@ -104,7 +116,7 @@ def final_versions(layout, lgz, ref, batch, pickup, mode):
             tool=t['tool'];j=current_publication(layout.root,tool,verify=False); rec=batch['tools'][tool]
             if not j or (j['transaction'],j['run_id'])!=(rec['publication_transaction'],t['run_id']): continue
             f=j['areas']['final']['new']['files'];folder=layout.relative('05_final/'+TOOL_DIRECTORIES[tool]);final=checked_json(layout,folder,'final_path.json',f)
-            versions.append(supplied_version(layout,tool,j,f,final,quick=quick,transaction=j['transaction'],edits=t.get('accepted_edit_count')))
+            versions.append(supplied_version(layout,tool,j,f,final,quick=quick,transaction=j['transaction'],edits=t.get('accepted_edit_count'), verify_content=verify_content))
         return versions
     if layout.version==2:
         pointer=layout.relative('.runtime/refinement/lgz_baseline.json')
@@ -118,11 +130,11 @@ def final_versions(layout, lgz, ref, batch, pickup, mode):
         if (original in seal and seal[original]!=f['final_path.json'] or lgz.get('final_fasta_sha256') not in (None,f['assembly.fa'])
                 or not (seal.get(original)==f['final_path.json'] or lgz.get('final_fasta_sha256')==f['assembly.fa'])): return []
         final=checked_json(layout,folder,'final_path.json',f)
-        return [supplied_version(layout,'lgz',r,f,final,quick=quick,transaction=f['final_path.json'],edits=None)]
+        return [supplied_version(layout,'lgz',r,f,final,quick=quick,transaction=f['final_path.json'],edits=None,verify_content=verify_content)]
     ck='grt/checkpoints/finalize.json'
     if not physical(layout.root,ck).is_file():return []
     r=obj(layout.root,ck);f=r.get('output_hashes',{});raw='metadata/grt_final_path.json'
     if r.get('status')!='success' or r.get('stage')!='finalize' or raw not in f:return []
     final=checked_json(layout,'metadata','grt_final_path.json',{'grt_final_path.json':f[raw]});rel=final['q4_relpath']
-    if rel not in ('grt/q/q3.fa','grt/q/q4.fa') or not f.get(rel) or lgz.get('final_fasta_sha256')!=f[rel] or sha256_file(physical(layout.root,rel))!=f[rel]:return []
+    if rel not in ('grt/q/q3.fa','grt/q/q4.fa') or not f.get(rel) or lgz.get('final_fasta_sha256')!=f[rel] or not physical(layout.root,rel).is_file() or verify_content and sha256_file(physical(layout.root,rel))!=f[rel]:return []
     return [dict(tool='lgz',fasta=rel,absolute=False,sha256=f[rel],edits=None,tracks=project_path(final,{},refined=False))]

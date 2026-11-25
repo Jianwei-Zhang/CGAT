@@ -9,14 +9,12 @@ import re
 import uuid
 
 try:
-    from refine_report import merge_manual_overview
     from workspace_layout import WorkspaceLayout
     from refinement_reports import ReportError, stat_key
     from refinement_tools import fingerprint
     from refinement_commit import current_publication
     from run_orchestration import sha256_file as digest, atomic_write_json as atomic_json
 except ModuleNotFoundError:
-    from .refine_report import merge_manual_overview
     from .workspace_layout import WorkspaceLayout
     from .refinement_reports import ReportError, stat_key
     from .refinement_tools import fingerprint
@@ -103,7 +101,7 @@ def overview_html(layout, batch=None, *, mode=None, verify_content=False):
     from report_overview_data import build_overview_view_model
     from render_overview_report import render_overview as render_page
     vm = build_overview_view_model(layout.root, batch, mode=mode, verify_content=verify_content)
-    return merge_manual_overview(layout, render_page(vm))
+    return render_page(vm)
 
 
 def refresh_diagnostic_overview(layout):

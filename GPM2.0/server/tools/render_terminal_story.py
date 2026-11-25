@@ -90,7 +90,7 @@ def terminal_card(lgz):
                 color=colors.get(p.get("dataset"),"var(--gen-unfilled)");marks.append(f'<span class="repair-part" style="left:{100*p["start"]/n:.8g}%;width:{100*(p["end"]-p["start"])/n:.8g}%;background:{color}"></span>')
         for k in ("5prime","3prime"):
             info=row["ends"].get(k); text="TEL" if info and info["state"] in ("already_present","recovered") else "○"; end="5′" if k=="5prime" else "3′"; key=f"terminal-{len(templates)}"; title=esc(c)+" · "+end
-            buttons.append(f'<button class="tel-end" type="button" data-story-open="{key}" aria-label="{title} · {text}" style="{("left" if k=="5prime" else "right")}:0">{text}</button>')
+            buttons.append(f'<button class="tel-end" type="button" data-story-open="{key}" aria-label="{title} · {text}" style="{("right:100%" if k=="5prime" else "left:100%")}">{text}</button>')
             templates.append(f'<template id="{key}" data-title="{title}">{_inspection(info,k,n)}</template>')
-        body.append(f'<div class="repair-rows"><b>{esc(c)} <small>{fmt_bp_short(n)}</small></b><div style="position:relative;width:{100*n/m:.9g}%;padding:.9em 0"><div class="repair-base" style="background:var(--text-muted)">{"".join(marks)}</div>{"".join(buttons)}</div></div>')
+        body.append(f'<div class="repair-rows"><b>{esc(c)} <small>{fmt_bp_short(n)}</small></b><div style="padding-inline:2.1rem"><div style="position:relative;width:{100*n/m:.9g}%;padding:.9em 0"><div class="repair-base" style="background:var(--text-muted)">{"".join(marks)}</div>{"".join(buttons)}</div></div></div>')
     return section(*head,'<style>.tel-end{position:absolute;top:0;font:inherit;font-size:.78rem;cursor:pointer;color:var(--brand);background:var(--surface-panel);border:1px solid var(--border-strong);border-radius:.3em;padding:0 .22em}</style>'+"".join(body+templates))

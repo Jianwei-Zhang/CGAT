@@ -31,7 +31,15 @@ class FinalStoryTests(unittest.TestCase):
         vm={'meta':{'mode':'full_pipeline'},'lgz_summary':{'inputs':{'assemblies':[]},'reference_tracks':{'chr1':{'length_bp':14}}},'refinement_summary':{'tools':[{'tool':'degap'}],'original_loci':self.edited['original_gaps']},'final_versions':[v]}
         html=final_card(vm);self.assertIn('data-copy="/original/server-job',html);self.assertIn('data-tool-index="0"',html);self.assertNotIn(' open',html);self.assertNotIn('download',html);self.assertIn('source-body',html)
         (self.layout.path('05_final/01_degap/assembly.fa')).write_bytes(b'changed')
-        with self.assertRaisesRegex(ValueError,'FASTA differs'):supplied_version(self.layout,'degap',{},f,self.direct,quick={},transaction='a',edits=1)
+        with self.assertRaisesRegex(ValueError,'FASTA differs'):supplied_version(self.layout,'degap',{},f,self.direct,quick={},transaction='a',edits=1,verify_content=True)
+
+    def test_zero_edit_tool_delivery_keeps_gaps_and_gets_its_own_fasta(self):
+        final=build(self.f.base,self.f.catalog,[]); files=self.publication(final)
+        v=supplied_version(self.layout,'degap',{},files,final,quick={},transaction='t',edits=0)
+        self.assertEqual(v['tracks'][0]['length'],self.f.base['chromosomes'][0]['q4_length'])
+        self.assertEqual([p['kind'] for p in v['tracks'][0]['parts']],['source','gap','source'])
+        vm={'meta':{'mode':'full_pipeline'},'lgz_summary':{'inputs':{'assemblies':[]}},'refinement_summary':{'tools':[{'tool':'degap'}],'original_loci':final['original_gaps']},'final_versions':[v]}
+        html=final_card(vm);self.assertIn('No new edits',html);self.assertIn('01_degap/assembly.fa',html);self.assertNotIn('data-tool-index=',html)
 
     def test_fail_closed_and_no_preview_row_cap(self):
         rows=[dict(segment_id=f'G{i}',kind='gap',length=1) for i in range(260)];d={'chromosomes':[dict(chr='C',q4_length=260,q4_sha256='a'*64,segments=rows)]};p=project_path(d,{},refined=False)[0];self.assertEqual((len(p['parts']),p['parts'][-1]['end']),(260,260))

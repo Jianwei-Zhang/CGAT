@@ -55,10 +55,10 @@ class RefinementOverviewTests(unittest.TestCase):
             self.assertIn("Staged (not published)", html)
             self.assertIn("等待中", html)
             self.assertIn("Pending", html)
-            self.assertIn("Not available (pending)", html)
+            self.assertIn("No verified refined version", html)
             self.assertNotIn("Final FASTA", html)
             self.assertNotIn("Full App package", html)
-            self.assertIn("Attempt diagnostics (workspace)", html)
+            self.assertNotIn('data-version-panel=', html)
             self.assertNotIn('href="02_refinement/01_degap/report.html"', html)
 
     def test_failed_report_retains_logs_without_fabricating_final_files(self):

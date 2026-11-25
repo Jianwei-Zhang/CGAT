@@ -332,6 +332,9 @@ def publish_result(root, lock, result, report, delivery, validate_delivery):
             if not matches(private / "prepared" / area, expected) or not matches(source[area], expected):
                 raise PublicationError("publication staging changed during preparation")
             sync_tree(private / "prepared" / area)
+        if area=="final":
+            st=((current[area] if unchanged else private/"prepared"/area)/"assembly.fa").stat()
+            journal["fasta_stat"]=[st.st_size,st.st_mtime_ns]
         journal["areas"][area] = {"new": expected, "previous": old, "unchanged": unchanged}
         ensure_directory(current[area].parent)
     layout_and_lock(root, lock)

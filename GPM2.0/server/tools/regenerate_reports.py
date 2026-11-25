@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 sys.dont_write_bytecode = True
-from refine_report import _with_manual_section, render_batch, render_overview as render_manual
+from render_manual_report import render_batch
 from refinement_commit import current_publication
 from render_refinement_report import render_tool_pages, render_failure
 from render_overview_report import render_overview
@@ -290,7 +290,6 @@ def regenerate(root, output):
                     ],
                 ),
             )
-            html = _with_manual_section(html, render_manual(entries))
         put(dest / "report.html", html)
         dump(dest / "overview_view_model.json", vm)
         dest.replace(output)

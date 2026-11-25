@@ -88,3 +88,14 @@ Gap 复用 06 弹窗，仅把基线换成导出快照，在实际选中的工具
 3. 同一原 gap 多工具闭合或保留原样、另有执行失败：排序、分母、铭牌选中和实际采用分别核对；DEGAP 多任务、仅全局和不可用三种入口不混用。
 4. LGZ-only、多工具独立交付、零改动、全未发布：各自只出现应有的成品卡；每个版本的图、复制路径与对应 FASTA 一致，直接接合处没有不存在的色块。
 5. App 调整路径并新增非目标 chr 后导出任务：本批只改选定位点，其他 chr 按快照保留；再测多个批次、无快照旧包、左右端延伸及未导回 App。可参考[已有往返测试](../app/backend/src/grt_package/tests/refined_v5.rs)。
+
+## 核对实现
+
+在 `GPM2.0/` 下运行 `python3 -B server/tests/report_path_review_fixture.py /tmp/cgat-review`（最后一个参数必须是**尚不存在**的目录；本机需有 `samtools` 和 `minimap2` 等 Server 测试依赖）。命令分别输出两份可用浏览器直接打开的 HTML。二者来自独立的受控作业，不把不同运行拼成一份“完整”结果：
+
+- `lgz/lgz-only.html`：从 01 看到 LGZ-only 06。可对照两条 chr 的共同尺度、同一 chr 的多处局部事件、两个恢复端和两个未恢复端，以及最终路径的正反向来源。
+- `project/06_report/report.html`：重点看 06–08。两个工具各有自己的已发布 FASTA；点 07 的精修片段会在 06 的弹窗中预选相应工具。手动批次包括切过并翻转的来源片段、额外 chr、竞争的闭合候选，以及两端延伸；第二个独立批次保留原样。复制的是该样例真实输出的服务器路径。
+
+验收证据按问题分开：`test_q0_report.py`、`test_report_frontend_ui.py` 和 LGZ stage 测试核对 01–端粒的坐标、阈值、窗口和证据降级；`test_report_gap_story.py` 核对联合编辑、拒绝候选、DEGAP 多任务/仅全局/无入口；`test_report_final_story.py` 与 `test_report_overview_data.py` 核对版本隔离、零改动、无交付、完整分母及离线边界；`test_report_manual_story.py` 通过实际 Server 发布流程，对照导出快照、选择文件、整套 FASTA 和自动报告校验值。这里验证报告和接纳契约，不把受控工具响应当作真实物种组装质量评估。
+
+可选的真实浏览器复核：生成上述目录后，用 `CHROME=/path/to/chromium node server/tests/report_path_review_browser.cjs /tmp/cgat-review`。它只打开本地样例、屏蔽外部请求，检查 390/1250 px 折叠行、07 的版本与焦点、08 的批次与候选切换以及末端证据。不需要安装 App 前端依赖。
