@@ -19,19 +19,23 @@ def section(key, num, zh, en, body, *, sub_zh=None, sub_en=None, right=""):
 
 
 INPUT_STYLE = """<style>
-.input-ref-band{display:flex;align-items:center;justify-content:space-between;gap:.45rem 1.25rem;flex-wrap:wrap;padding:.55rem .85rem;margin-bottom:.65rem;border:1px solid var(--border-subtle);border-left:3px solid var(--brand);border-radius:var(--radius-sm);background:var(--brand-soft);font-size:.85rem}
-.input-ref-main{display:flex;align-items:baseline;gap:.45rem .85rem;flex-wrap:wrap}
-.input-ref-role{font-size:.76rem;font-weight:700;letter-spacing:.02em;color:var(--brand)}
-.input-ref-name{font:700 .9rem/1.2 var(--font-mono);color:var(--text-primary)}
-.input-ref-stat{color:var(--text-secondary);font-variant-numeric:tabular-nums}
-.input-ref-note{font-size:.79rem;color:var(--text-muted)}
-.input-table th.num-col,.input-table td.num-col{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.input-ds-cell{display:inline-flex;align-items:center;gap:.48rem;font-weight:600;color:var(--text-primary)}
-.input-aux-bar{display:flex;align-items:center;gap:.4rem .9rem;flex-wrap:wrap;margin-top:.55rem;padding-top:.5rem;border-top:1px dashed var(--border-subtle);font-size:.81rem;color:var(--text-secondary)}
-.input-aux-lbl{font-size:.76rem;font-weight:700;color:var(--text-muted);margin-right:.15rem}
-.input-aux-item{display:inline-flex;align-items:center;gap:.3rem}
-.input-aux-item::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--border-strong)}
-.input-aux-bar>.input-aux-lbl+.input-aux-item::before{display:none}
+.project-dataset-scroll{overflow-x:auto;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel)}
+.project-dataset-table{width:100%;border-collapse:collapse;font-size:.875rem;text-align:left}
+.project-dataset-table th,.project-dataset-table td{padding:11px 12px;border-top:0;border-bottom:1px solid var(--border-subtle);vertical-align:middle}
+.project-dataset-table thead th{background:var(--surface-subtle);color:var(--text-secondary);font-size:.82rem;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border-subtle)}
+.project-dataset-table tbody th[scope="row"]{background:transparent;color:var(--text-primary);font-weight:500;font-size:.875rem;white-space:normal}
+.project-dataset-table tbody>tr:hover>td,.project-dataset-table tbody>tr:hover>th{background:var(--surface-subtle)}
+.project-dataset-table tbody>tr:last-child>*{border-bottom:0}
+.project-dataset-name{display:inline-flex;align-items:center;gap:.45rem;overflow-wrap:anywhere;font-weight:500;color:var(--text-primary)}
+.project-dataset-table .numeric{white-space:nowrap;font-variant-numeric:tabular-nums}
+.project-dataset-role{display:inline-block;padding:2px 9px;border:1px solid var(--border-default);border-radius:999px;background:var(--brand-soft);color:var(--brand);font-size:.79rem;font-weight:500;line-height:1.4;white-space:nowrap}
+.project-dataset-role[data-dataset-role="reference"]{background:var(--ctg-ref-fill);border-color:var(--ctg-ref-stroke);color:var(--ctg-ref-text)}
+.project-dataset-role[data-dataset-role="primary"]{background:var(--ctg-primary-fill);border-color:var(--ctg-primary-stroke);color:var(--ctg-primary-text)}
+.project-dataset-role[data-dataset-role="support"]{background:var(--ctg-companion-fill);border-color:var(--ctg-companion-stroke);color:var(--ctg-companion-text)}
+.input-aux-bar{display:flex;align-items:center;gap:.45rem .65rem;flex-wrap:wrap;margin-top:.65rem;font-size:.8rem;color:var(--text-secondary)}
+.input-aux-lbl{font-size:.78rem;font-weight:600;color:var(--text-muted);margin-right:.1rem}
+.input-qc-tag{display:inline-flex;align-items:center;gap:.3rem;padding:2px 9px;border:1px solid var(--border-subtle);border-radius:999px;background:var(--surface-subtle);color:var(--text-secondary);font-size:.79rem;white-space:nowrap}
+.input-qc-tag.is-enabled{border-color:var(--tone-ok-line);background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
 </style>"""
 
 ASSIGN_STYLE = """<style>
@@ -71,56 +75,101 @@ details.chr-group-row[open]>summary .chr-group-name::before{transform:rotate(90d
 </style>"""
 
 
+def _fmt_catalog_length(value, missing):
+    if value is None:
+        return missing
+    n = int(value)
+    if abs(n) >= 1_000_000_000:
+        disp = f"{n / 1_000_000_000:,.2f} Gb"
+    elif abs(n) >= 1_000_000:
+        disp = f"{n / 1_000_000:,.2f} Mb"
+    elif abs(n) >= 1_000:
+        disp = f"{n / 1_000:,.2f} kb"
+    else:
+        return esc(f"{n:,} bp")
+    raw_bp = f"{n:,} bp"
+    return f'<span title="{esc(raw_bp)}">{esc(disp)}</span>'
+
+
 def input_card(inputs):
     missing = '<span class="muted">' + bi("未记录", "Not recorded") + '</span>'
 
-    def measure(st, key, formatter):
-        return esc(formatter(st[key])) if st.get(key) is not None else missing
+    def measure_int(st, key):
+        return esc(fmt_int(st[key])) if st.get(key) is not None else missing
 
-    refs = []
+    rows = []
     for ref in inputs["reference"]:
         st = ref["stats"]
-        refs.append(
-            '<div class="input-ref-band">'
-            '<div class="input-ref-main">'
-            f'<span class="input-ref-role">{bi("参考基因组", "Reference")}</span>'
-            f'<strong class="input-ref-name">{esc(ref["name"])}</strong>'
-            f'<span class="input-ref-stat">{measure(st, "sequence_count", fmt_int)} {bi("条序列", "sequences")}</span>'
-            f'<span class="input-ref-stat">{measure(st, "length_bp", fmt_bp)}</span>'
-            '</div>'
-            f'<span class="input-ref-note">{bi("比对与染色体定位的坐标参照", "Coordinate reference for alignment and placement")}</span>'
-            '</div>'
+        rows.append((
+            'reference',
+            bi("参考", "Reference"),
+            f'<span class="project-dataset-name">{esc(ref["name"])}</span>',
+            measure_int(st, "sequence_count"),
+            _fmt_catalog_length(st.get("length_bp"), missing),
+            _fmt_catalog_length(st.get("n50_bp"), missing),
+            measure_int(st, "gap_count"),
+        ))
+    for index, assembly in enumerate(inputs["assemblies"]):
+        st = assembly["stats"]
+        raw_role = str(assembly.get("role") or "assembly_candidate")
+        if raw_role in ("support", "companion"):
+            role_attr, role_lbl = "support", bi("辅助组装", "Auxiliary")
+        elif raw_role == "primary":
+            role_attr, role_lbl = "primary", bi("主组装", "Primary")
+        else:
+            role_attr, role_lbl = "primary", bi("候选组装", "Assembly")
+        name_html = (
+            f'<span class="project-dataset-name">'
+            f'<i class="swatch" style="width:8px;height:8px;background:var(--ds-{index % 6})"></i>'
+            f'{esc(assembly["name"])}</span>'
         )
+        rows.append((
+            role_attr,
+            role_lbl,
+            name_html,
+            measure_int(st, "sequence_count"),
+            _fmt_catalog_length(st.get("length_bp"), missing),
+            _fmt_catalog_length(st.get("n50_bp"), missing),
+            measure_int(st, "gap_count"),
+        ))
+
+    gap_tip = esc("连续 N ≥ 100 bp / N runs ≥ 100 bp")
     headers = [
-        (bi("候选组装", "Candidate assembly"), ""),
-        (bi("序列数", "Sequences"), ' class="num-col"'),
-        (bi("总长", "Total length"), ' class="num-col"'),
-        (bi("序列 N50", "Sequence N50"), ' class="num-col"'),
-        (bi("Gap 数（连续 N ≥100 bp）", "Gaps (N runs ≥100 bp)"), ' class="num-col"'),
+        f'<th scope="col">{bi("数据类型", "Data type")}</th>',
+        f'<th scope="col">{bi("名称", "Name")}</th>',
+        f'<th scope="col">{bi("序列数", "Sequences")}</th>',
+        f'<th scope="col">{bi("总长度", "Total length")}</th>',
+        '<th scope="col">N50</th>',
+        f'<th scope="col" title="{gap_tip}">{bi("Gap 数", "Gaps")}</th>',
     ]
-    thead = "<thead><tr>" + "".join(f"<th{cls}>{h}</th>" for h, cls in headers) + "</tr></thead>"
-    if inputs["assemblies"]:
-        body_rows = []
-        for index, assembly in enumerate(inputs["assemblies"]):
-            st = assembly["stats"]
-            ds_cell = f'<span class="input-ds-cell"><i class="swatch" style="background:var(--ds-{index % 6})"></i>{esc(assembly["name"])}</span>'
-            vals = [measure(st, "sequence_count", fmt_int), measure(st, "length_bp", fmt_bp),
-                    measure(st, "n50_bp", fmt_bp), measure(st, "gap_count", fmt_int)]
-            body_rows.append("<tr><td>" + ds_cell + "</td>" + "".join(f'<td class="num-col">{v}</td>' for v in vals) + "</tr>")
+    thead = "<thead><tr>" + "".join(headers) + "</tr></thead>"
+    if rows:
+        body_rows = [
+            f'<tr><td><span class="project-dataset-role" data-dataset-role="{esc(role_attr)}">{role_lbl}</span></td>'
+            f'<th scope="row">{name_html}</th>'
+            f'<td class="numeric">{seq_n}</td>'
+            f'<td class="numeric">{tot_len}</td>'
+            f'<td class="numeric">{n50}</td>'
+            f'<td class="numeric">{gaps}</td></tr>'
+            for role_attr, role_lbl, name_html, seq_n, tot_len, n50, gaps in rows
+        ]
         tbody = "<tbody>" + "".join(body_rows) + "</tbody>"
     else:
-        tbody = f'<tbody><tr><td colspan="5" class="muted">{missing}</td></tr></tbody>'
-    grid = f'<div class="table-wrap"><table class="input-table">{thead}{tbody}</table></div>'
+        tbody = f'<tbody><tr><td colspan="6" class="muted">{missing}</td></tr></tbody>'
+    grid = (
+        '<div class="project-dataset-scroll" tabindex="0" role="region" aria-label="Datasets">'
+        f'<table class="project-dataset-table">{thead}{tbody}</table></div>'
+    )
 
-    aux = [f'<span class="input-aux-item">{esc({"hifi": "HiFi", "ont": "ONT", "reads": "Reads"}[r["technology"]])}: <b class="num">{r["file_count"]}</b> '
+    aux = [f'<span class="input-qc-tag">{esc({"hifi": "HiFi", "ont": "ONT", "reads": "Reads"}[r["technology"]])}: <b class="num">{r["file_count"]}</b> '
            + bi("个文件", "files") + '</span>' for r in inputs["typed_reads"]]
     for key, zh, en in (("telomere_rules", "端粒规则", "Telomere rules"), ("centromere_reference", "着丝粒参考", "Centromere reference")):
         if (inputs["annotations"].get(key) or {}).get("configured") is True:
-            aux.append('<span class="input-aux-item">' + bi(zh, en) + ": " + bi("已配置", "configured") + '</span>')
+            aux.append('<span class="input-qc-tag is-enabled">' + bi(zh, en) + " · " + bi("已配置", "configured") + '</span>')
     aux_html = ('<div class="input-aux-bar"><span class="input-aux-lbl">' + bi("辅助输入", "Auxiliary inputs") + '</span>'
                 + "".join(aux) + '</div>') if aux else ""
-    ref_html = "".join(refs) or f'<div class="input-ref-band">{missing}</div>'
-    return section("inputs", "01", "输入数据", "Inputs", INPUT_STYLE + ref_html + grid + aux_html)
+    count_right = bi(f"{len(rows)} 个数据集", f"{len(rows)} datasets") if rows else ""
+    return section("inputs", "01", "输入数据", "Inputs", INPUT_STYLE + grid + aux_html, right=count_right)
 
 
 def assignment_card(assignment):

@@ -90,7 +90,7 @@ class ReportFrontendUITests(unittest.TestCase):
                 self.assertIn('data-lang-btn="zh"', html)
                 self.assertIn('data-lang-btn="en"', html)
                 self.assertIn('data-theme-toggle="1"', html)
-                self.assertIn('class="wb-sidebar"', html)
+                self.assertNotIn('class="wb-sidebar"', html)
                 self.assertNotIn('id="improvement-overview"', html)
                 self.assertNotIn('id="pseudomolecule-evolution"', html)
                 self.assertEqual('id="inputs"' in html, scenario!='manual')

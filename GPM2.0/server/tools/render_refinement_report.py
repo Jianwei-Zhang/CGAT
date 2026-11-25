@@ -61,6 +61,9 @@ CSS = """
   --gen-closed:#2b7a57;--gen-partial:#356ea8;--gen-unfilled:#cbd5e1;--gen-rejected:#b91c1c;--gen-na:#e2e8f0;
   --gen-patch:#c97a2b;--gen-gap:#b91c1c;--gen-tel:#2b7a57;--gen-cen:#6d4c9c;
   --ds-0:#335c81;--ds-1:#2a7b76;--ds-2:#5e548e;--ds-3:#b07d3b;--ds-4:#9e4765;--ds-5:#4a6fa5;
+  --ctg-primary-fill:#d2dfef;--ctg-primary-stroke:#6d85a1;--ctg-primary-text:#243a54;
+  --ctg-companion-fill:#e7dec4;--ctg-companion-stroke:#8a7551;--ctg-companion-text:#5c492a;
+  --ctg-ref-fill:#cfcfcf;--ctg-ref-stroke:#8e8e8e;--ctg-ref-text:#4f4f4f;
 }
 html[data-theme="dark"]{
   color-scheme:dark;
@@ -88,6 +91,9 @@ html[data-theme="dark"]{
   --gen-closed:#3ea374;--gen-partial:#5c98d4;--gen-unfilled:#475569;--gen-rejected:#dc5964;--gen-na:#334155;
   --gen-patch:#dfa048;--gen-gap:#dc5964;--gen-tel:#43b37d;--gen-cen:#9e82cc;
   --ds-0:#5585b5;--ds-1:#3f9e98;--ds-2:#8b7ec2;--ds-3:#cc9852;--ds-4:#c26e8a;--ds-5:#6890c4;
+  --ctg-primary-fill:#28486e;--ctg-primary-stroke:#6899d1;--ctg-primary-text:#e8f2ff;
+  --ctg-companion-fill:#594527;--ctg-companion-stroke:#bf9b63;--ctg-companion-text:#faefd9;
+  --ctg-ref-fill:#384352;--ctg-ref-stroke:#8292a6;--ctg-ref-text:#e2e8f0;
 }
 @media (prefers-color-scheme:dark){
   html:not([data-theme="light"]){
@@ -116,6 +122,9 @@ html[data-theme="dark"]{
     --gen-closed:#3ea374;--gen-partial:#5c98d4;--gen-unfilled:#475569;--gen-rejected:#dc5964;--gen-na:#334155;
     --gen-patch:#dfa048;--gen-gap:#dc5964;--gen-tel:#43b37d;--gen-cen:#9e82cc;
     --ds-0:#5585b5;--ds-1:#3f9e98;--ds-2:#8b7ec2;--ds-3:#cc9852;--ds-4:#c26e8a;--ds-5:#6890c4;
+    --ctg-primary-fill:#28486e;--ctg-primary-stroke:#6899d1;--ctg-primary-text:#e8f2ff;
+    --ctg-companion-fill:#594527;--ctg-companion-stroke:#bf9b63;--ctg-companion-text:#faefd9;
+    --ctg-ref-fill:#384352;--ctg-ref-stroke:#8292a6;--ctg-ref-text:#e2e8f0;
   }
 }
 html[data-lang="zh"] .t-en{display:none!important}
@@ -141,7 +150,7 @@ small,.muted{color:var(--text-muted);font-size:.84rem}
 /* Sticky Single-Row Topbar Header */
 .cgat-header{position:sticky;top:0;z-index:40;background:var(--surface-panel);background:var(--surface-header);backdrop-filter:saturate(180%) blur(10px);-webkit-backdrop-filter:saturate(180%) blur(10px);border-top:2.5px solid var(--brand);border-bottom:1px solid var(--border-subtle);box-shadow:0 1px 2px rgba(15,23,42,.03)}
 .cgat-header-inner{max-width:1280px;margin:0 auto;min-height:48px;padding:.46rem 1.5rem;display:flex;flex-direction:column;justify-content:center}
-.cgat-header.is-centered .cgat-header-inner{max-width:1140px}
+.cgat-header.is-centered .cgat-header-inner{max-width:1200px}
 .cgat-title-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem 1.25rem;min-width:0}
 .cgat-title-left{display:flex;align-items:center;gap:.55rem;min-width:0;flex:1 1 auto}
 .cgat-brand-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--brand);flex-shrink:0}
@@ -180,7 +189,7 @@ html[data-theme="dark"] .theme-btn .ico-sun{display:block}
 
 /* Clean Frameless-Sidebar / Centered Single-Column Layout */
 .wb-shell{max-width:1280px;margin:0 auto;padding:1.25rem 1.5rem 2.5rem;display:grid;grid-template-columns:184px minmax(0,1fr);gap:1.65rem;align-items:start}
-.wb-shell.no-sidebar{display:block;max-width:1140px}
+.wb-shell.no-sidebar{display:block;max-width:1200px}
 .wb-sidebar{position:sticky;top:66px;padding-top:.15rem}
 .wb-toc{list-style:none;margin:0;padding:0;border-left:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:.12rem}
 .wb-toc a{display:flex;align-items:baseline;gap:.42rem;padding:.34rem .72rem;margin-left:-1px;border-left:2px solid transparent;color:var(--text-muted);font-size:.83rem;font-weight:500;line-height:1.35;transition:color .12s,border-color .12s,background .12s;border-radius:0 var(--radius-sm) var(--radius-sm) 0}
@@ -394,6 +403,7 @@ details.tree-node[open]>summary .tree-caret{transform:rotate(90deg)}
 .pager a:hover{background:var(--surface-subtle);text-decoration:none}
 
 @media (max-width:1024px){
+  .cgat-header-inner{padding:.46rem 1rem}
   .wb-shell{grid-template-columns:minmax(0,1fr);padding:1rem;gap:.9rem}
   .wb-sidebar{position:static;padding:0;min-width:0}
   .wb-toc{flex-direction:row;overflow-x:auto;border-left:0;border-bottom:1px solid var(--border-subtle);gap:.2rem}

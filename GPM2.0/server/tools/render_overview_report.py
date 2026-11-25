@@ -90,19 +90,7 @@ def render_overview(vm):
     ws_name = meta.get("workspace_name") or "CGAT Workspace"
     gen_at = meta.get("generated_at") or ""
 
-    sidebar = [
-        ("inputs", "01", "输入数据", "Inputs"),
-        ("chr-groups", "02", "染色体分组", "Chromosome groups"),
-        ("alignment-q0", "03", "初始路径 q0", "Initial path q0"),
-        ("first-repair", "04", "第一轮修补", "First repair"),
-        ("structural-repair", "05", "结构修正", "Structural correction"),
-        ("terminal-process", "", "端粒处理", "Telomeres"),
-        *([("auto-refinement", "06", "自动精修", "Automatic refinement")] if vm["refinement_summary"]["tools"] else []),
-        *([("final-path", "07" if vm["refinement_summary"]["tools"] else "06", "Final Path", "Final Path")] if meta["mode"] not in ("lgz_failed", "manual_only") else []),
-    ]
-
     if meta['mode']=='manual_only':
-        sidebar=[('manual-refinement','08','手动精修','Manual refinement')]
         body=_run_notices(vm)
     else:
         body = (
@@ -143,7 +131,7 @@ def render_overview(vm):
         brand_sep=False,
         header_time_html=_format_header_time(gen_at),
         header_time_raw=True,
-        sidebar_items=sidebar,
+        sidebar_items=None,
         page_title_plain=f"CGAT Server 报告：{ws_name}",
     )
     batches=vm['manual_summary']['batches']
