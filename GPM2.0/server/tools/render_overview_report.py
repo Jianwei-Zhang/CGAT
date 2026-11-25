@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 try:
+    from render_final_story import final_card
     from render_gap_story import gap_card
     from render_terminal_story import terminal_card
     from render_repair_story import repair_card, DIALOG
@@ -19,6 +20,7 @@ try:
         workbench_page,
     )
 except ModuleNotFoundError:
+    from .render_final_story import final_card
     from .render_gap_story import gap_card
     from .render_terminal_story import terminal_card
     from .render_repair_story import repair_card, DIALOG
@@ -343,6 +345,7 @@ def render_overview(vm):
         ("structural-repair", "05", "结构修正", "Structural correction"),
         ("terminal-process", "", "端粒处理", "Telomeres"),
         *([("auto-refinement", "06", "自动精修", "Automatic refinement")] if vm["refinement_summary"]["tools"] else []),
+        *([("final-path", "07" if vm["refinement_summary"]["tools"] else "06", "Final Path", "Final Path")] if meta["mode"] not in ("lgz_failed", "manual_only") else []),
         ("result-files", "", "结果取件", "Result Pickup"),
         ("diagnostics-fold", "", "诊断与明细", "Diagnostics"),
     ]
@@ -356,6 +359,7 @@ def render_overview(vm):
         + repair_card(vm["lgz_summary"], structural=True)
         + terminal_card(vm["lgz_summary"])
         + gap_card(vm)
+        + final_card(vm)
         + _render_result_files_and_diagnostics(vm)
         + (DIALOG if vm["refinement_summary"]["tools"] or any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene", "terminal_scene")) else "")
     )

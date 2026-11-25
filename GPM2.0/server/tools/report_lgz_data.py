@@ -414,6 +414,7 @@ def collect(layout):
     try:
         final = load("final_summary.json", run)
         versions(final)
+        out["final_fasta_sha256"] = (final.get("sequence_versions", {}).get(final.get("final_q_version")) or {}).get("sha256")
         q0 = final.get("q0_construction") or q0
         out["chromosomes"] = chromosome_rows(final)
         out["outcome"] = counts(final.get("outcome_summary"))
@@ -447,4 +448,5 @@ def collect(layout):
             out["q0_scene_sha256"] = q0_stats.get("sha256")
     except failures:
         errors.append("q0 selection: missing_or_invalid_tracks")
+    out["reference_tracks"] = ref_tracks
     return out

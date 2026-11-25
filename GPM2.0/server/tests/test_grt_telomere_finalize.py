@@ -343,6 +343,13 @@ print(
                 {"assigned", "unplaced"},
             )
             self.assertTrue(all(row["final_path_segment_id"] for row in accepted))
+            from report_final_story import final_versions
+            from workspace_layout import WorkspaceLayout
+            from run_orchestration import sha256_file
+            versions = final_versions(WorkspaceLayout.detect(server), {"final_fasta_sha256":sha256_file(server/"grt/q/q3.fa")}, {"tools":[]}, None, [], "lgz_only")
+            self.assertEqual(versions[0]["fasta"], "grt/q/q3.fa")
+            self.assertEqual({c["chr"]:c["length"] for c in versions[0]["tracks"]}, {name:len(seq) for name,seq in q3.items()})
+            self.assertFalse(versions[0]["absolute"])
             # The report uses the same admitted event, normalized to half-open positions.
             from server_report_collect import collect_lgz_result
             from report_terminal_story import terminal_scene

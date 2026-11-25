@@ -482,6 +482,9 @@ def build_overview_view_model(root, batch=None, *, mode=None, verify_content=Fal
             ),
             None,
         )
+    from report_final_story import final_versions
+    pickups = pickup(layout, batch, manual, verify_content)
+    finals = final_versions(layout, lgz, ref, batch, pickups, mode)
     return dict(
         meta=dict(
             schema_version="cgat.report-overview.v1",
@@ -499,8 +502,9 @@ def build_overview_view_model(root, batch=None, *, mode=None, verify_content=Fal
         lgz_summary=lgz,
         refinement_summary=ref,
         manual_summary=dict(batches=manual),
+        final_versions=finals,
         result_paths=dict(
-            quick_pickup=pickup(layout, batch, manual, verify_content),
+            quick_pickup=pickups,
             directory_tree=tree(layout),
             maintenance={
                 "never_delete_runtime": True,

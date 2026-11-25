@@ -81,6 +81,7 @@ def publish_baseline(root, lock):
             raise ValueError("LGZ baseline changed during final staging")
     sync_tree(prepared)
     record = {"schema": "cgat.lgz-baseline-publication", "state": "publishing", "binding": binding,
+              "server_final_directory": str(layout.path("05_final")),
               "files": inventory(prepared), "prepared": prepared.relative_to(root).as_posix(),
               "backup": (home / "previous").relative_to(root).as_posix(), "previous": old}
     ensure_directory(target.parent)
