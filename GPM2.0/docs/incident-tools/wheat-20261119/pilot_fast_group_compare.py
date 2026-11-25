@@ -1,5 +1,6 @@
 """Read-only independent geometry comparison. Reference spans are support proxies, not truth."""
-from collections import defaultdict
+from bisect import bisect_right
+from collections import Counter, defaultdict
 import gzip
 from hashlib import sha256
 import json
@@ -48,9 +49,16 @@ def verify_arm(root,arm,candidate="BC"):
     return metrics,occ,joins,ordered
 
 
+def overlaps(span, intervals, ends):
+    i=bisect_right(ends,span.start)
+    while i<len(intervals) and intervals[i].start<span.end:
+        yield span.intersection(intervals[i]); i+=1
+
+
 def ref_coverage(root,arms):
     snapshot=sealed(root/'q0-latest-fork-20261123-1435/control/snapshot.json','2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d'); source=Path(snapshot['source']); spans={a:[] for a in arms}
     targets={s[:2] for _,occ,_,_ in arms.values() for s in occ}; nfiles=0
+    ends={a:{k:tuple(i.end for i in vs) for k,vs in occ.items()} for a,(_,occ,_,_) in arms.items()}
     for row in snapshot['files']:
         rel=row['path']
         if not rel.startswith('runs/') or not rel.endswith('_vs_ref/result.paf'): continue
@@ -68,11 +76,9 @@ def ref_coverage(root,arms):
                 for block in hit.aligned_blocks():
                     if block.operation=='X':continue
                     for a,ivs in selected.items():
-                        for i in ivs:
-                            v=block.query.intersection(i)
-                            if v is not None:
-                                left=block.target.start+(v.start-block.query.start if hit.strand=='+' else block.query.end-v.end)
-                                per[a].append(Interval(left,left+v.length))
+                        for v in overlaps(block.query,ivs,ends[a][k]):
+                            left=block.target.start+(v.start-block.query.start if hit.strand=='+' else block.query.end-v.end)
+                            per[a].append(Interval(left,left+v.length))
                 for a,v in per.items():spans[a].extend(merged_intervals(v))
         need(nb==row['size'] and h.hexdigest()==row['sha256'],'reference PAF identity')
     need(nfiles==2,'expected both frozen reference PAFs');return {a:merged_intervals(x) for a,x in spans.items()}
@@ -81,7 +87,7 @@ def ref_coverage(root,arms):
 def compare(arms,ref,x,y):
     m,o,j,order=arms[x]; n,p,k,other=arms[y]; same=sum(intersect_bp(v,p.get(s,())) for s,v in o.items());opp=sum(intersect_bp(v,p.get((*s[:2],'-' if s[2]=='+' else '+'),())) for s,v in o.items()); common=intersect_bp(ref[x],ref[y]);size=lambda v:sum(i.length for i in v)
     # Relative order only for single-occurrence shared, same-strand sources. A split is not a certified junction.
-    shared={s for s in set(order)&set(other) if order.count(s)==other.count(s)==1};ids={s:i for i,s in enumerate(other) if s in shared}; ranks=[ids[s] for s in order if s in shared]
+    counts,other_counts=Counter(order),Counter(other);shared={s for s in counts.keys()&other_counts.keys() if counts[s]==other_counts[s]==1};ids={s:i for i,s in enumerate(other) if s in shared}; ranks=[ids[s] for s in order if s in shared]
     return dict(same_source_same_strand_bp=same,same_source_opposite_strand_bp=opp,source_bp_only_in_first=m['metrics']['source_bp_used']-same-opp,
                 source_bp_only_in_second=n['metrics']['source_bp_used']-same-opp,common_join_geometry=len(j&k),first_only_joins=len(j-k),second_only_joins=len(k-j),
                 reference_supported_bp_only_in_first=size(ref[x])-common,reference_supported_bp_only_in_second=size(ref[y])-common,
@@ -89,11 +95,11 @@ def compare(arms,ref,x,y):
 
 
 def main(root,candidate='BC'):
-    need(candidate in ('BC','BC-local'),'unregistered pilot arm')
+    need(candidate in ('BC','BC-local','BC-indexed'),'unregistered pilot arm')
     arms={a:verify_arm(root,a,candidate) for a in 'ABC'};ref=ref_coverage(root.parent,arms);report={}
     for a,(v,*_) in arms.items():
         report[a]={k:w for k,w in v['metrics'].items() if k!='record_hashes'};report[a].update(from_input_s=v['from_input_s'],input_load_s=v['load_s'],mapper_calls=v['mapper_calls'],reference_supported_bp=sum(x.length for x in ref[a]))
-    write(root/('comparison.json' if candidate=='BC' else 'comparison-local.json'),dict(arms=report,comparisons={x+'_'+y:compare(arms,ref,x,y) for x,y in [('A','B'),('A','C'),('B','C')]},
+    write(root/{'BC':'comparison.json','BC-local':'comparison-local.json','BC-indexed':'comparison-indexed.json'}[candidate],dict(arms=report,comparisons={x+'_'+y:compare(arms,ref,x,y) for x,y in [('A','B'),('A','C'),('B','C')]},
         limits='One group. A is frozen initial-evidence sequence, not truth or final repaired Q0. Reference metric uses initial high-MAPQ same-strand paired blocks, not independent validation. Unused bases are not donor eligibility.'))
 
 if __name__=='__main__':main(Path(sys.argv[1]).resolve(strict=True),*sys.argv[2:])

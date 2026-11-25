@@ -1,0 +1,112 @@
+{
+  "axes_sha256": "7c93bb87545a40a561ac09a88260cc043a297f1236a6d5875c837d4d17542c31",
+  "first_request_sha256": "1a51ebcfef103cb8c986ca7e98cb11eb7e86f6d68f9100d057fc3446e9698ec5",
+  "group": "4D",
+  "group_query_context_counts": {
+    "neither": 131,
+    "query": 29,
+    "target_only": 147
+  },
+  "known_inventory": 23845,
+  "results": [
+    {
+      "category": "target_only",
+      "cold_exact_mapper_calls": 1,
+      "cold_native_s": 3.4205282940529287,
+      "context": "q0-regional-context-0256d86416d1d9e765601362",
+      "fasta_materialize_and_hash_s": 1.360942831961438,
+      "flags": [
+        "-c",
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "query_bp": 31810,
+      "raw_receipt_sha256": "dae8cec7653b08094ed6704a0e63325f9aaba3a4141e5c381cc9fcd71b3b7da9",
+      "raw_rows": 658,
+      "raw_sha256": "a9a18aceda17b60beb316c726f84460ca88316b35414aee159675ff9a6013b24",
+      "status": "matched",
+      "target_bp": 18816791,
+      "target_windows": 706,
+      "threads": 2,
+      "warm_exact_mapper_calls": 0,
+      "warm_verify_and_decode_s": 0.07441597001161426
+    },
+    {
+      "category": "target_only",
+      "cold_exact_mapper_calls": 1,
+      "cold_native_s": 4.123916356009431,
+      "context": "q0-regional-context-0264fa283ea95d7099e36a64",
+      "fasta_materialize_and_hash_s": 0.11475667008198798,
+      "flags": [
+        "-c",
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join",
+        "-m",
+        "2000"
+      ],
+      "query_bp": 20350,
+      "raw_receipt_sha256": "86d5022737bb7831993985e49853e642e5f17f61b22e769dfb0e9444a5ba4f11",
+      "raw_rows": 352,
+      "raw_sha256": "d3603827dcca085906dacb2580ea116f01c9c9028d5f49b3f06ceee132d11b82",
+      "status": "matched",
+      "target_bp": 2136441,
+      "target_windows": 72,
+      "threads": 2,
+      "warm_exact_mapper_calls": 0,
+      "warm_verify_and_decode_s": 0.08191582199651748
+    },
+    {
+      "category": "query",
+      "cold_exact_mapper_calls": 1,
+      "cold_native_s": 1.864173409063369,
+      "context": "q0-regional-context-138dee2fbbf0403378e4bdb4",
+      "fasta_materialize_and_hash_s": 0.8807550710625947,
+      "flags": [
+        "-c",
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "query_bp": 11027,
+      "raw_receipt_sha256": "7be297146c7fc43af967f0d635888a2285002619382437b03538730dd993c745",
+      "raw_rows": 354,
+      "raw_sha256": "db8e8ed2768167a4e040179144711562fc5c1c60bb677464e2018e6df47e68a4",
+      "status": "matched",
+      "target_bp": 13824937,
+      "target_windows": 490,
+      "threads": 2,
+      "warm_exact_mapper_calls": 0,
+      "warm_verify_and_decode_s": 0.05704142805188894
+    },
+    {
+      "category": "query",
+      "cold_exact_mapper_calls": 1,
+      "cold_native_s": 1.2783020930364728,
+      "context": "q0-regional-context-16b389d8cf483c2f9ad6f53d",
+      "fasta_materialize_and_hash_s": 0.13444948696997017,
+      "flags": [
+        "-c",
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "query_bp": 20805,
+      "raw_receipt_sha256": "c827a4eeca17761ae384097558eb86abc809f69f5824b9c516d27d503d31abb4",
+      "raw_rows": 124,
+      "raw_sha256": "5a14400c51e254c054899cdc2240ae16ae277e70301eee8b1ddde29f989cc068",
+      "status": "matched",
+      "target_bp": 3224765,
+      "target_windows": 82,
+      "threads": 2,
+      "warm_exact_mapper_calls": 0,
+      "warm_verify_and_decode_s": 0.04642517096363008
+    }
+  ],
+  "scope": "Preselected 4D-query contexts with a frozen historical target inventory. Same complete inputs and original flags. Raw exact stage only; unit timings exclude shared staging and coarse chaining. Existing verified cache capability, not incremental cold savings or final Q0."
+}
