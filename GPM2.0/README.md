@@ -273,6 +273,8 @@ The package preserves the primary and auxiliary dataset roles established during
 | **3. Assembly & Subview** | Examine chromosome-wide collinearity ribbons, filter alignments, manipulate contig cards, and zoom in on local pairwise evidence in Subview. |
 | **4. Final Path & Export** | Reorder, flip, or insert contig slices and gaps (with per-chromosome baseline restore and Final Path Log contribution summary), queue and export **Refinement Tasks** (`refinement_tasks.zip` for current chromosome or all queued project loci, paired with `refine.py`) or **Legacy DEGAP-JOBS (scripts)**, or export PNG, TSV, LOG, AGP, and FASTA files. |
 
+**Layout export:** With source sequences available, Home and Assembly write `<name>.agp` and `<name>.components.fa` together. Match AGP column 6 to the first word of each FASTA header (`originalContigID__datasetName`). Each referenced component is included once, full-length and forward; AGP supplies its slice and strand. Escaped names retain their originals in the FASTA description. **Sequence** exports the assembled chromosomes instead. Light projects offer **AGP only**, using the original component IDs and rejecting ambiguous names. A path consisting entirely of gaps has no component FASTA.
+
 ### In-app updates (updater-enabled builds)
 
 This feature is being implemented; it has not been released as part of this change. The following workflow applies to a signed, updater-enabled build. Users of older builds without an updater must manually install the first updater-enabled version once.

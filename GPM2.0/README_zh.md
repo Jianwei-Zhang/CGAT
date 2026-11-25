@@ -260,6 +260,8 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 | **3. Assembly 与 Subview** | 在染色体尺度检查共线性比对色带、调整筛选条件、移动/翻转/隐藏/镜像 contig，并在 Subview 中放大核对局部成对比对与锚点证据。 |
 | **4. Final Path 编辑与导出** | 编辑染色体片段顺序与方向（支持按染色体一键恢复服务端预计算基线及 Final Path 日志贡献表），按当前染色体或本项目全部已选范围登记并**导出精修任务**（`refinement_tasks.zip`，配合 `refine.py`）或**旧版 DEGAP-JOBS（脚本包）**，或导出 PNG、TSV、日志、AGP 与 FASTA。 |
 
+**组装结构导出：** 有源序列时，Home 和装配页一起写出 `<名称>.agp` 和 `<名称>.components.fa`。AGP 第 6 列与 FASTA 标题的首字段一致（`原ContigID__原数据集名`）。每条被引用的组件只写一次，保留完整正向序列，截取范围和方向由 AGP 指定；名称如需转义，FASTA 标题的描述中保留原名。“组装序列”另行导出拼好的染色体。Light 项目提供“仅 AGP”，沿用原组件 ID，遇到重名歧义会报错。路径若全是 gap，则没有组件 FASTA。
+
 ### 应用内更新（已启用更新的构建）
 
 本功能正在接入，尚未随本次改动发布。以下流程适用于已启用签名更新的构建；不含更新模块的旧版本仍需手动安装一次首个支持更新的版本。

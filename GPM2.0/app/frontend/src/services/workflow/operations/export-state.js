@@ -93,6 +93,7 @@ export async function exportFinalPathAgp({
   chrName,
   finalPathEntry,
   outputPath,
+  includeComponents = false,
   stateOrLocale = "zh",
 }) {
   if (!isTauriRuntime()) {
@@ -108,6 +109,7 @@ export async function exportFinalPathAgp({
     chrName,
     finalPathEntry,
     outputPath,
+    includeComponents,
     stateOrLocale,
   });
 }
@@ -117,6 +119,7 @@ export async function exportProjectFinalPathAgp({
   projectId,
   finalPathByChr,
   outputPath,
+  includeComponents = false,
   stateOrLocale = "zh",
 }) {
   if (!isTauriRuntime()) {
@@ -131,6 +134,7 @@ export async function exportProjectFinalPathAgp({
     projectId,
     finalPathByChr,
     outputPath,
+    includeComponents,
     stateOrLocale,
   });
 }

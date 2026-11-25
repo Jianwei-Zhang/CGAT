@@ -13,6 +13,7 @@ import {
   closeFinalPathExportDialog,
   launchFinalPathExportJob,
   planFinalPathExportSteps,
+  pickAgpExportPath,
   requestCancelFinalPathExport,
   renderFinalPathViewportPng,
   resolveFinalPathViewportSnapshot,
@@ -1188,7 +1189,7 @@ test("runFinalPathExportAction writes sibling PNG TSV FASTA and AGP outputs for 
       writeFinalPathExportTextFile: async (payload) => {
         calls.push(["tsv", payload.outputPath, payload.text]);
       },
-      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); },
+      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); return { outputPaths: [payload.outputPath] }; },
       exportFinalPathFasta: async (payload) => {
         calls.push(["fasta", payload.outputPath]);
       },
@@ -1288,7 +1289,7 @@ test("runFinalPathExportAction writes only sibling PNG and TSV outputs for all e
       writeFinalPathExportTextFile: async (payload) => {
         calls.push(["tsv", payload.outputPath]);
       },
-      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); },
+      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); return { outputPaths: [payload.outputPath] }; },
       exportFinalPathFasta: async (payload) => {
         calls.push(["fasta", payload.outputPath]);
       },
@@ -1385,7 +1386,7 @@ test("runFinalPathExportAction omits log from all export when final path contain
       writeFinalPathExportTextFile: async (payload) => {
         calls.push(["text", payload.outputPath]);
       },
-      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); },
+      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); return { outputPaths: [payload.outputPath] }; },
       exportFinalPathFasta: async (payload) => {
         calls.push(["fasta", payload.outputPath]);
       },
@@ -1484,7 +1485,7 @@ test("runFinalPathExportAction keeps FASTA export for partitioned full packages 
       writeFinalPathExportTextFile: async (payload) => {
         calls.push(["tsv", payload.outputPath]);
       },
-      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); },
+      exportFinalPathAgp: async (payload) => { calls.push(["agp", payload.outputPath]); return { outputPaths: [payload.outputPath] }; },
       exportFinalPathFasta: async (payload) => {
         calls.push(["fasta", payload.outputPath]);
       },
@@ -1524,7 +1525,7 @@ test("planFinalPathExportSteps expands all export into png tsv log fasta agp ord
         kind: "fasta",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.fasta",
       },
-      { kind: "agp", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
+      { kind: "agp", includeComponents: true, outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
     ],
   );
 });
@@ -1550,7 +1551,7 @@ test("planFinalPathExportSteps retains AGP in all export when fasta is unavailab
         kind: "log",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.log",
       },
-      { kind: "agp", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
+      { kind: "agp", includeComponents: false, outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
     ],
   );
 });
@@ -1573,7 +1574,7 @@ test("planFinalPathExportSteps omits log when log export is unavailable", () => 
         kind: "tsv",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.tsv",
       },
-      { kind: "agp", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
+      { kind: "agp", includeComponents: false, outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
     ],
   );
   assert.deepEqual(
@@ -1807,11 +1808,25 @@ test("AGP export uses the current final path and AGP save filter without FASTA",
   const [step] = planFinalPathExportSteps({ kind: "agp", targetPath: target, canExportFasta: false });
   let payload;
   await runFinalPathExportStep({ step, finalPathEntry: entry, state, deps: {
-    exportFinalPathAgp: async (value) => { payload = value; },
+    exportFinalPathAgp: async (value) => { payload = value; return { outputPaths: [target] }; },
     exportFinalPathFasta: async () => { throw new Error("must not export FASTA"); },
   } });
+  assert.equal(payload.includeComponents, false);
   assert.equal(payload.finalPathEntry, entry);
   assert.equal(payload.chrName, "Chr01");
   assert.equal(payload.workspaceRoot, "D:/ws");
   assert.equal(payload.outputPath, target);
+});
+
+
+test("paired AGP uses the basename even if the native save picker omits the extension", async () => {
+  assert.equal(await pickAgpExportPath(async () => "/out/chr1", "base", {}), "/out/chr1.agp");
+  assert.equal(await pickAgpExportPath(async () => "/out/chr1.AGP", "base", {}), "/out/chr1.AGP");
+  assert.equal(await pickAgpExportPath(async () => null, "base", {}), null);
+  const [step] = planFinalPathExportSteps({kind:"agp", targetPath:"/out/chr1.agp", canExportFasta:true});
+  const args = {step, state:{locale:"en",assembly:{}}, finalPathEntry:{}, deps:{exportFinalPathAgp: async p => {
+    assert.equal(p.includeComponents,true); return { outputPaths:[p.outputPath,"/out/chr1.components.fa"] };
+  }}};
+  assert.deepEqual((await runFinalPathExportStep(args)).outputPaths, [step.outputPath,"/out/chr1.components.fa"]);
+  await assert.rejects(runFinalPathExportStep({...args,deps:{exportFinalPathAgp:async()=>({})}}), /no confirmed file list/);
 });

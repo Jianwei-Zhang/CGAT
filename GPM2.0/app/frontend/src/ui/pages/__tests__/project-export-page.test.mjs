@@ -171,7 +171,7 @@ for (const [locale, names] of Object.entries({
   assert.deepEqual([...html.matchAll(/data-project-export-action="([^"]+)"|data-context-submenu-trigger|role="separator"/g)]
     .map(m => m[1] || (m[0] === "data-context-submenu-trigger" ? "preview" : "|")), [...keys.slice(0, 5), "|", "all", "|", "refinement-all"]);
   assert.deepEqual([...html.matchAll(/<span>([^<]+)<\/span>/g)].map(m => m[1]), names);
-  assert.deepEqual([...html.matchAll(/class="project-export-extension">([^<]+)/g)].map(m => m[1]), [".agp", ".fasta", ".tsv", ".log", ".zip"]);
+  assert.deepEqual([...html.matchAll(/class="project-export-extension">([^<]+)/g)].map(m => m[1]), [".agp + .components.fa", ".fasta", ".tsv", ".log", ".zip"]);
   assert.match(html, /data-context-submenu-trigger aria-haspopup="menu" aria-expanded="false"/);
   assert.match(html, /class="context-menu-submenu" data-context-submenu role="menu"/);
   assert.deepEqual([...html.matchAll(/data-preview-format="([^"]+)"/g)].map(m => m[1]), ["svg", "png", "pdf"]);
@@ -1600,7 +1600,7 @@ test("project export all writes one merged artifact per export type", async () =
     writeFinalPathExportBinaryFile: async (payload) => {
       binaryWrites.push(payload);
     },
-    exportProjectFinalPathAgp: async (payload) => { agpExports.push(payload); },
+    exportProjectFinalPathAgp: async (payload) => { agpExports.push(payload); return { outputPaths: [payload.outputPath, payload.outputPath.replace(/\.agp$/, ".components.fa")] }; },
     exportProjectFinalPathFasta: async (payload) => {
       fastaExports.push(payload);
     },
@@ -1608,6 +1608,8 @@ test("project export all writes one merged artifact per export type", async () =
 
   assert.equal(result, true);
   assert.deepEqual(agpExports.map(item => item.outputPath), ["/exports/p1_project_path_20260430205930.agp"]);
+  assert.equal(agpExports[0].includeComponents, true);
+  assert.ok(store.getState().projectExport.job.completedOutputs.includes("/exports/p1_project_path_20260430205930.components.fa"));
   assert.deepEqual(agpExports[0].finalPathByChr, fastaExports[0].finalPathByChr);
   assert.deepEqual(binaryWrites.map((item) => item.outputPath), ["/exports/p1_project_path_20260430205930.png"]);
   assert.deepEqual(textWrites.map((item) => item.outputPath), [
@@ -2433,7 +2435,7 @@ test("project export all sends phased haplotypes to agp and omits phased parent 
     getExportTimestamp: () => "20260430205930",
     pickSaveFilePath: async () => "/exports/p1_project_path.agp",
     exportProjectFinalPathAgp: async (payload) => {
-      agpExports.push(payload);
+      agpExports.push(payload); return { outputPaths: [payload.outputPath, payload.outputPath.replace(/\.agp$/, ".components.fa")] };
     },
   });
 
@@ -2443,8 +2445,11 @@ test("project export all sends phased haplotypes to agp and omits phased parent 
 
 
 test("project AGP menu and all-export plan remain available without FASTA", async () => {
-  const html = renderProjectExportPage(createState());
-  assert.match(html, /data-project-export-action="agp"/);
+  const state = createState();
+  state.initializer.datasets.forEach(d => { d.fastaAvailable = false; });
+  const html = renderProjectExportPage(state);
+  assert.match(html, /组装结构（仅 AGP）/);
+  assert.doesNotMatch(html, /\.components\.fa/);
   const steps = __test.planProjectExportSteps({ kind: "all", baseName: "project", targetPath: "/out", canExportFasta: false });
   assert.ok(steps.some(step => step.kind === "agp" && step.outputPath === "/out/project.agp"));
   assert.ok(!steps.some(step => step.kind === "fasta"));

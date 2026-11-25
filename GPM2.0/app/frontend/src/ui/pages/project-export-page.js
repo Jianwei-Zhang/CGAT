@@ -27,6 +27,8 @@ import {
   writeFinalPathExportTextFile,
 } from "../../services/workflow-api.js";
 import {
+  confirmedAgpOutputs,
+  pickAgpExportPath,
   appendTimestampToOutputPath,
   buildTimestampedExportBaseName,
   resolveExportTimestamp,
@@ -455,6 +457,7 @@ function getLabels(state) {
       exportTsv: "Path Details",
       exportFasta: "Sequence",
       exportAgp: "Layout",
+      exportAgpOnly: "Layout (AGP only)",
       exportLog: "Contig Usage",
       exportRefinementAll: "Refinement Tasks",
       refDisabled: "A Final Path in this assembly contains reference objects. Assembly statistics cannot be displayed, and Contig Usage cannot be exported. Other outputs remain available.",
@@ -516,6 +519,7 @@ function getLabels(state) {
     exportTsv: "路径明细",
     exportFasta: "组装序列",
     exportAgp: "组装结构",
+    exportAgpOnly: "组装结构（仅 AGP）",
     exportLog: "Contig 使用统计",
     exportRefinementAll: "精修任务",
     refDisabled: "当前组装的 Final Path 包含参考序列对象，无法显示装配统计，也不能导出 Contig 使用统计。其他结果仍可导出。",
@@ -1390,8 +1394,8 @@ const exportLabelKeys = { agp: "exportAgp", fasta: "exportFasta", tsv: "exportTs
   png: "exportImage", all: "exportAll", "refinement-all": "exportRefinementAll" };
 
 function renderProjectExportMenu({ labels, fresh, previewReady, canExportFasta, canExportLog }) {
-  const item = (action, ext, attrs = "") => `<button type="button" class="final-path-export-item" data-project-export-action="${action}"${attrs}>
-    <span>${escapeHtml(labels[exportLabelKeys[action]])}</span>${ext ? `<span class="project-export-extension">.${ext}</span>` : ""}</button>`;
+  const item = (action, ext, attrs = "", caption = labels[exportLabelKeys[action]]) => `<button type="button" class="final-path-export-item" data-project-export-action="${action}"${attrs}>
+    <span>${escapeHtml(caption)}</span>${ext ? `<span class="project-export-extension">.${ext}</span>` : ""}</button>`;
   const divider = '<div class="final-path-export-divider" role="separator"></div>';
   const pending = fresh ? "" : " disabled";
   const imagePending = previewReady ? "" : " disabled";
@@ -1403,7 +1407,7 @@ function renderProjectExportMenu({ labels, fresh, previewReady, canExportFasta, 
       <button type="button" class="button ghost tiny final-path-export-toggle" data-project-export-toggle="true"
         aria-label="${label}" data-app-tooltip="${label}" aria-expanded="false">${projectIcon("export")}</button>
       <div class="final-path-export-menu is-hidden" data-project-export-menu>
-        ${item("agp", "agp", pending)}
+        ${item("agp", canExportFasta ? "agp + .components.fa" : "agp", pending, canExportFasta ? labels.exportAgp : labels.exportAgpOnly)}
         ${canExportFasta ? item("fasta", "fasta") : ""}
         ${item("tsv", "tsv", pending)}
         ${canExportLog ? item("log", "log") : ""}
@@ -1913,10 +1917,7 @@ async function resolveProjectExportTarget({ state, kind, baseName, deps = {} }) 
     }, state);
   }
   if (normalizedKind === "agp") {
-    return pickSaveFile({
-      defaultPath: `${baseName}.agp`,
-      filters: [{ name: "AGP", extensions: ["agp"] }],
-    }, state);
+    return pickAgpExportPath(pickSaveFile, baseName, state);
   }
   if (normalizedKind === "fasta") {
     return pickSaveFile({
@@ -2060,13 +2061,18 @@ async function runProjectExport(host, store, kind, deps = {}) {
         });
       } else if (step.kind === "fasta" || step.kind === "agp") {
         const exportPath = step.kind === "agp" ? (deps.exportProjectFinalPathAgp || exportProjectFinalPathAgp) : exportFasta;
-        await exportPath({
+        const result = await exportPath({
           workspaceRoot: state.session?.workspacePath || "",
           projectId: Number(state.session?.projectId || 0),
           finalPathByChr,
+          ...(step.kind === "agp" ? { includeComponents: canProjectExportFasta(state) } : {}),
           outputPath: step.outputPath,
           stateOrLocale: state,
         });
+        if (step.kind === "agp") {
+          completedOutputs.push(...confirmedAgpOutputs(result, state));
+          continue;
+        }
       } else if (step.kind === "png") {
         const bytesBase64 = await renderPng(previewSnapshot);
         await writeBinary({

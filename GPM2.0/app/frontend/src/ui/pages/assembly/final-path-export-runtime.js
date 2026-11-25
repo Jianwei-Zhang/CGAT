@@ -527,11 +527,12 @@ export function planFinalPathExportSteps({
 }) {
   const normalizedKind = normalizeString(kind).toLowerCase();
   const kinds = ["png", "tsv", ...(canExportLog ? ["log"] : []), ...(canExportFasta ? ["fasta"] : []), "agp"];
-  if (normalizedKind === "all") {
-    return kinds.map(kind => ({ kind, outputPath: joinOutputPath(targetPath, `${baseName}.${kind}`) }));
-  }
-  return [...kinds, "refinement-current-chr", "refine-jobs", "degap-jobs"].includes(normalizedKind)
-    ? [{ kind: normalizedKind, outputPath: targetPath }] : [];
+  const planned = normalizedKind === "all" ? kinds
+    : [...kinds, "refinement-current-chr", "refine-jobs", "degap-jobs"].filter(kind => kind === normalizedKind);
+  return planned.map(kind => ({ kind,
+    ...(kind === "agp" ? { includeComponents: canExportFasta } : {}),
+    outputPath: normalizedKind === "all" ? joinOutputPath(targetPath, `${baseName}.${kind}`) : targetPath,
+  }));
 }
 
 function resolveDegapJobDisplayLabel(job) {
@@ -708,6 +709,11 @@ export function closeFinalPathExportDialog(assembly) {
   };
 }
 
+export async function pickAgpExportPath(pickSaveFile, baseName, state) {
+  const path = await pickSaveFile({ defaultPath: `${baseName}.agp`, filters: [{ name: "AGP", extensions: ["agp"] }] }, state);
+  return path && !/\.agp$/i.test(path) ? `${path}.agp` : path;
+}
+
 export async function resolveFinalPathExportTarget({ state, kind, baseName, deps = {} }) {
   const pickSaveFilePathImpl = deps.pickSaveFilePath || pickSaveFilePath;
   const pickDirectoryPathImpl = deps.pickDirectoryPath || pickDirectoryPath;
@@ -732,10 +738,7 @@ export async function resolveFinalPathExportTarget({ state, kind, baseName, deps
     }, state);
   }
   if (normalizedKind === "agp") {
-    return pickSaveFilePathImpl({
-      defaultPath: `${baseName}.agp`,
-      filters: [{ name: "AGP", extensions: ["agp"] }],
-    }, state);
+    return pickAgpExportPath(pickSaveFilePathImpl, baseName, state);
   }
   if (normalizedKind === "fasta") {
     return pickSaveFilePathImpl({
@@ -780,6 +783,13 @@ function buildFinalPathLogModelForState(state, finalPathEntry) {
     grtBaselineEntry: assembly.grtProjectView?.baselineFinalPathByChr?.[chrName] || null,
     manualRefinementResults,
   });
+}
+
+export function confirmedAgpOutputs(result, state) {
+  if (!Array.isArray(result?.outputPaths) || !result.outputPaths.length || !result.outputPaths.every(path => typeof path === "string" && path.trim())) {
+    throw new Error(state?.locale === "en" ? "AGP export returned no confirmed file list." : "AGP 导出未返回已写出的文件清单。");
+  }
+  return result.outputPaths;
 }
 
 export async function runFinalPathExportStep({
@@ -830,15 +840,16 @@ export async function runFinalPathExportStep({
   }
   if (step?.kind === "fasta" || step?.kind === "agp") {
     const exportPath = step.kind === "agp" ? (deps.exportFinalPathAgp || exportFinalPathAgp) : exportFastaImpl;
-    await exportPath({
+    const result = await exportPath({
       workspaceRoot: state.session?.workspacePath || "",
       projectId: Number(state.session?.projectId || 0),
       chrName: resolveCurrentFinalPathChrName(assembly),
       finalPathEntry,
       outputPath: step.outputPath,
+      ...(step.kind === "agp" ? { includeComponents: step.includeComponents } : {}),
       stateOrLocale: state,
     });
-    return { outputPath: step.outputPath };
+    return step.kind === "agp" ? { outputPaths: confirmedAgpOutputs(result, state) } : { outputPath: step.outputPath };
   }
   if (step?.kind === "refinement-current-chr" || step?.kind === "refine-jobs") {
     const scope = frozenRefinement?.scope || resolveManualRefinementScopeFromKind(step.kind);
@@ -1044,7 +1055,7 @@ export async function launchFinalPathExportJob({
         return runStep({
           step,
           finalPathEntry,
-          state: store.getState(),
+          state: step.kind === "agp" || step.kind === "fasta" ? state : store.getState(),
           host,
           deps,
           frozenRefinement,

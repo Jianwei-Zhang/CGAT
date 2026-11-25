@@ -10,6 +10,10 @@ use sha2::{Digest, Sha256};
 
 use crate::db::open_workspace_db;
 
+mod agp_bundle;
+use agp_bundle::Component;
+pub use agp_bundle::export_final_path_agp_bundle;
+
 const DEFAULT_CHR_GAP_BP: i64 = 100;
 const DEFAULT_END_GAP_BP: i64 = 100;
 const FASTA_WRAP_WIDTH: usize = 80;
@@ -276,13 +280,7 @@ pub fn export_project_final_path_agp(
     project_id: i64,
     params: &ExportProjectFinalPathFastaParams,
 ) -> Result<FinalPathExportSummary> {
-    let conn = open_workspace_db(project_db_path)?;
-    let text = build_final_path_agp(&conn, project_id, &params.records)?;
-    if let Some(parent) = params.output_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&params.output_path, text)
-        .with_context(|| format!("failed to write {}", params.output_path.display()))?;
+    agp_bundle::export_agp_files(project_db_path, project_id, params, false)?;
     Ok(FinalPathExportSummary {
         output_path: params.output_path.clone(),
     })
@@ -309,17 +307,27 @@ fn validate_agp_range(start: i64, end: i64, length: i64) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn build_final_path_agp(
     conn: &Connection,
     project_id: i64,
     records: &[FinalPathFastaRecord],
 ) -> Result<String> {
+    Ok(plan_final_path_agp(conn, project_id, records, false)?.0)
+}
+
+fn plan_final_path_agp(
+    conn: &Connection,
+    project_id: i64,
+    records: &[FinalPathFastaRecord],
+    qualified: bool,
+) -> Result<(String, BTreeMap<String, (Component, i64)>)> {
     validate_project_exists(conn, project_id)?;
     if records.is_empty() {
         bail!("at least one final-path AGP record is required");
     }
     let mut objects = HashSet::new();
-    let mut identities = HashMap::<String, String>::new();
+    let mut identities = BTreeMap::new();
     let mut lines = vec!["##agp-version 2.1".to_string()];
     for record in records {
         let object = record.chr_name.trim();
@@ -330,10 +338,10 @@ fn build_final_path_agp(
         let mut begin = 1_i64;
         let mut part = 1_i64;
         for segment in &record.final_path_segments {
-            // Each item is (original component ID, stable source identity, start, end).
+            // Each placement retains the full component identity/length and source coordinates.
             // Expand assembly contigs to their original source coordinates, matching
             // build_final_path_ctg_source_sequence (not the displayed ctg orientation).
-            let mut components = Vec::<(String, String, i64, i64)>::new();
+            let mut components = Vec::new();
             match segment {
                 FinalPathExportSegment::Gap { gap_size_bp } => {
                     if *gap_size_bp <= 0 {
@@ -356,12 +364,7 @@ fn build_final_path_agp(
                         params![project_id, sha256], |row| row.get(0),
                     ).context("AGP refinement patch is unavailable in this project")?;
                     validate_agp_range(*start, *end, length)?;
-                    components.push((
-                        format!("refine-{sha256}"),
-                        format!("refinement:{sha256}"),
-                        *start,
-                        *end,
-                    ));
+                    components.push((Component::Patch(sha256.clone()), length, *start, *end));
                 }
                 FinalPathExportSegment::Source {
                     dataset_name,
@@ -369,7 +372,7 @@ fn build_final_path_agp(
                     start,
                     end,
                 } => {
-                    if let Some((_, sha, length)) = crate::grt_package::lookup_auto_source(
+                    if let Some((dataset, sha, length)) = crate::grt_package::lookup_auto_source(
                         conn,
                         project_id,
                         dataset_name,
@@ -377,8 +380,12 @@ fn build_final_path_agp(
                     )? {
                         validate_agp_range(*start, *end, length)?;
                         components.push((
-                            format!("{contig_name}@{sha}"),
-                            format!("automatic:{sha}:{contig_name}"),
+                            Component::Auto {
+                                dataset,
+                                sha,
+                                name: contig_name.clone(),
+                            },
+                            length,
                             *start,
                             *end,
                         ));
@@ -393,8 +400,12 @@ fn build_final_path_agp(
                     ).with_context(|| format!("AGP source {dataset_name}:{contig_name} not found in project {project_id}"))?;
                         validate_agp_range(*start, *end, length)?;
                         components.push((
-                            contig_name.clone(),
-                            format!("source:{id}"),
+                            Component::Source {
+                                id,
+                                name: contig_name.clone(),
+                                dataset: dataset_name.clone(),
+                            },
+                            length,
                             *start,
                             *end,
                         ));
@@ -407,13 +418,14 @@ fn build_final_path_agp(
                     start,
                     end,
                 } => {
-                    let (id, length): (i64, i64) = conn
+                    let (id, length, genome): (i64, i64, String) = conn
                         .query_row(
-                            "SELECT rc.id, rc.length FROM reference_chr rc
+                            "SELECT rc.id, rc.length, rg.name FROM reference_chr rc
+                         JOIN reference_genome rg ON rg.id = rc.reference_genome_id
                          JOIN project p ON p.reference_genome_id = rc.reference_genome_id
                          WHERE p.id = ?1 AND rc.chr_name = ?2",
                             params![project_id, reference_chr_name.trim()],
-                            |row| Ok((row.get(0)?, row.get(1)?)),
+                            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                         )
                         .with_context(|| format!("AGP reference {reference_chr_name} not found"))?;
                     if member_end_bp < member_start_bp {
@@ -422,8 +434,12 @@ fn build_final_path_agp(
                     validate_agp_range(*member_start_bp, *member_end_bp, length)?;
                     validate_agp_range(*start, *end, member_end_bp - member_start_bp + 1)?;
                     components.push((
-                        reference_chr_name.trim().to_string(),
-                        format!("reference:{id}"),
+                        Component::Reference {
+                            id,
+                            genome,
+                            name: reference_chr_name.trim().into(),
+                        },
+                        length,
                         member_start_bp + (start - 1),
                         member_start_bp + (end - 1),
                     ));
@@ -437,10 +453,10 @@ fn build_final_path_agp(
                         .pop().with_context(|| format!("AGP assembly_ctg_id {assembly_ctg_id} not found in project {project_id}"))?;
                     let mut offset = 0_i64;
                     for member in ctg.members.iter().filter(|member| !member.hidden) {
-                        let length: i64 = conn.query_row(
-                            "SELECT length FROM source_seq WHERE id = ?1",
+                        let (length, dataset): (i64, String) = conn.query_row(
+                            "SELECT s.length, d.name FROM source_seq s JOIN dataset d ON d.id=s.dataset_id WHERE s.id=?1",
                             params![member.source_seq_id],
-                            |row| row.get(0),
+                            |row| Ok((row.get(0)?, row.get(1)?)),
                         )?;
                         if member.source_end < member.source_start {
                             bail!("invalid AGP source member range");
@@ -456,8 +472,12 @@ fn build_final_path_agp(
                             let first = member.source_start + (low - offset - 1);
                             let last = member.source_start + (high - offset - 1);
                             components.push((
-                                member.source_seq_name.clone(),
-                                format!("source:{}", member.source_seq_id),
+                                Component::Source {
+                                    id: member.source_seq_id,
+                                    name: member.source_seq_name.clone(),
+                                    dataset,
+                                },
+                                length,
                                 if start <= end { first } else { last },
                                 if start <= end { last } else { first },
                             ));
@@ -470,11 +490,13 @@ fn build_final_path_agp(
                     }
                 }
             }
-            for (name, identity, start, end) in components {
+            for (component, length, start, end) in components {
+                let name = component.id(qualified);
                 validate_agp_id(&name)?;
-                if let Some(previous) = identities.insert(name.clone(), identity.clone())
-                    && previous != identity
-                {
+                let prior = identities
+                    .entry(name.clone())
+                    .or_insert((component.clone(), length));
+                if prior.1 != length || !prior.0.same_record(&component) {
                     bail!(
                         "ambiguous AGP component ID {name}: different source sequences share this name; use unique source FASTA identifiers"
                     );
@@ -484,7 +506,10 @@ fn build_final_path_agp(
                 let next = begin
                     .checked_add(high - low + 1)
                     .context("AGP object coordinate overflow")?;
-                let orient = if start <= end { "+" } else { "-" };
+                // A reversed multi-member slice may retain only one base of a member.
+                let reverse = start > end
+                    || matches!(segment, FinalPathExportSegment::Ctg { start, end, .. } if start > end);
+                let orient = if reverse { "-" } else { "+" };
                 lines.push(format!(
                     "{object}\t{begin}\t{}\t{part}\tW\t{name}\t{low}\t{high}\t{orient}",
                     next - 1
@@ -497,7 +522,7 @@ fn build_final_path_agp(
             bail!("AGP object {object} has no segments");
         }
     }
-    Ok(format!("{}\n", lines.join("\n")))
+    Ok((format!("{}\n", lines.join("\n")), identities))
 }
 
 fn export_ctg_fasta_with_connection(
@@ -932,7 +957,7 @@ fn build_final_path_sequence(
                 if start <= end {
                     final_sequence.push_str(slice);
                 } else {
-                    final_sequence.push_str(&reverse_complement(slice));
+                    final_sequence.push_str(&reverse_complement_iupac(slice));
                 }
             }
             FinalPathExportSegment::RefSegment {
@@ -988,7 +1013,7 @@ fn build_final_path_sequence(
                 if start <= end {
                     final_sequence.push_str(slice);
                 } else {
-                    final_sequence.push_str(&reverse_complement(slice));
+                    final_sequence.push_str(&reverse_complement_iupac(slice));
                 }
             }
         }
@@ -2087,51 +2112,63 @@ fn load_named_sequences_via_fai(
             // Keep the historical full-scan behavior for unindexed names.
             return Ok(None);
         };
-        if entry.offset == 0 || entry.line_width < entry.line_bases {
-            return Ok(None);
-        }
-        if !fai_entry_matches_record(&mut file, entry.offset, name)? {
-            return Ok(None);
-        }
-        // A record must start right after a line break, otherwise the entry does
-        // not describe this file and the scan below is authoritative.
-        let mut previous = [0_u8; 1];
-        file.seek(SeekFrom::Start(entry.offset - 1))?;
-        if file.read(&mut previous)? != 1 || !matches!(previous[0], b'\n' | b'\r') {
-            return Ok(None);
-        }
-        let terminator = entry.line_width - entry.line_bases;
-        let full_lines = entry.length / entry.line_bases;
-        let remainder = entry.length % entry.line_bases;
-        let bytes = if remainder == 0 {
-            full_lines * entry.line_width
-        } else {
-            full_lines * entry.line_width + remainder + terminator
-        };
-        file.seek(SeekFrom::Start(entry.offset))?;
-        let mut buffer = Vec::new();
-        Read::take(&mut file, bytes)
-            .read_to_end(&mut buffer)
-            .with_context(|| format!("failed to read {}", fasta_path.display()))?;
-        let mut next = [0_u8; 1];
-        let boundary = match file.read(&mut next) {
-            Ok(1) => Some(next[0]),
-            _ => None,
-        };
-        if !matches!(boundary, None | Some(b'>') | Some(b'\n') | Some(b'\r')) {
-            return Ok(None);
-        }
-        let Ok(text) = String::from_utf8(buffer) else {
+        let Some(sequence) = read_indexed_record(&mut file, fasta_path, name, entry)? else {
             return Ok(None);
         };
-        let sequence: String = text.chars().filter(|ch| !ch.is_whitespace()).collect();
-        if sequence.len() as u64 != entry.length {
-            // The index does not describe this file; scan it instead.
-            return Ok(None);
-        }
         found.insert(name.clone(), sequence);
     }
     Ok(Some(found))
+}
+
+fn read_indexed_record(
+    file: &mut File,
+    fasta_path: &Path,
+    name: &str,
+    entry: &FaiEntry,
+) -> Result<Option<String>> {
+    if entry.offset == 0 || entry.line_width < entry.line_bases {
+        return Ok(None);
+    }
+    if !fai_entry_matches_record(file, entry.offset, name)? {
+        return Ok(None);
+    }
+    // A record must start right after a line break, otherwise the entry does
+    // not describe this file and the scan below is authoritative.
+    let mut previous = [0_u8; 1];
+    file.seek(SeekFrom::Start(entry.offset - 1))?;
+    if file.read(&mut previous)? != 1 || !matches!(previous[0], b'\n' | b'\r') {
+        return Ok(None);
+    }
+    let terminator = entry.line_width - entry.line_bases;
+    let full_lines = entry.length / entry.line_bases;
+    let remainder = entry.length % entry.line_bases;
+    let bytes = if remainder == 0 {
+        full_lines * entry.line_width
+    } else {
+        full_lines * entry.line_width + remainder + terminator
+    };
+    file.seek(SeekFrom::Start(entry.offset))?;
+    let mut buffer = Vec::new();
+    Read::take(&mut *file, bytes)
+        .read_to_end(&mut buffer)
+        .with_context(|| format!("failed to read {}", fasta_path.display()))?;
+    let mut next = [0_u8; 1];
+    let boundary = match file.read(&mut next) {
+        Ok(1) => Some(next[0]),
+        _ => None,
+    };
+    if !matches!(boundary, None | Some(b'>') | Some(b'\n') | Some(b'\r')) {
+        return Ok(None);
+    }
+    let Ok(text) = String::from_utf8(buffer) else {
+        return Ok(None);
+    };
+    let sequence: String = text.chars().filter(|ch| !ch.is_whitespace()).collect();
+    if sequence.len() as u64 != entry.length {
+        // The index does not describe this file; scan it instead.
+        return Ok(None);
+    }
+    Ok(Some(sequence))
 }
 
 fn parse_fai_index(text: &str) -> HashMap<String, FaiEntry> {
@@ -2660,6 +2697,181 @@ Chr01B\t1\t3\t1\tW\ttigA\t2\t4\t+\n"
                 .to_string()
                 .contains("ambiguous AGP component ID")
         );
+    }
+
+    #[test]
+    fn paired_agp_rebuilds_each_haplotype_from_unique_full_forward_components() {
+        use super::{
+            FinalPathExportSegment as Seg, FinalPathFastaRecord as Record,
+            export_final_path_agp_bundle,
+        };
+        use sha2::{Digest, Sha256};
+        let (temp, db, conn) = agp_fixture();
+        let root = temp.path();
+        let patch = b"ACRY";
+        let sha = format!("{:x}", Sha256::digest(patch));
+        let object = b">tigA\nTGCAR\n";
+        let version = format!("{:x}", Sha256::digest(object));
+        let alias = format!("@cgat.auto:{version}:Tool A");
+        conn.execute(
+            "INSERT INTO project_refinement_patch VALUES (1,?1,?2)",
+            params![sha, patch.as_slice()],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO project_auto_version_object VALUES (?1,?2)",
+            params![version, object.as_slice()],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO project_auto_source VALUES (1,?1,'tigA','Tool A',5,?2)",
+            params![alias, version],
+        )
+        .unwrap();
+        conn.execute_batch("UPDATE source_seq SET seq_name='tigA' WHERE id=2; UPDATE dataset SET name='asm A__1',display_name='wrong alias' WHERE id=2;").unwrap();
+        for (id, name, seq) in [
+            (1, "main.fa", "ACGTryswkN"),
+            (2, "other.fa", "TCGACGTACGTACGTACGTA"),
+        ] {
+            let path = root.join(name);
+            if id == 1 {
+                write_indexed_fasta(&path, &[("tigA", seq.into())], 5, true);
+            } else {
+                fs::write(&path, format!(">unused\nACGT\n>tigA\n{seq}\n")).unwrap();
+            }
+            conn.execute(
+                "INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(?1,?2)",
+                params![id, path.to_str()],
+            )
+            .unwrap();
+        }
+        let r = root.join("ref.fa");
+        fs::write(&r, format!(">refChr\n{}\n", "TACRY".repeat(20))).unwrap();
+        conn.execute(
+            "INSERT INTO reference_chr_locator(reference_chr_id,fasta_path) VALUES(1,?1)",
+            [r.to_str()],
+        )
+        .unwrap();
+        let source = |ds: &str, start, end| Seg::Source {
+            dataset_name: ds.into(),
+            contig_name: "tigA".into(),
+            start,
+            end,
+        };
+        let a = Record {
+            chr_name: "Chr01A".into(),
+            final_path_segments: vec![
+                source("primary", 7, 2),
+                Seg::Gap { gap_size_bp: 3 },
+                source("asm A__1", 2, 6),
+                Seg::Ctg {
+                    assembly_ctg_id: 1,
+                    start: 6,
+                    end: 1,
+                },
+                Seg::RefSegment {
+                    reference_chr_name: "refChr".into(),
+                    member_start_bp: 2,
+                    member_end_bp: 9,
+                    start: 8,
+                    end: 3,
+                },
+                Seg::RefinementPatch {
+                    sha256: sha.clone(),
+                    start: 4,
+                    end: 1,
+                },
+                source(&alias, 5, 2),
+            ],
+        };
+        let b = Record {
+            chr_name: "Chr01B".into(),
+            final_path_segments: vec![source("primary", 1, 4)],
+        };
+        let dest = root.join("all.agp");
+        let params = ExportProjectFinalPathFastaParams {
+            output_path: dest.clone(),
+            records: vec![a, b.clone()],
+        };
+        let paths = export_final_path_agp_bundle(&db, 1, &params).unwrap();
+        assert_eq!(paths, vec![dest.clone(), root.join("all.components.fa")]);
+        let fasta = fs::read_to_string(&paths[1]).unwrap();
+        assert!(fasta.contains(r#"origin={"id":"tigA","source":"asm A__1"}"#));
+        let mut components = HashMap::new();
+        for record in fasta.split('>').skip(1) {
+            let (header, seq) = record.split_once('\n').unwrap();
+            let id = header.split_ascii_whitespace().next().unwrap();
+            assert!(
+                components
+                    .insert(id, seq.lines().collect::<String>())
+                    .is_none()
+            );
+        }
+        assert_eq!(components.len(), 5);
+        assert_eq!(components["tigA__primary"], "ACGTryswkN");
+        assert_eq!(components["tigA__asm:20A:5F:5F1"].len(), 20);
+        assert_eq!(components["refChr__ref::ref"].len(), 100);
+        let mut rebuilt = HashMap::<String, String>::new();
+        for row in fs::read_to_string(dest)
+            .unwrap()
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+        {
+            let f: Vec<_> = row.split('\t').collect();
+            let seq = rebuilt.entry(f[0].into()).or_default();
+            assert_eq!(f[1].parse::<usize>().unwrap(), seq.len() + 1);
+            if f[4] == "N" {
+                seq.push_str(&"N".repeat(f[5].parse().unwrap()));
+            } else {
+                let part =
+                    &components[f[5]][f[6].parse::<usize>().unwrap() - 1..f[7].parse().unwrap()];
+                if f[8] == "-" {
+                    seq.push_str(&super::reverse_complement_iupac(part));
+                } else {
+                    seq.push_str(part);
+                }
+            }
+            assert_eq!(f[2].parse::<usize>().unwrap(), seq.len());
+        }
+        for (chr, seq) in super::build_final_path_fasta_records(&conn, 1, &params.records).unwrap()
+        {
+            assert!(seq.eq_ignore_ascii_case(&rebuilt[&chr]));
+        }
+        let single = ExportProjectFinalPathFastaParams {
+            output_path: root.join("single.agp"),
+            records: vec![b],
+        };
+        let paths = export_final_path_agp_bundle(&db, 1, &single).unwrap();
+        assert_eq!(
+            fs::read_to_string(&paths[1]).unwrap(),
+            ">tigA__primary\nACGTryswkN\n"
+        );
+    }
+
+    #[test]
+    fn paired_agp_does_not_publish_incomplete_files_or_replace_existing_outputs() {
+        let (temp, db, _conn) = agp_fixture();
+        let agp = temp.path().join("path.agp");
+        let fa = temp.path().join("path.components.fa");
+        let params = ExportProjectFinalPathFastaParams {
+            output_path: agp.clone(),
+            records: vec![super::FinalPathFastaRecord {
+                chr_name: "chr1".into(),
+                final_path_segments: vec![FinalPathExportSegment::Source {
+                    dataset_name: "primary".into(),
+                    contig_name: "tigA".into(),
+                    start: 1,
+                    end: 2,
+                }],
+            }],
+        };
+        assert!(super::export_final_path_agp_bundle(&db, 1, &params).is_err());
+        assert!(!agp.exists() && !fa.exists());
+        fs::write(&fa, "existing").unwrap();
+        assert!(super::export_final_path_agp_bundle(&db, 1, &params).is_err());
+        assert!(super::export_project_final_path_agp(&db, 1, &params).is_err());
+        assert_eq!(fs::read_to_string(&fa).unwrap(), "existing");
+        assert!(!agp.exists());
     }
 
     #[test]

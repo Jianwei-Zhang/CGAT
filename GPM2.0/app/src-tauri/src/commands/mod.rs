@@ -22,8 +22,7 @@ use gpm_next_backend::degap_jobs::{
 };
 use gpm_next_backend::exporter::{
     ExportFinalPathFastaParams, ExportProjectFinalPathFastaParams, FinalPathExportSegment,
-    FinalPathFastaRecord, ListExportRecordsParams,
-    export_final_path_agp as backend_export_final_path_agp,
+    FinalPathFastaRecord, ListExportRecordsParams, export_final_path_agp_bundle,
     export_final_path_fasta as backend_export_final_path_fasta,
     export_project_final_path_agp as backend_export_project_final_path_agp,
     export_project_final_path_fasta as backend_export_project_final_path_fasta,
@@ -861,7 +860,7 @@ mod tests {
     }
 
     #[test]
-    fn agp_export_commands_roundtrip_current_paths_without_fasta() {
+    fn agp_export_commands_roundtrip_layout_only_and_paired_sources() {
         let root = create_test_workspace_root();
         let workspace = root.display().to_string();
         let conn = open_workspace_db(&project_db_path(&workspace)).unwrap();
@@ -878,27 +877,62 @@ mod tests {
             {"type":"gap", "gapSizeBp":7}
         ]});
         let single = root.join("single.agp");
-        let result = export_final_path_agp(
+        let result = tauri::async_runtime::block_on(export_final_path_agp(
             workspace.clone(),
             1,
             "Chr01A".into(),
             entry.clone(),
             single.display().to_string(),
-        )
+            None,
+        ))
         .unwrap();
         assert_eq!(result["outputPath"], single.display().to_string());
         let text = fs::read_to_string(&single).unwrap();
         assert!(text.contains("Chr01A\t1\t6\t1\tW\ttig1\t3\t8\t-"));
         assert!(text.contains("Chr01A\t7\t13\t2\tN\t7\tcontig\tno\tna"));
         let project = root.join("project.agp");
-        export_project_final_path_agp(
-            workspace,
+        tauri::async_runtime::block_on(export_project_final_path_agp(
+            workspace.clone(),
             1,
             json!({"Chr01A":entry}),
             project.display().to_string(),
-        )
+            Some(false),
+        ))
         .unwrap();
         assert_eq!(fs::read_to_string(project).unwrap(), text);
+        let source = root.join("source.fa");
+        fs::write(&source, ">tig1\nACGTACGTACGTACGTACGT\n").unwrap();
+        let conn = open_workspace_db(&project_db_path(&workspace)).unwrap();
+        conn.execute(
+            "INSERT INTO source_seq_locator(source_seq_id,fasta_path) VALUES(1,?1)",
+            [source.to_str()],
+        )
+        .unwrap();
+        drop(conn);
+        let paired = root.join("paired.agp");
+        let companion = root.join("paired.components.fa");
+        let result = tauri::async_runtime::block_on(export_final_path_agp(
+            workspace,
+            1,
+            "Chr01A".into(),
+            entry,
+            path_to_string(&paired),
+            Some(true),
+        ))
+        .unwrap();
+        assert_eq!(
+            result["outputPaths"],
+            json!([path_to_string(&paired), path_to_string(&companion)])
+        );
+        assert!(
+            fs::read_to_string(paired)
+                .unwrap()
+                .contains("\tW\ttig1__ds\t3\t8\t-")
+        );
+        assert_eq!(
+            fs::read_to_string(companion).unwrap(),
+            ">tig1__ds\nACGTACGTACGTACGTACGT\n"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

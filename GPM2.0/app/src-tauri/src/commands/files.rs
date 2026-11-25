@@ -121,50 +121,75 @@ pub fn export_project_final_path_fasta(
     .map_err(format_error)
 }
 
+fn write_agp_output(
+    workspace: &str,
+    project: i64,
+    output: String,
+    records: Vec<FinalPathFastaRecord>,
+    components: Option<bool>,
+) -> anyhow::Result<Value> {
+    let db = project_db_path(workspace);
+    let params = ExportProjectFinalPathFastaParams {
+        output_path: PathBuf::from(output.trim()),
+        records,
+    };
+    let paths = if components.unwrap_or(false) {
+        export_final_path_agp_bundle(&db, project, &params)?
+    } else {
+        vec![backend_export_project_final_path_agp(&db, project, &params)?.output_path]
+    };
+    Ok(
+        json!({ "outputPath": path_to_string(&params.output_path), "outputPaths": paths.iter().map(|p| path_to_string(p)).collect::<Vec<_>>() }),
+    )
+}
+
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn export_final_path_agp(
+pub async fn export_final_path_agp(
     workspaceRoot: String,
     projectId: i64,
     chrName: String,
     finalPathEntry: Value,
     outputPath: String,
+    includeComponents: Option<bool>,
 ) -> CommandResult<Value> {
-    (|| {
-        let summary = backend_export_final_path_agp(
-            &project_db_path(&workspaceRoot),
+    run_blocking_command("export_final_path_agp", move || {
+        write_agp_output(
+            &workspaceRoot,
             projectId,
-            &ExportFinalPathFastaParams {
-                chr_name: chrName.trim().to_string(),
-                output_path: PathBuf::from(outputPath.trim()),
-                final_path_segments: normalize_final_path_export_segments(&finalPathEntry)?,
-            },
-        )?;
-        Ok(json!({ "outputPath": path_to_string(&summary.output_path) }))
-    })()
-    .map_err(format_error)
+            outputPath,
+            vec![FinalPathFastaRecord {
+                chr_name: chrName,
+                final_path_segments: normalize_final_path_export_segments(&finalPathEntry)
+                    .map_err(format_error)?,
+            }],
+            includeComponents,
+        )
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn export_project_final_path_agp(
+pub async fn export_project_final_path_agp(
     workspaceRoot: String,
     projectId: i64,
     finalPathByChr: Value,
     outputPath: String,
+    includeComponents: Option<bool>,
 ) -> CommandResult<Value> {
-    (|| {
-        let summary = backend_export_project_final_path_agp(
-            &project_db_path(&workspaceRoot),
+    run_blocking_command("export_project_final_path_agp", move || {
+        write_agp_output(
+            &workspaceRoot,
             projectId,
-            &ExportProjectFinalPathFastaParams {
-                output_path: PathBuf::from(outputPath.trim()),
-                records: normalize_project_final_path_fasta_records(&finalPathByChr)?,
-            },
-        )?;
-        Ok(json!({ "outputPath": path_to_string(&summary.output_path) }))
-    })()
-    .map_err(format_error)
+            outputPath,
+            normalize_project_final_path_fasta_records(&finalPathByChr).map_err(format_error)?,
+            includeComponents,
+        )
+        .map_err(format_error)
+    })
+    .await
 }
 
 #[tauri::command]

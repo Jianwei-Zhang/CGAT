@@ -1118,6 +1118,7 @@ test("exportFinalPathAgp routes the current finalPathEntry through the tauri com
     };
 
     await exportFinalPathAgp({
+      includeComponents: true,
       workspaceRoot: "D:\\Desktop\\GPM\\ws1",
       projectId: 7,
       chrName: "Chr01",
@@ -1129,6 +1130,7 @@ test("exportFinalPathAgp routes the current finalPathEntry through the tauri com
   }
 
   assert.equal(calls[0].command, "export_final_path_agp");
+  assert.equal(calls[0].args.includeComponents, true);
   assert.equal(calls[0].args.workspaceRoot, "D:\\Desktop\\GPM\\ws1");
   assert.equal(calls[0].args.projectId, 7);
   assert.equal(calls[0].args.chrName, "Chr01");
@@ -1166,6 +1168,7 @@ test("exportProjectFinalPathAgp routes the merged finalPathByChr through the tau
   }
 
   assert.equal(calls[0].command, "export_project_final_path_agp");
+  assert.equal(calls[0].args.includeComponents, false);
   assert.equal(calls[0].args.workspaceRoot, "D:\\Desktop\\GPM\\ws1");
   assert.equal(calls[0].args.projectId, 7);
   assert.deepEqual(calls[0].args.finalPathByChr, finalPathByChr);

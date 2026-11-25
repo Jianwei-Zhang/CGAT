@@ -244,7 +244,7 @@ export function createAssemblyProgressModalRenderer({
       job, locale: getAssemblyLocale(state), scope: "assembly", escapeHtml, receipt: refinementReceipt,
       stepLabel: kind => pageI18n[{
         png: "finalPathExportPng", tsv: "finalPathExportTsv", log: "finalPathExportLog",
-        fasta: "finalPathExportFasta", agp: "finalPathExportAgp",
+        fasta: "finalPathExportFasta", agp: job.steps?.find(step => step.kind === "agp")?.includeComponents ? "finalPathExportAgp" : "finalPathExportAgpOnly",
       }[kind]] || kind,
     });
   }

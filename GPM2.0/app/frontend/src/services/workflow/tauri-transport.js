@@ -89,11 +89,12 @@ export function createTauriTransport({
       chrName,
       finalPathEntry,
       outputPath,
+      includeComponents,
       stateOrLocale = "zh",
     }) {
       return invokeNormalized(
         "export_final_path_agp",
-        { workspaceRoot, projectId, chrName, finalPathEntry, outputPath },
+        { workspaceRoot, projectId, chrName, finalPathEntry, outputPath, includeComponents },
         stateOrLocale,
       );
     },
@@ -102,11 +103,12 @@ export function createTauriTransport({
       projectId,
       finalPathByChr,
       outputPath,
+      includeComponents,
       stateOrLocale = "zh",
     }) {
       return invokeNormalized(
         "export_project_final_path_agp",
-        { workspaceRoot, projectId, finalPathByChr, outputPath },
+        { workspaceRoot, projectId, finalPathByChr, outputPath, includeComponents },
         stateOrLocale,
       );
     },
