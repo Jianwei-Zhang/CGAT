@@ -1,5 +1,7 @@
 # CGAT Server report ViewModel v1 · frontend handoff (2026-11-24)
 
+Presentation design: [Final Path report narrative and acceptance criteria (2026-11-25, 中文)](server-report-final-path-design-20261125.md). This v1 contract describes existing data, not the implementation status of the new cards.
+
 `server/tools/report_overview_data.py::build_overview_view_model(root, batch=None, *, mode=None, verify_content=False, generated_at=None) -> dict` is the read-only boundary. Add `server/tools` to the Python import path. It does not start tools, publish, repair inputs or save a report. An online writer supplies its own batch; an offline reader identifies the current completion by **automatic overview digest**, validates the batch hash and its comparison file hashes, and never infers ownership from a directory timestamp. Missing LGZ data are diagnostic, not a new zero measurement. A self-contradictory layout or sealed comparison is an error; do not silently present a different generation.
 
 ## Renderers (no locks, receipt writes or workspace discovery in templates)
