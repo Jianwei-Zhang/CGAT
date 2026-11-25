@@ -91,7 +91,7 @@ class ReportFrontendUITests(unittest.TestCase):
                 self.assertIn('data-lang-btn="en"', html)
                 self.assertIn('data-theme-toggle="1"', html)
                 self.assertIn('class="wb-sidebar"', html)
-                self.assertIn('id="improvement-overview"', html)
+                self.assertNotIn('id="improvement-overview"', html)
                 self.assertIn('id="pseudomolecule-evolution"', html)
                 self.assertIn('id="inputs"', html)
                 self.assertIn('id="alignment-q0"', html)
@@ -99,7 +99,6 @@ class ReportFrontendUITests(unittest.TestCase):
                 self.assertIn('id="refinement-comparison"', html)
                 self.assertIn('id="result-files"', html)
                 self.assertIn('id="diagnostics-fold"', html)
-                self.assertIn("LGZ 基线（非精修结果）", html)
                 self.assertIn('id="ws-tree"', html)
                 self.assertIn('data-tree-action="expand"', html)
                 self.assertNotIn(PRIVATE, html)
@@ -109,6 +108,35 @@ class ReportFrontendUITests(unittest.TestCase):
                     self.assertIn('target="_blank"', html)
                 # Ensure top-level directory tree nodes start collapsed (not <details class="tree-node" open>)
                 self.assertNotRegex(html, r'<details class="tree-node[^"]*"\s+open\b')
+
+    def test_input_and_assignment_cards_are_first_and_preserve_complete_membership(self):
+        from report_lgz_data import assignment_groups
+        from render_path_story import assignment_card
+        root = self.parent / "story"
+        vm = workspace(root, "success")
+        model = vm["lgz_summary"]["assignment"]
+        self.assertEqual(model["min_coverage_percent"], 12.5)
+        self.assertEqual([group["chr"] for group in model["groups"]], ["chr1", "chr2"])
+        html = render_overview(vm)
+        self.assertLess(html.index('id="inputs"'), html.index('id="chr-groups"'))
+        self.assertLess(html.index('id="chr-groups"'), html.index('id="pseudomolecule-evolution"'))
+        self.assertEqual(html.count('id="inputs"'), 1)
+        self.assertIn("12.5%", html)
+        def row(ds, ctg, chrom):
+            return dict(dataset_name=ds, seq_name=ctg, assigned_chr_name=chrom)
+        rows = [row("A", f"ctg{i}", "chr1") for i in range(202)]
+        rows.extend([row("A", "ctg201", "chr2"), row("B", "ctg201", "chr1"), row("B", "<unsafe>", "chr2")])
+        groups = assignment_groups(dict(rows=rows, available=True), ["chr2", "chr1", "empty"])
+        self.assertEqual([g["member_count"] for g in groups], [2, 203, 0])
+        page = assignment_card({"groups": groups})
+        self.assertEqual(page.count('class="member multi"'), 2)
+        self.assertIn('for="multi-members-only"', page)
+        self.assertIn("&lt;unsafe&gt;", page)
+        self.assertIn("本次阈值未记录", page)
+        self.assertNotIn("<unsafe>", page)
+        for table in ({"available": False}, {"available": True, "rows": rows, "preview_only": True},
+                      {"available": True, "rows": [], "row_count": 1}):
+            self.assertIsNone(assignment_groups(table, ["chr1"]))
 
     def test_large_scenario_stays_bounded_and_preserves_full_chromosome_heatmap(self):
         root = self.parent / "large"

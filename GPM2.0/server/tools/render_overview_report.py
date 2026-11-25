@@ -1,15 +1,10 @@
-"""First-principles 3-block, 2-level CGAT Server overview HTML renderer.
-
-Block 1 (#improvement-overview): Compact Improvement Ladder (q0 -> LGZ -> Refinement) + 1 baseline line.
-Block 2 (#pseudomolecule-evolution): Interactive Pseudomolecule Evolution & Refinement Canvas with
-  stage switching, single-chromosome vertical evolution tracks, and direct 1-click job report links.
-Block 3 (#result-files): Clean Result Pickup table + folded workspace tree, inputs/q0, & diagnostics.
-"""
+"""Offline report: source inputs and chromosome groups precede the assembly and delivery views."""
 from __future__ import annotations
 
 from collections import defaultdict
 
 try:
+    from render_path_story import input_card, assignment_card
     from render_refinement_report import (
         DATASET_COLORS,
         badge_bi,
@@ -22,15 +17,14 @@ try:
         fmt_bp_short,
         fmt_bytes,
         fmt_int,
-        format_counts_html,
         link,
         status_badge,
-        svg_funnel,
         svg_stacked_bar,
         table,
         workbench_page,
     )
 except ModuleNotFoundError:
+    from .render_path_story import input_card, assignment_card
     from .render_refinement_report import (
         DATASET_COLORS,
         badge_bi,
@@ -43,10 +37,8 @@ except ModuleNotFoundError:
         fmt_bp_short,
         fmt_bytes,
         fmt_int,
-        format_counts_html,
         link,
         status_badge,
-        svg_funnel,
         svg_stacked_bar,
         table,
         workbench_page,
@@ -81,8 +73,8 @@ def _pickup_label(key):
     fixed = {
         "genome_catalog": ("组装版本目录 (results.tsv)", "Assembly catalog (results.tsv)"),
         "catalog": ("组装版本目录 (results.tsv)", "Assembly catalog (results.tsv)"),
-        "lgz": ("LGZ 基线 FASTA", "LGZ baseline FASTA"),
-        "lgz_fasta": ("LGZ 基线 FASTA", "LGZ baseline FASTA"),
+        "lgz": ("LGZ 基线（非精修结果）FASTA", "LGZ baseline FASTA (non-refined)"),
+        "lgz_fasta": ("LGZ 基线（非精修结果）FASTA", "LGZ baseline FASTA (non-refined)"),
         "full": ("CGAT App 完整包 (Full)", "CGAT App Full package"),
         "full_package": ("CGAT App 完整包 (Full)", "CGAT App Full package"),
         "light": ("CGAT App 轻量包 (Light)", "CGAT App Light package"),
@@ -349,25 +341,11 @@ def _render_track_bar(
     )
 
 
-def _render_improvement_overview(vm):
+def _run_notices(vm):
     meta = vm["meta"]
     lgz = vm["lgz_summary"]
-    ref = vm["refinement_summary"]
-    manual_batches = vm["manual_summary"]["batches"]
-    chrs = lgz.get("chromosomes") or []
-    seq_vers = lgz.get("sequence_versions") or {}
-    final_q, final_stats = _latest_lgz_version(seq_vers)
-    q0_stats = seq_vers.get("q0") or {}
-    q0_gaps = q0_stats.get("gap_count")
-    lgz_rem = (lgz.get("outcome") or {}).get("remaining_gap_count", final_stats.get("gap_count"))
-    tel_complete = sum(
-        1 for c in chrs for st in (c.get("telomeres") or {}).values() if st in ("already_present", "recovered")
-    )
-    tel_recorded = sum(1 for c in chrs for _ in (c.get("telomeres") or {}).values())
-    unconst = (lgz.get("q0") or {}).get("not_constructed_chromosomes") or 0
-    tools = ref.get("tools") or []
-    total_ref_gaps = (ref.get("gap_matrix") or {}).get("total_gap_count")
-
+    tools = vm["refinement_summary"]["tools"]
+    unconst = lgz.get("q0", {}).get("not_constructed_chromosomes") or 0
     # Failure / interrupt / manual-only banner if applicable
     top_alert = ""
     if meta["mode"] == "manual_only":
@@ -381,169 +359,7 @@ def _render_improvement_overview(vm):
         title = bi("本次运行未完成，未声明最终交付产物", "Run did not complete; no final delivery declared")
         if meta["batch_status"] == "invalidated":
             title = bi("当前精修批次已失效", "Current refinement batch is invalidated")
-        top_alert = callout(reason_line, tone="err", title=title)
-
-    # Compact Horizontal Improvement Ladder: q0 -> LGZ -> Refinement tool(s)
-    ladder_rows = []
-    max_bar_gaps = max(
-        [
-            v
-            for v in (
-                q0_gaps,
-                lgz_rem,
-                total_ref_gaps,
-                *(
-                    sum((t.get("counts") or {}).values())
-                    for t in tools
-                    if isinstance(t.get("counts"), dict)
-                ),
-            )
-            if isinstance(v, int) and v > 0
-        ],
-        default=1,
-    )
-
-    if isinstance(q0_gaps, int):
-        bar = svg_stacked_bar(
-            [(q0_gaps, "var(--gen-unfilled)", f"q0 gaps: {q0_gaps}"), (max(0, max_bar_gaps - q0_gaps), "transparent", "")],
-            width=420,
-            height=13,
-            aria_label=f"q0 gaps: {q0_gaps}",
-        )
-        ladder_rows.append(
-            '<div class="evo-step-row">'
-            f'<div class="evo-step-lbl">{bi("q0 初始构图", "q0 Initial")}<small>{bi("≥100 N 缺口", "≥100 N gaps")}</small></div>'
-            f'<div class="evo-step-bar">{bar}</div>'
-            f'<div class="evo-step-val"><b>{q0_gaps:,}</b> {bi("个 Gap", "gaps")}</div>'
-            '</div>'
-        )
-
-    if isinstance(lgz_rem, int):
-        lgz_closed = max(0, q0_gaps - lgz_rem) if isinstance(q0_gaps, int) else 0
-        lgz_net = (lgz_rem - q0_gaps) if isinstance(q0_gaps, int) else None
-        segs = []
-        if lgz_closed > 0:
-            segs.append((lgz_closed, "var(--gen-patch)", f"LGZ net reduced: {lgz_closed}"))
-        if lgz_rem > 0:
-            segs.append((lgz_rem, "var(--gen-unfilled)", f"LGZ remaining: {lgz_rem}"))
-        pad = max(0, max_bar_gaps - (lgz_closed + lgz_rem))
-        if pad > 0:
-            segs.append((pad, "transparent", ""))
-        bar = svg_stacked_bar(segs, width=420, height=13, aria_label=f"LGZ remaining: {lgz_rem}")
-        delta_txt = ""
-        if lgz_net is not None:
-            if lgz_net < 0:
-                delta_txt = f' <span class="gain">({lgz_net:+d})</span>'
-            elif lgz_net > 0:
-                delta_txt = f' <small class="muted">({lgz_net:+d})</small>'
-            else:
-                delta_txt = f' <small class="muted">({bi("无变化", "unchanged")})</small>'
-        q_lbl = f" ({esc(final_q)})" if final_q else ""
-        ladder_rows.append(
-            '<div class="evo-step-row">'
-            f'<div class="evo-step-lbl">{bi("LGZ 基线", "LGZ Baseline")}{q_lbl}<small>{bi("非精修结果", "Non-refined")}</small></div>'
-            f'<div class="evo-step-bar">{bar}</div>'
-            f'<div class="evo-step-val">{bi("剩余", "Rem")} <b>{lgz_rem:,}</b>{delta_txt}</div>'
-            '</div>'
-        )
-
-    for t in tools:
-        tname = t["tool"]
-        st = t["status"]
-        cnt = t.get("counts")
-        reuse_sub = bi("复用结果", "Reused") if t.get("result_reused") else (bi("复用原生", "Reused native") if t.get("native_reused") else "")
-        if isinstance(cnt, dict) and st != "invalidated":
-            cl, pa, un, rj = cnt.get("closed", 0), cnt.get("partial", 0), cnt.get("unfilled", 0), cnt.get("rejected", 0)
-            tot_t = cl + pa + un + rj
-            segs = [
-                (cl, "var(--gen-closed)", f"Closed: {cl}"),
-                (pa, "var(--gen-partial)", f"Partial: {pa}"),
-                (un, "var(--gen-unfilled)", f"Unfilled: {un}"),
-                (rj, "var(--gen-rejected)", f"Rejected: {rj}"),
-            ]
-            pad = max(0, max_bar_gaps - tot_t)
-            if pad > 0:
-                segs.append((pad, "transparent", ""))
-            bar = svg_stacked_bar(segs, width=420, height=13, aria_label=f"{tname} refinement outcomes")
-            rem_t = un + rj
-            extra_st = "" if st == "published" else f" {status_badge(st)}"
-            rf_n = t.get("retained_flank_count")
-            rf_txt = f" · {bi('保留侧翼', 'flank')} {rf_n}" if rf_n else ""
-            val_html = (
-                f'<span class="gain">{bi("闭合", "Closed")} {cl:,}/{tot_t:,}</span>'
-                + (f' · {bi("部分", "Partial")} {pa:,}' if pa else "")
-                + f' · {bi("剩余", "Rem")} <b>{rem_t:,}</b>{rf_txt}{extra_st}'
-            )
-            sub_lbl = " · ".join(filter(None, [bi("精修后", "Refined"), reuse_sub]))
-            ladder_rows.append(
-                '<div class="evo-step-row">'
-                f'<div class="evo-step-lbl">{esc(tname)}<small>{sub_lbl}</small></div>'
-                f'<div class="evo-step-bar">{bar}</div>'
-                f'<div class="evo-step-val">{val_html}</div>'
-                '</div>'
-            )
-        else:
-            # Staged / pending / failed / invalidated — preserve exact contract status text
-            c_html = format_counts_html(cnt, status=st, invalidated=st == "invalidated", omit_zero=True)
-            reason_s = f' <small class="muted">· {esc(t["reason"])}</small>' if t.get("reason") else ""
-            diag_link = (
-                " " + link(t["report_href"], bi("工作区诊断", "Attempt diagnostics (workspace)"), raw=True)
-                if (not t.get("publication_verified") and t.get("report_href"))
-                else ""
-            )
-            ladder_rows.append(
-                '<div class="evo-step-row">'
-                f'<div class="evo-step-lbl">{esc(tname)}<small>{bi("精修工具", "Refinement")}</small></div>'
-                f'<div class="evo-step-bar">{status_badge(st)} {c_html}{reason_s}{diag_link}</div>'
-                f'<div class="evo-step-val">—</div>'
-                '</div>'
-            )
-
-    ladder_html = f'<div class="evo-ladder">{"".join(ladder_rows)}</div>' if ladder_rows else ""
-
-    # Single calm legend + denominator footnote
-    has_ref_evaluated = any(isinstance(t.get("counts"), dict) and t["status"] != "invalidated" for t in tools)
-    legend_bits = []
-    if isinstance(q0_gaps, int) and isinstance(lgz_rem, int) and q0_gaps > lgz_rem:
-        legend_bits.append('<span class="legend-item"><i class="swatch" style="background:var(--gen-patch)"></i>' + bi("LGZ 补丁缩减", "LGZ reduced") + '</span>')
-    if has_ref_evaluated:
-        legend_bits.append('<span class="legend-item"><i class="swatch is-closed"></i>' + bi("精修闭合", "Refined closed") + '</span>')
-        if any((t.get("counts") or {}).get("partial", 0) > 0 for t in tools):
-            legend_bits.append('<span class="legend-item"><i class="swatch is-partial"></i>' + bi("部分闭合", "Partial") + '</span>')
-        if any((t.get("counts") or {}).get("rejected", 0) > 0 for t in tools):
-            legend_bits.append('<span class="legend-item"><i class="swatch is-rejected"></i>' + bi("拒绝", "Rejected") + '</span>')
-    if ladder_rows:
-        legend_bits.append('<span class="legend-item"><i class="swatch" style="background:var(--gen-unfilled)"></i>' + bi("剩余未闭合", "Remaining") + '</span>')
-
-    denom_note = ""
-    if tools and total_ref_gaps is not None:
-        if lgz_rem is not None and lgz_rem != total_ref_gaps:
-            denom_note = bi(
-                f"注：LGZ 统计 ≥100 N 缺口（剩余 {lgz_rem:,}）；精修评估全部 N 区间（共 {total_ref_gaps:,}）。多工具仅对照，不排名、不验证准确性。",
-                f"Note: LGZ counts ≥100 N gaps ({lgz_rem:,}); refinement evaluates all N-runs ({total_ref_gaps:,}). No ranking; accuracy not validated.",
-            )
-        else:
-            denom_note = bi(
-                f"注：全部分母共 {total_ref_gaps:,} 个 LGZ 缺口；多工具仅对照，不排名、不验证准确性。",
-                f"Note: full denominator = {total_ref_gaps:,} LGZ gaps; no automatic ranking or accuracy validation.",
-            )
-
-    # 1 concise baseline summary line
-    summary_bits = []
-    if final_stats.get("sequence_count") is not None:
-        summary_bits.append(f'<span><b>{final_stats["sequence_count"]:,}</b> {bi("条序列", "seqs")}</span>')
-    if final_stats.get("length_bp") is not None:
-        summary_bits.append(
-            f'<span>{bi("总长", "Length")} <b>{esc(fmt_bp_short(final_stats["length_bp"]))}</b>'
-            + (f' <small class="muted">({esc(final_q)})</small>' if final_q else "")
-            + '</span>'
-        )
-    if final_stats.get("n50_bp") is not None:
-        summary_bits.append(f'<span>N50 <b>{esc(fmt_bp_short(final_stats["n50_bp"]))}</b></span>')
-    if tel_recorded:
-        summary_bits.append(f'<span>{bi("端粒", "Telomeres")} <b>{tel_complete}/{len(chrs) * 2}</b></span>')
-    if manual_batches:
-        summary_bits.append(f'<span>{bi("手动精修", "Manual")} <b>{len(manual_batches)}</b> {bi("批次", "batch(es)")}</span>')
+        top_alert = callout(reason_line, tone="err", title=title, title_raw=True)
 
     warn_unconst = (
         callout(
@@ -557,18 +373,7 @@ def _render_improvement_overview(vm):
         else ""
     )
 
-    return (
-        '<section id="improvement-overview" class="panel">'
-        f'<div class="panel-head"><h2>{bi("组装改善总览", "Assembly Improvement")}</h2>'
-        f'<span class="muted">{bi("q0 → LGZ 基线（非精修结果）→ 精修", "q0 → LGZ Baseline (Non-Refined) → Refinement")}</span></div>'
-        + top_alert
-        + ladder_html
-        + (f'<div class="legend-row">{"".join(legend_bits)}</div>' if legend_bits else "")
-        + (f'<div class="summary-line" style="margin-top:.55rem;padding-top:.55rem;border-top:1px solid var(--border-subtle);margin-bottom:.25rem">{"".join(summary_bits)}</div>' if summary_bits else "")
-        + (f'<p class="muted" style="margin-top:.2rem">{denom_note}</p>' if denom_note else "")
-        + warn_unconst
-        + '</section>'
-    )
+    return top_alert + warn_unconst
 
 
 def _render_pseudomolecule_evolution(vm):
@@ -590,7 +395,10 @@ def _render_pseudomolecule_evolution(vm):
             '</section>'
         )
 
-    ds_names = sorted({ds for c in chrs for ds in (c.get("source_bp") or {}) if ds})
+    # Match input source colors even when an assembly contributes no sequence.
+    inputs = [row["name"] for row in lgz["inputs"]["assemblies"]]
+    observed = {ds for c in chrs for ds in (c.get("source_bp") or {}) if ds}
+    ds_names = list(dict.fromkeys([*inputs, *sorted(observed.difference(inputs))]))
     ds_color_idx = {name: i for i, name in enumerate(ds_names)}
     max_len = max((c.get("length_bp") or 0 for c in chrs), default=1) or 1
 
@@ -1146,40 +954,7 @@ def _render_result_files_and_diagnostics(vm):
     tree_fold = disclosure(bi("工作区目录结构与维护", "Workspace Directory & Maintenance"), tree_inner)
 
     # Fold 2: Inputs & q0 construction
-    inputs, funnel, q0 = lgz["inputs"], lgz["funnel"], lgz["q0"]
-    all_ds = [*inputs["reference"], *inputs["assemblies"]]
-    role_map = {"reference": ("参考", "Ref"), "primary": ("主组装", "Primary"), "support": ("辅助", "Support"), "assembly_candidate": ("候选组装", "Candidate")}
-    ds_rows = []
-    for d in all_ds:
-        st = d.get("stats") or {}
-        rz, re_ = role_map.get(d["role"], (d["role"], d["role"]))
-        ds_rows.append((
-            f'<strong>{esc(d["name"])}</strong>',
-            bi(rz, re_),
-            f'<span class="num">{esc(fmt_int(st.get("sequence_count")))}</span>',
-            f'<span class="num">{esc(fmt_bp(st.get("length_bp")))}</span>',
-            f'<span class="num">{esc(fmt_bp_short(st.get("n50_bp")))}</span>',
-            f'<span class="num">{esc(fmt_int(st.get("gap_count")))}</span>',
-            f'<span class="num">{esc(fmt_bp_short(st.get("n_bp")))}</span>',
-        ))
-    reads_bits = [f'{str(r.get("technology", "")).upper()} ({r.get("file_count", 0)} files)' for r in inputs.get("typed_reads", [])]
-    ann = inputs.get("annotations") or {}
-    ann_bits = [
-        f'{bi(zh, en)}: {fmt_int(ann[k].get("row_count"))}'
-        for k, zh, en in (("telomere_rules", "端粒规则", "Telomere rules"), ("centromere_reference", "着丝粒参考", "Centromere ref"))
-        if (ann.get(k) or {}).get("configured") is True
-    ]
-    extra_meta = []
-    if reads_bits:
-        extra_meta.append("Reads: " + " · ".join(esc(x) for x in reads_bits))
-    if ann_bits:
-        extra_meta.append(" · ".join(ann_bits))
-    funnel_svg = svg_funnel([
-        ("输入 Contigs", "Input contigs", funnel.get("input_contigs"), "var(--ds-0)", ""),
-        ("比对至参考", "Aligned to ref", funnel.get("reference_aligned_contigs"), "var(--ds-1)", ""),
-        ("已归属染色体", "Assigned unique", funnel.get("assigned_unique_contigs"), "var(--gen-closed)", ""),
-        ("未分配 Contigs", "Unassigned", funnel.get("unassigned_contigs"), "var(--gen-patch)", ""),
-    ])
+    q0 = lgz["q0"]
     src_bp = q0.get("source_bp") or {}
     sorted_src = sorted(src_bp.items(), key=lambda kv: (-kv[1], kv[0]))
     if len(sorted_src) > 1:
@@ -1206,18 +981,10 @@ def _render_result_files_and_diagnostics(vm):
         if q0.get("source_rows_truncated") else ""
     )
     inputs_fold = (
-        '<div id="inputs">'
+        '<div>'
         + disclosure(
-            bi(f"输入数据与 q0 构图明细（{len(inputs['reference'])} 参考 · {len(inputs['assemblies'])} 组装）",
-               f"Inputs & q0 Construction ({len(inputs['reference'])} ref · {len(inputs['assemblies'])} asm)"),
-            table(
-                [bi("数据集", "Dataset"), bi("角色", "Role"), bi("序列数", "Seqs"), bi("总长度", "Length"), "N50", bi("Gap (≥100 N)", "Gaps"), "N"],
-                ds_rows,
-                empty=bi("无输入统计", "No inputs"),
-            )
-            + (f'<p class="muted">{" · ".join(extra_meta)}</p>' if extra_meta else "")
-            + '<div id="alignment-q0" class="split-grid" style="margin-top:.75rem">'
-            + f'<div><h3>{bi("参考比对与归属去向", "Alignment & Assignment")}</h3>{funnel_svg}</div>'
+            bi("q0 构图明细", "q0 construction details"),
+            '<div id="alignment-q0" class="split-grid" style="margin-top:.75rem">'
             + f'<div><h3>{bi("q0 来源构成", "q0 Sources")}</h3>{src_block}'
             + f'<p class="muted">{bi(f"构建 {sel_c} 条 chr · 原有 N 连接 {inp_j} · 新增未知连接 {unk_j}", f"{sel_c} chrs · {inp_j} input gaps · {unk_j} unknown joins")}</p>'
             + '</div></div>'
@@ -1388,14 +1155,17 @@ def render_overview(vm):
         sub_parts.append(f'<span>{esc(gen_at)}</span>')
 
     sidebar = [
-        ("improvement-overview", "", "组装改善", "Improvement"),
+        ("inputs", "01", "输入数据", "Inputs"),
+        ("chr-groups", "02", "染色体分组", "Chromosome groups"),
         ("pseudomolecule-evolution", "", "假分子演化", "Evolution"),
         ("result-files", "", "结果取件", "Result Pickup"),
         ("diagnostics-fold", "", "诊断与明细", "Diagnostics"),
     ]
 
     body = (
-        _render_improvement_overview(vm)
+        _run_notices(vm)
+        + input_card(vm["lgz_summary"]["inputs"])
+        + assignment_card(vm["lgz_summary"].get("assignment", {}))
         + _render_pseudomolecule_evolution(vm)
         + _render_result_files_and_diagnostics(vm)
     )

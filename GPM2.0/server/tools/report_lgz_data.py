@@ -100,6 +100,41 @@ def stats(value):
     return counts(value, STATS) if isinstance(value, dict) else {}
 
 
+def assignment_groups(table, reference_order):
+    """Preserve the complete run-bound membership; a ctg name is scoped to its assembly."""
+    if (not isinstance(table, dict) or table.get("available") is not True
+            or not isinstance(table.get("rows"), list) or table.get("preview_only")
+            or table.get("row_count", len(table["rows"])) != len(table["rows"])):
+        return None
+    groups = {chrom: {} for chrom in reference_order}
+    owners = defaultdict(set)
+    for row in table["rows"]:
+        dataset, ctg, chrom = (row[key] for key in ("dataset_name", "seq_name", "assigned_chr_name"))
+        if not all(safe_name(name) for name in (dataset, ctg, chrom)):
+            raise ValueError("invalid assignment identifier")
+        targets = owners[dataset, ctg]
+        if chrom in targets:
+            raise ValueError("duplicate chromosome assignment")
+        targets.add(chrom)
+        groups.setdefault(chrom, {}).setdefault(dataset, []).append(ctg)
+    return [{"chr": chrom, "member_count": sum(map(len, sources.values())),
+             "sources": [{"dataset": ds, "members": [{"name": ctg, "multi": len(owners[ds, ctg]) > 1}
+                                                       for ctg in names]} for ds, names in sources.items()]}
+            for chrom, sources in groups.items()]
+
+
+def recorded_coverage(package):
+    rows = package.get("rows", []) if isinstance(package, dict) else []
+    if len(rows) == 1 and isinstance(rows[0], dict):
+        try:
+            value = float(rows[0]["chr_assignment_min_coverage_percent"])
+        except (KeyError, ValueError, TypeError):
+            return None
+        if 0 <= value <= 100:
+            return value
+    return None
+
+
 def chromosome_rows(final):
     annotations = final.get("annotations", {})
     tel, cen = defaultdict(dict), defaultdict(list)
@@ -160,6 +195,7 @@ def collect(layout):
     base = layout.relative("report")
     root = layout.root
     errors = []
+    reference_order = []
     out = dict(
         status=None,
         run_id=None,
@@ -167,6 +203,7 @@ def collect(layout):
         href=file_href(root, base + "/report.html"),
         diagnostics=errors,
         inputs={"reference": [], "assemblies": [], "typed_reads": [], "annotations": {}},
+        assignment={"min_coverage_percent": None, "groups": None},
         funnel={},
         q0={},
         sequence_versions={},
@@ -208,6 +245,10 @@ def collect(layout):
             out["inputs"]["reference" if d["role"] == "reference" else "assemblies"].append(
                 dict(name=d["name"], role=d["role"], stats=stats(d.get("stats")))
             )
+            if d["role"] == "reference":
+                reference_order.extend(row["sequence"] for row in (d.get("stats") or {}).get("sequences", [])
+                                       if isinstance(row, dict) and safe_name(row.get("sequence")))
+        out["assignment"]["min_coverage_percent"] = recorded_coverage(f.get("package"))
         typed = f.get("typed_reads")
         if typed is None:
             groups = Counter(
@@ -288,6 +329,7 @@ def collect(layout):
                 aligned[unit[4:]] = summ["aligned_query_count"]
             if unit == "assign" and facts.get("tables", {}).get("assignments", {}).get("available") is not False:
                 out["funnel"].update(counts(summ, ("assigned_unique_contigs", "unassigned_contigs")))
+                out["assignment"]["groups"] = assignment_groups(facts.get("tables", {}).get("assignments"), reference_order)
             q0 = facts.get("q0_construction") or q0
             for key in ("donor_sets", "donor_members"):
                 tab = facts.get("tables", {}).get(key, {})
