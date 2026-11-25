@@ -83,7 +83,7 @@ test("measured wrapping follows container width, translated labels and font-size
   const classes = new Set(), events = new Map();
   const buttons = ["min(70px, 100%)", "min(160px, 100%)", "min(70px, 100%)"].map(minWidth => ({ minWidth }));
   const labelNodes = [50, 40, 25].map(scrollWidth => ({ scrollWidth }));
-  const navigation = { querySelector: () => null, querySelectorAll: selector => selector === ".assembly-navigation-label" ? labelNodes : buttons };
+  const navigation = { dataset: {}, querySelector: () => null, querySelectorAll: selector => selector === ".assembly-navigation-label" ? labelNodes : buttons };
   const nav = { clientWidth: 1000, getBoundingClientRect() {},
     classList: { toggle(name, value) { value ? classes.add(name) : classes.delete(name); } },
     querySelector: selector => ({ getBoundingClientRect: () => ({ width: selector === ".route-nav" ? 150 : 250 }) }) };
@@ -122,8 +122,7 @@ async function fixture(fn, overrides = {}) {
       };
     };
     const partition = makeSelect(), project = makeSelect(), chr = makeSelect();
-    const currentGroup = { dataset: {} };
-    const navigation = { hidden: false, querySelector: key => ({ "[data-current-scope]": currentGroup, "#assembly-partition-select": partition, "#session-workspace-select": project, "#assembly-chromosome-select": chr }[key]), querySelectorAll: () => [] };
+    const navigation = { hidden: false, dataset: {}, querySelector: key => ({ "#assembly-partition-select": partition, "#session-workspace-select": project, "#assembly-chromosome-select": chr }[key]), querySelectorAll: () => [] };
     const root = { querySelector: key => key === "[data-assembly-navigation]" ? navigation : null };
     const calls = [], notices = [];
     const deps = { flush: async () => calls.push("flush"), switchWorkspace: async path => {
@@ -131,7 +130,7 @@ async function fixture(fn, overrides = {}) {
     }, selectChromosome: async name => { calls.push(["chr", name]); store.setState({ assembly: { ...store.getState().assembly, selectedChrName: name } }); },
       refresh: () => calls.push("refresh"), notice: async message => notices.push(message), ...overrides };
     const dispose = bindAssemblyNavigation(root, store, deps);
-    try { await fn({ root, store, partition, project, chr, navigation, currentGroup, calls, notices, deps }); }
+    try { await fn({ root, store, partition, project, chr, navigation, calls, notices, deps }); }
     finally { dispose(); }
   } finally { globalThis.window = previous; }
 }
@@ -144,15 +143,18 @@ test("partition selection changes only filter state and keeps project/assembly r
   await h.partition.change("empty"); assert.match(h.project.innerHTML, /此项目暂无组装/);
 }));
 
-test("only the committed assembly and its selected chromosome share the current-object highlight", () => fixture(async h => {
+test("project, assembly and Chr are siblings on a single navigation surface at every width", () => fixture(async h => {
   const markup = renderAssemblyNavigation(h.store.getState());
-  const [filter, current] = markup.split('<div class="assembly-navigation-current" data-current-scope="chromosome">');
-  assert.match(filter, /id="assembly-partition-select"/);
-  assert.doesNotMatch(filter, /id="session-workspace-select"/);
-  assert.match(current, /id="session-workspace-select"[\s\S]*id="assembly-chromosome-select"/);
+  assert.equal((markup.match(/<div\b/g) || []).length, 1, "no nested picker group");
+  assert.deepEqual([...markup.matchAll(/<label class="assembly-navigation-field assembly-navigation-([^" ]+)"/g)].map(match => match[1]), ["partition", "project", "chr"]);
+  assert.match(markup, /data-current-scope="chromosome"/);
+  const css = readFileSync(new URL("../../../styles/shell.css", import.meta.url), "utf8");
+  assert.match(css, /\.assembly-navigation \{[^}]*border: 1px solid var\(--theme-blue-line[^}]*background: var\(--theme-blue-surface/);
+  assert.match(css, /@media \(max-width: 600px\) \{\s*\.assembly-navigation \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1.6fr\) minmax\(0, .8fr\)/);
+  assert.doesNotMatch(css, /\.assembly-navigation-current|\.assembly-navigation-partition \.shell-select-toggle/);
   await h.partition.change("maize");
   assert.equal(h.project.value, "/rice"); assert.equal(h.chr.value, "Chr1");
-  const update = patch => { h.store.setState(patch); syncAssemblyNavigation(h.root, h.store.getState()); return h.currentGroup.dataset.currentScope; };
+  const update = patch => { h.store.setState(patch); syncAssemblyNavigation(h.root, h.store.getState()); return h.navigation.dataset.currentScope; };
   assert.equal(update({}), "chromosome");
   assert.equal(update({ assembly: { ...h.store.getState().assembly, selectedChrName: "missing" } }), "assembly");
   assert.equal(h.chr.value, "");

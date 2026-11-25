@@ -58,12 +58,10 @@ export function buildAssemblyNavigationModel(state, library = readProjectLibrary
 export function renderAssemblyNavigation(state) {
   const model = buildAssemblyNavigationModel(state);
   const field = (kind, id, text, options) => `<label class="assembly-navigation-field assembly-navigation-${kind}" for="${id}-toggle"><span class="assembly-navigation-label">${text}</span>${renderShellSelect(id, text, options, { bounded: true })}</label>`;
-  return `<div class="assembly-navigation" data-assembly-navigation ${assemblyNavigationVisible(state) ? "" : "hidden"}>
+  return `<div class="assembly-navigation" data-current-scope="${model.currentScope}" data-assembly-navigation ${assemblyNavigationVisible(state) ? "" : "hidden"}>
     ${field("partition", "assembly-partition-select", model.copy.partition, model.partitions)}
-    <div class="assembly-navigation-current" data-current-scope="${model.currentScope}">
-      ${field("project", "session-workspace-select", model.copy.project, model.projects)}
-      ${field("chr", "assembly-chromosome-select", model.copy.chr, model.chromosomes)}
-    </div>
+    ${field("project", "session-workspace-select", model.copy.project, model.projects)}
+    ${field("chr", "assembly-chromosome-select", model.copy.chr, model.chromosomes)}
   </div>`;
 }
 
@@ -88,8 +86,7 @@ export function syncAssemblyNavigation(root, state) {
     return;
   }
   const model = buildAssemblyNavigationModel(state);
-  const currentGroup = navigation.querySelector("[data-current-scope]");
-  if (currentGroup && currentGroup.dataset.currentScope !== model.currentScope) currentGroup.dataset.currentScope = model.currentScope;
+  if (navigation.dataset.currentScope !== model.currentScope) navigation.dataset.currentScope = model.currentScope;
   for (const [id, title, options] of [["assembly-partition-select", model.copy.partition, model.partitions],
     ["session-workspace-select", model.copy.project, model.projects], ["assembly-chromosome-select", model.copy.chr, model.chromosomes]]) {
     const select = navigation.querySelector(`#${id}`);
