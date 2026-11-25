@@ -917,8 +917,18 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             from .q0_threshold_prepare import initial_questions
             def refresh_native(tasks):
                 repair_inputs.verify()
+                def record_residual(need, have_path, counts, issues):
+                    # A diagnostic, never an input, success marker or proof of completed mapping.
+                    report = dict(schema='q0_updated_native_fallback_demand_v1',decision_only=True,
+                                  input_fingerprint=request_identity,has_path=have_path,counts=counts,
+                                  questions=issues,source_intervals=record(need),completed_tasks=len(tasks),
+                                  task_inventory_id=stable_id('q0-fallback-evidence',[(t['task_id'],t['paf']) for t in tasks]))
+                    rel = f"grt/evidence/q0_prepare/native_decisions/{stable_id('q0-fallback-demand',report)}.json"
+                    try: atomic_write_json(workspace_artifact_path(root,rel),report)
+                    except OSError as exc: print(f'LGZ q0 native fallback: optional demand log unavailable: {exc}',flush=True)
+                    else: print(f'LGZ q0 native fallback: updated_demand={rel} questions={len(issues)}',flush=True)
                 result = initial_questions(root,sources,lengths,assignments,base_alignments,threads=threads,
-                                           existing_catalog=catalog,supplementary=tasks)
+                                           existing_catalog=catalog,supplementary=tasks,on_updated_questions=record_residual)
                 repair_inputs.verify()
                 return result
             native_gate = FallbackGate(catalog.parts,regional_frontier,refresh_native,forced_native)

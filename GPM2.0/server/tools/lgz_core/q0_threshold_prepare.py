@@ -125,7 +125,7 @@ def _supplement_links(root, parts, tasks, short_geometry, threads):
 
 
 def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1, selection_checkpoint=None,
-                      existing_catalog=None, supplementary=()):
+                      existing_catalog=None, supplementary=(), on_updated_questions=None):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_request_paths
     from .q0_threshold_questions import questions
@@ -186,8 +186,11 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
     selected = select_request_paths(data, screen_threads=threads, progress=log,
                                     **({"checkpoint": selection_checkpoint} if selection_checkpoint is not None else {}))
     log("paths selected; calculating first supplement request")
-    need, counts = questions(data, selected, assignments)
+    issues = [] if on_updated_questions is not None else None
+    need, counts = questions(data, selected, assignments, **({'issue_sink':issues.append} if issues is not None else {}))
     have_path = any(row.path is not None for row in selected.paths.values())
+    if on_updated_questions is not None:
+        on_updated_questions(need, have_path, counts, issues)
     if have_path:
         log(f"placements: sufficient={counts.get('positive_placement_stop', 0)} weak={counts.get('weak_placement', 0)}; "
             f"unknown joins: sufficient_to_keep_gap={counts.get('observed_facing_match_leave_gap', 0)} "

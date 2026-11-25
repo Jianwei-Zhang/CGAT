@@ -87,7 +87,7 @@ def _supported_unknown_joins(paths, placed, links, policy):
     return positive
 
 
-def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
+def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy(), issue_sink=None):
     minimum = policy.minimum_anchor_bp
     if type(reach) is not int or reach < minimum:
         raise ValueError('question shoulders shorter than the required paired support')
@@ -132,6 +132,9 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
             weak = [v for v in sides if not supported(v, anchors, minimum)] if sides else [s.interval]
             if weak:
                 needed[s.source].extend(weak); stats['weak_placement'] += 1
+                if issue_sink is not None:
+                    issue_sink(dict(kind='weak_placement',groups=[path.chromosome],id=s.placement_id,
+                                    spans=[[s.source.dataset,s.source.contig,v.start,v.end] for v in weak]))
             else:
                 stats['positive_placement_stop'] += 1
                 if s.source in missing:
@@ -150,9 +153,14 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
                 stats['observed_facing_match_leave_gap'] += 1
                 continue
             stats['unproven_join'] += 1
+            endpoints = [] if issue_sink is not None else None
             for p, local in ((lp, j.left_end), (rp, j.right_start)):
                 lo, hi = max(0, local-reach), min(p.interval.length, local+reach)
-                needed[p.source].append(p.source_interval(Interval(lo, hi)))
+                span = p.source_interval(Interval(lo, hi)); needed[p.source].append(span)
+                if endpoints is not None: endpoints.append([p.source.dataset,p.source.contig,span.start,span.end])
+            if issue_sink is not None:
+                issue_sink(dict(kind='unproven_join',groups=[path.chromosome],id=j.join_id,
+                                placement_ids=[j.left_id,j.right_id],spans=endpoints))
     # A secondary assignment to an unbuilt chromosome is a possible rival, not an
     # independent reason to redo an already supported placement. Do not exempt the
     # rest of its contig or erase an independent weak-junction request on this axis.
@@ -164,4 +172,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
                 stats['missing_chromosome_parts'] += 1
                 stats['secondary_assignment_supported_bp_not_requested'] += part.interval.length - sum(i.length for i in remaining)
                 needed[part.source].extend(remaining)
+                if remaining and issue_sink is not None:
+                    issue_sink(dict(kind='missing_chromosome_part',groups=sorted(c for c in absent & roots if part.source in required[c]),
+                                    id=part.segment_id,spans=[[part.source.dataset,part.source.contig,v.start,v.end] for v in remaining]))
     return {s: merged_intervals(v) for s, v in needed.items() if v}, dict(stats)

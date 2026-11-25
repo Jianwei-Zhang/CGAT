@@ -11,15 +11,20 @@ def descriptor(phase, queries, targets):
     return {'id': stable_id('q0-native-fallback-scope',[phase,q,t]), 'phase':phase, 'query_ids':q, 'target_ids':t}
 
 
-def touches(row, parts, demand):
-    if demand is None:  # No bounded decision can justify omission.
-        return True
-    for keys in (row['query_ids'], row['target_ids']):
-        for key in keys:
+def first_contact(row, parts, demand):
+    if not demand: return None
+    for side in ('query_ids','target_ids'):
+        for key in row[side]:
             part = parts[key]
-            if any(part.interval.intersection(span) is not None for span in demand.get(part.source, ())):
-                return True
-    return False
+            for span in demand.get(part.source, ()):
+                overlap = part.interval.intersection(span)
+                if overlap is not None:
+                    return f"{side}:{key}:{overlap.start}-{overlap.end}"
+    return None
+
+
+def touches(row, parts, demand):
+    return demand is None or first_contact(row,parts,demand) is not None
 
 
 class FallbackGate:
@@ -46,10 +51,12 @@ class FallbackGate:
                 need, have_path = self.refresh(tasks)
                 self.need, self.last_pafs = need if have_path else None, pafs
         for i,row in cold:
-            relevant = row['id'] in self.forced or touches(row,self.parts,self.need)
+            reason = ('final_selection_reopened' if row['id'] in self.forced else 'no_bounded_demand' if self.need is None
+                      else first_contact(row,self.parts,self.need))
+            relevant = reason is not None
             action = 'original_matrix' if relevant else 'defer_disjoint'
             print(f"LGZ q0 native fallback: phase={phase} matrix={row['id']} query_parts={len(row['query_ids'])} "
-                  f"target_parts={len(row['target_ids'])} decision={action}",flush=True)
+                  f"target_parts={len(row['target_ids'])} decision={action} reason={reason or 'no_remaining_contact'}",flush=True)
             if relevant:
                 results[i] = run(requests[i], False)
                 if results[i] is None: raise Q0EvidenceError('required native fallback produced no task')

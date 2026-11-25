@@ -14,7 +14,7 @@ from server.tools.lgz_core import q0_threshold_prepare as threshold
 from server.tools.lgz_core.common import stable_id
 from server.tools.lgz_core.q0_catalog import CandidateCatalog
 from server.tools.lgz_core.q0_native_frontier import FallbackGate, PHASES, descriptor, omitted, touches, validate_inventory
-from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError
+from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey, merged_intervals
 from server.tools.lgz_core.q0_threshold_acceptance import ThresholdRepairRequired, audit
 from server.tools.lgz_core.q0_threshold_questions import questions
 
@@ -92,6 +92,10 @@ class NativeFrontierTests(unittest.TestCase):
             self.assertEqual(result.records['chr1'],truth)
             out=prep.json_file(root/receipt['catalog']);self.assertEqual(out['supplementary_alignments'],cached)
             self.assertEqual(out['supplement_scope']['deferred_native_matrices'],[descriptor(PHASES[0],[self.a.segment_id],all_targets)])
+            log,=(root/'grt/evidence/q0_prepare/native_decisions').glob('*.json'); note=prep.json_file(log)
+            self.assertTrue(note['decision_only'] and note['has_path']);self.assertEqual(note['questions'],[])
+            self.assertEqual(note['source_intervals'],[]);self.assertEqual(note['completed_tasks'],2)
+            self.assertEqual(note['input_fingerprint'],receipt['input_fingerprint']);self.assertNotIn(log.relative_to(root).as_posix(),{row['path'] for row in receipt['outputs']})
             with patch.object(prep,'_prepare_evidence_pass',side_effect=AssertionError('valid new ready must be reusable')):
                 self.assertEqual(prep.prepare_evidence(root,threads=1,minimap2=mapper,supplement_scope='positive_threshold'),receipt)
 
@@ -132,6 +136,16 @@ class NativeFrontierTests(unittest.TestCase):
         with TemporaryDirectory() as d, patch.object(prep,'_readless_package'), patch.object(threshold,'initial_generation',return_value=('id',None,False,need)), patch.object(prep,'_prepare_evidence_pass',side_effect=[({'outputs':[]},None,None),StopAfterRepair]) as dispatch, patch.object(adm,'load_evidence_input',return_value=exposed), self.assertRaises(StopAfterRepair):
             threshold.prepare(Path(d),1,'unused')
         self.assertEqual(dispatch.call_args.kwargs['forced_native'],{self.row['id']});self.assertEqual(dispatch.call_args.kwargs['frontier_override'],need);self.assertIsNone(dispatch.call_args.kwargs['fallback_reason'])
+
+    def test_optional_issue_list_reproduces_unresolved_intervals_without_changing_decisions(self):
+        data=replace(self.data,pair_links=()); chosen=adm.select_q0_paths(data); original=questions(data,chosen,[])
+        rows=[]; self.assertEqual(questions(data,chosen,[],issue_sink=rows.append),original)
+        self.assertTrue(any(r['kind']=='unproven_join' and len(r['placement_ids'])==2 for r in rows))
+        by_source={}
+        for row in rows:
+            self.assertEqual(row['groups'],['chr1']);self.assertTrue(row['id'])
+            for ds,contig,lo,hi in row['spans']: by_source.setdefault(SourceKey(ds,contig),[]).append(Interval(lo,hi))
+        self.assertEqual({k:merged_intervals(v) for k,v in by_source.items()},original[0])
 
     def test_phase_conservation_and_part_frame_boundaries(self):
         k=self.a.segment_id; split=replace(self.a,interval=Interval(50,100));row=descriptor(PHASES[0],[k],[k]);self.assertFalse(touches(row,{k:split},{split.source:(Interval(0,50),)}));self.assertTrue(touches(row,{k:split},{split.source:(Interval(49,51),)}))
