@@ -120,13 +120,27 @@
 /* Route-specific project shortcut visibility must override the flex label rule. */
 .nav-session-field[hidden] { display: none; }
 
-/* Assembly scope navigation stays together as a subordinate breadcrumb rail; global utilities never compete with long names. */
+/* The project filter is independent of the assembly and chromosome actually open. */
 .app-nav.has-assembly-navigation { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 12px; align-items: center; }
 .app-nav.has-assembly-navigation > .route-nav { justify-self: start; }
-.assembly-navigation { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; width: max-content; justify-self: start; padding: 3px 8px; border: 1px solid var(--border-subtle, #dbe3ec); border-radius: 7px; background: var(--surface-subtle, #f8fafc); }
+.assembly-navigation { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; width: max-content; justify-self: start; padding: 1px 0; }
 .assembly-navigation-partition { --assembly-picker-min: 7ch; --assembly-picker-max: 18ch; }
 .assembly-navigation-project { --assembly-picker-min: 18ch; --assembly-picker-max: 34ch; }
 .assembly-navigation-chr { --assembly-picker-min: 7ch; --assembly-picker-max: 14ch; }
+.assembly-navigation-partition { padding-inline-end: 6px; border-inline-end: 1px solid var(--border-default, #cbd5e1); }
+.assembly-navigation-current {
+  display: flex; align-items: center; gap: 6px; min-width: 0; padding: 2px 6px;
+  border: 1px solid transparent; border-radius: 6px;
+}
+.assembly-navigation-current:not([data-current-scope="none"]) {
+  background: var(--theme-blue-surface, #ebf3fc); border-color: var(--theme-blue-line, #b6cde4);
+}
+.assembly-navigation-current [data-shell-select-caption] { color: var(--text-muted, #64748b); font-weight: 400; }
+.assembly-navigation-current:not([data-current-scope="none"]) .assembly-navigation-project [data-shell-select-caption],
+.assembly-navigation-current[data-current-scope="chromosome"] .assembly-navigation-chr [data-shell-select-caption] {
+  color: var(--theme-blue-ink, #234b72); font-weight: 600;
+}
+.assembly-navigation-current:not([data-current-scope="none"]) .assembly-navigation-project [data-shell-select-caption] { font-size: var(--font-body); }
 .assembly-navigation[hidden] { display: none; }
 .assembly-navigation-field { display: flex; flex: 0 1 auto; align-items: center; gap: 4px; min-width: 0; font-size: var(--font-small); }
 .assembly-navigation-field + .assembly-navigation-field::before { content: "/"; color: var(--border-strong, #94a3b8); font-size: var(--font-caption); font-weight: 400; margin-inline-end: 2px; }
@@ -147,10 +161,12 @@
 .app-nav.has-assembly-navigation > .nav-session-controls { flex-wrap: nowrap; }
 .app-nav.is-assembly-nav-stacked > .nav-session-controls { grid-column: 2; grid-row: 1; }
 @media (max-width: 600px) {
-  .assembly-navigation { display: grid; width: 100%; gap: 6px; padding: 6px 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, .8fr); }
+  .assembly-navigation { display: grid; width: 100%; padding: 3px 0; grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); }
+  .assembly-navigation-current { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
   .assembly-navigation-field { flex-direction: column; align-items: stretch; gap: 3px; }
   .assembly-navigation-field + .assembly-navigation-field::before { display: none; }
   .assembly-navigation .shell-select { width: 100%; max-width: none; }
-  .assembly-navigation .shell-select-toggle { width: 100%; min-width: 0; border-color: var(--border-default, #cbd5e1); background: var(--surface-panel, #fff); }
+  .assembly-navigation .shell-select-toggle { width: 100%; min-width: 0; }
+  .assembly-navigation-partition .shell-select-toggle { border-color: var(--border-default, #cbd5e1); background: var(--surface-panel, #fff); }
   .assembly-navigation-label { font-size: var(--font-caption); }
 }

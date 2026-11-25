@@ -122,7 +122,8 @@ async function fixture(fn, overrides = {}) {
       };
     };
     const partition = makeSelect(), project = makeSelect(), chr = makeSelect();
-    const navigation = { hidden: false, querySelector: key => ({ "#assembly-partition-select": partition, "#session-workspace-select": project, "#assembly-chromosome-select": chr }[key]), querySelectorAll: () => [] };
+    const currentGroup = { dataset: {} };
+    const navigation = { hidden: false, querySelector: key => ({ "[data-current-scope]": currentGroup, "#assembly-partition-select": partition, "#session-workspace-select": project, "#assembly-chromosome-select": chr }[key]), querySelectorAll: () => [] };
     const root = { querySelector: key => key === "[data-assembly-navigation]" ? navigation : null };
     const calls = [], notices = [];
     const deps = { flush: async () => calls.push("flush"), switchWorkspace: async path => {
@@ -130,7 +131,7 @@ async function fixture(fn, overrides = {}) {
     }, selectChromosome: async name => { calls.push(["chr", name]); store.setState({ assembly: { ...store.getState().assembly, selectedChrName: name } }); },
       refresh: () => calls.push("refresh"), notice: async message => notices.push(message), ...overrides };
     const dispose = bindAssemblyNavigation(root, store, deps);
-    try { await fn({ root, store, partition, project, chr, navigation, calls, notices, deps }); }
+    try { await fn({ root, store, partition, project, chr, navigation, currentGroup, calls, notices, deps }); }
     finally { dispose(); }
   } finally { globalThis.window = previous; }
 }
@@ -141,6 +142,21 @@ test("partition selection changes only filter state and keeps project/assembly r
   assert.equal(h.store.getState().assemblyNavigation.partitionId, "maize");
   assert.deepEqual(h.calls, []); assert.match(h.project.innerHTML, /B73/); assert.match(h.project.innerHTML, /当前组装/);
   await h.partition.change("empty"); assert.match(h.project.innerHTML, /此项目暂无组装/);
+}));
+
+test("only the committed assembly and its selected chromosome share the current-object highlight", () => fixture(async h => {
+  const markup = renderAssemblyNavigation(h.store.getState());
+  const [filter, current] = markup.split('<div class="assembly-navigation-current" data-current-scope="chromosome">');
+  assert.match(filter, /id="assembly-partition-select"/);
+  assert.doesNotMatch(filter, /id="session-workspace-select"/);
+  assert.match(current, /id="session-workspace-select"[\s\S]*id="assembly-chromosome-select"/);
+  await h.partition.change("maize");
+  assert.equal(h.project.value, "/rice"); assert.equal(h.chr.value, "Chr1");
+  const update = patch => { h.store.setState(patch); syncAssemblyNavigation(h.root, h.store.getState()); return h.currentGroup.dataset.currentScope; };
+  assert.equal(update({}), "chromosome");
+  assert.equal(update({ assembly: { ...h.store.getState().assembly, selectedChrName: "missing" } }), "assembly");
+  assert.equal(h.chr.value, "");
+  assert.equal(update({ session: {}, assembly: state().assembly }), "none");
 }));
 
 test("workspace selection flushes once, remains in assembly, updates filter only after successful switch", () => fixture(async h => {
@@ -164,6 +180,7 @@ for (const failure of ["flush", "switchWorkspace"]) test(`${failure} failure lea
   assert.equal(h.store.getState().activeRoute, "assembly");
   assert.equal(h.store.getState().assemblyNavigation.busy, false);
   assert.match(h.notices[0], /broken/);
+  assert.equal(h.project.value, "/rice", "a failed switch restores the displayed current assembly");
   if (failure === "flush") assert.deepEqual(h.calls, []);
 }, { [failure]: async () => { throw new Error("broken"); } }));
 
@@ -179,6 +196,7 @@ test("pending save serializes navigation and drops stale work when the project c
   await fixture(async h => {
     const pending = h.project.change("/rice2");
     assert.equal(h.store.getState().assemblyNavigation.busy, true);
+    assert.equal(h.project.value, "/rice", "the requested assembly is not shown as current while saving");
     await h.chr.change("unplaced");
     h.store.setState({ session: { workspacePath: "/different", projectId: 3 } });
     resolve(); await pending;

@@ -50,7 +50,9 @@ export function buildAssemblyNavigationModel(state, library = readProjectLibrary
     description: `${Number(chr.ctgCount) || 0} Contigs · ${(Number(chr.placedBp || 0) / 1e6).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Mb`,
   }));
   if (!chromosomes.some(item => item.selected)) chromosomes.unshift({ value: "", label: copy.chooseChr, selected: true, disabled: true });
-  return { copy, partitions, projects, chromosomes, filter, busy: assemblyNavigationBusy(state) };
+  const hasAssembly = Boolean(currentPath && state.session?.projectId);
+  const currentScope = !hasAssembly ? "none" : chromosomes.some(chr => chr.selected && chr.value) ? "chromosome" : "assembly";
+  return { copy, partitions, projects, chromosomes, filter, currentScope, busy: assemblyNavigationBusy(state) };
 }
 
 export function renderAssemblyNavigation(state) {
@@ -58,8 +60,10 @@ export function renderAssemblyNavigation(state) {
   const field = (kind, id, text, options) => `<label class="assembly-navigation-field assembly-navigation-${kind}" for="${id}-toggle"><span class="assembly-navigation-label">${text}</span>${renderShellSelect(id, text, options, { bounded: true })}</label>`;
   return `<div class="assembly-navigation" data-assembly-navigation ${assemblyNavigationVisible(state) ? "" : "hidden"}>
     ${field("partition", "assembly-partition-select", model.copy.partition, model.partitions)}
-    ${field("project", "session-workspace-select", model.copy.project, model.projects)}
-    ${field("chr", "assembly-chromosome-select", model.copy.chr, model.chromosomes)}
+    <div class="assembly-navigation-current" data-current-scope="${model.currentScope}">
+      ${field("project", "session-workspace-select", model.copy.project, model.projects)}
+      ${field("chr", "assembly-chromosome-select", model.copy.chr, model.chromosomes)}
+    </div>
   </div>`;
 }
 
@@ -84,6 +88,8 @@ export function syncAssemblyNavigation(root, state) {
     return;
   }
   const model = buildAssemblyNavigationModel(state);
+  const currentGroup = navigation.querySelector("[data-current-scope]");
+  if (currentGroup && currentGroup.dataset.currentScope !== model.currentScope) currentGroup.dataset.currentScope = model.currentScope;
   for (const [id, title, options] of [["assembly-partition-select", model.copy.partition, model.partitions],
     ["session-workspace-select", model.copy.project, model.projects], ["assembly-chromosome-select", model.copy.chr, model.chromosomes]]) {
     const select = navigation.querySelector(`#${id}`);
@@ -95,6 +101,9 @@ export function syncAssemblyNavigation(root, state) {
     }
     select.setAttribute("aria-label", title);
     const selected = options.find(item => item.selected);
+    // The picker changes its native value before the switch is saved/accepted.
+    // Keep the displayed caption on the committed selection, including after a failed switch.
+    if (selected && select.value !== selected.value) select.value = selected.value;
     select.setAttribute("data-app-tooltip", selected?.label || title);
     select.closest("label")?.querySelector(".assembly-navigation-label")?.replaceChildren(title);
     select.disabled = model.busy || (id === "assembly-chromosome-select" && !state.assembly?.chromosomes?.length);
