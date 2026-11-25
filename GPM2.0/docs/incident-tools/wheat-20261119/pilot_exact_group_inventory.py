@@ -21,7 +21,7 @@ from lgz_core.q0_threshold_acceptance import decode
 from lgz_core.common import sha256_file,stable_id
 
 
-def audit(root,lookup,tool,rb,category,name,stamp,*,locators=False):
+def audit(root,lookup,tool,rb,category,name,stamp,*,locators=False,derive_missing_decision=False):
     rel="grt/evidence/q0_prepare/regional/"+name; d=root/rel; raw=bounded(d/"context.json",64<<20); c=json.loads(raw);spec=c["spec"];w=spec["query"]
     require(sha256(pack_context(name,spec,lookup)).hexdigest()==stamp and spec["tool"]==tool and spec["targets"]==sorted(spec["targets"],key=lambda v:v["window_id"]),"different frozen context/order/tool")
     ctx=m._ops().identity(root,rel+"/context.json");require(ctx["sha256"]==sha256(raw).hexdigest(),"context changed")
@@ -42,13 +42,15 @@ def audit(root,lookup,tool,rb,category,name,stamp,*,locators=False):
     else:
         decision=dict(schema="lgz_q0_cigar_profile_v1",policy=asdict(policy),reason="screening_not_needed",reference_bases=rb,query_bases=q.length,additional_flags=[],approximate_chaining_is_evidence=False)
     path=d/(stable_id("q0-regional-decision",decision)+".json")
-    if not path.is_file():return dict(row,status="missing_matching_decision")
-    require(json.loads(bounded(path,1<<20))==decision,"decision drift")
+    saved = path.is_file()
+    if not saved and not derive_missing_decision:return dict(row,status="missing_matching_decision")
+    if saved:require(json.loads(bounded(path,1<<20))==decision,"decision drift")
+    else:row["decision_needs_rewrite"]=True  # Same deterministic flags, no on-disk changes.
     rs=dict(schema="lgz_q0_regional_raw_v1",context=ctx,flags=["-c",*m.BASE_FLAGS,*decision["additional_flags"]]);sub=rel+"/"+stable_id("q0-regional-raw",rs); leaf=verify(sub,rs)
     if leaf is None:return dict(row,status="missing_raw")
     nr=sum(1 for _ in read_paf(root/sub/"result.paf",query_lengths={q.window_id:q.length},target_lengths=targets)); pin=next(v for v in leaf["outputs"] if v["path"]==sub+"/result.paf")
     if locators:
-        row.update(context_file=ctx,decision_file=m._ops().identity(root,rel+"/"+path.name),chaining_receipt=decision.get("chaining_receipt"),raw_receipt=m._ops().identity(root,sub+"/success.json"),raw_paf=pin)
+        row.update(context_file=ctx,decision_file=m._ops().identity(root,rel+"/"+path.name) if saved else None,chaining_receipt=decision.get("chaining_receipt"),raw_receipt=m._ops().identity(root,sub+"/success.json"),raw_paf=pin)
     return dict(row,status="verified",raw_sha256=pin["sha256"],raw_bytes=pin["size"],raw_rows=nr,coarse_required=need_chain,flags=rs["flags"])
 
 

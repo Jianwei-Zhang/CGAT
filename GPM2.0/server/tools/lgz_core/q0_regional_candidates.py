@@ -12,7 +12,7 @@ from .common import stable_id
 from .q0_catalog import _IntervalUnion, DISCOVERY_REFERENCE_IDENTITY
 from .q0_neighbor_requests import known_neighbors
 from .q0_query_windows import WindowPolicy, plan_query_windows, TargetWindow
-from .q0_regional_mapping import BASE_FLAGS, MAX_TARGET_BASES, prepare_regional_mapping
+from .q0_regional_mapping import BASE_FLAGS, MAX_TARGET_BASES, RegionalWorkLog, prepare_regional_mapping
 from .q0_frontier_scope import window_touches_frontier
 from .q0_sources import Interval, Q0EvidenceError
 from .q0_regional_execution import ParentRequest, RegionalExecutor, plan_request, completed_result
@@ -280,7 +280,7 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
             report["reused_part_pairs"] += (requested & ~eligible).bit_count()
             if eligible:
                 yield planner.planning_request(key, eligible)
-    with execution, ThreadPoolExecutor(max_workers=workers,thread_name_prefix="q0-candidate") as pool:
+    with RegionalWorkLog("candidate") as work, execution, ThreadPoolExecutor(max_workers=workers,thread_name_prefix="q0-candidate") as pool:
         for number, (parent_number, request, (planned,native,reason)) in enumerate(execution.completed(requests()), 1):
             key = request.segment_id
             parent_order[key] = parent_number
@@ -295,6 +295,7 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                 item["query_ids"].append(key);item["regional_fallback"].append({"query":key,"reason":reason})
                 report["fallback_parents"] += 1
             for window_number, (query, targets) in enumerate(planned):
+                work.add("candidates")
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional candidate comparisons")
                 if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
@@ -302,14 +303,16 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                         raise Q0EvidenceError("q0 frontier omissions require a bound scope recorder")
                     unsearched.observe(query, targets, catalog.parts)
                     report["frontier_omitted_windows"] += 1
+                    work.add("frontier_omitted")
                     continue
                 report["regional_windows"] += 1
                 if len(pending) >= workers: consume()
-                future = pool.submit(prepare_regional_mapping,root,catalog,query,targets,tool,
+                future = pool.submit(work.run, prepare_regional_mapping,root,catalog,query,targets,tool,
                                      reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
                 pending[future] = (parent_number, window_number)
                 if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
             if number%100 == 0:
+                work.emit("progress")
                 print(f"LGZ q0 candidate regions: eligible_parents_completed={number} requested_parents={report['requested_parents']} completed={len(tasks)} fallback={report['fallback_parents']}",flush=True)
         while pending: consume()
     report.update(execution.report)

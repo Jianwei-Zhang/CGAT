@@ -148,6 +148,37 @@ class RegionalMappingTests(unittest.TestCase):
         self.assertNotEqual(first["task_id"],second["task_id"])
         self.assertEqual(old["spec"]["raw_receipt"],new["spec"]["raw_receipt"])
 
+    def test_dispatch_log_distinguishes_processes_and_projection_without_changing_evidence(self):
+        from server.tools.lgz_core.q0_regional_mapping import RegionalWorkLog
+        policy = CigarWorkPolicy(minimum_query_bases=1)
+        cold, hit, project = (RegionalWorkLog("partial") for _ in range(3))
+        task = cold.run(self.run_mapping, policy=policy)
+        self.assertEqual([cold.counts[k] for k in ("chain_started", "raw_started", "projection_built", "projection_only")], [1,1,1,0])
+        changed = QueryWindow(self.query.segment_id,30000,8500,12500,((10000,11000),))
+        with mock.patch("subprocess.Popen", side_effect=AssertionError("cache must not start a mapper")):
+            self.assertEqual(hit.run(self.run_mapping, policy=policy), task)
+            other = project.run(self.run_mapping, changed, policy=policy)
+        self.assertNotEqual(other, task)
+        for log in (hit, project):
+            self.assertEqual([log.counts[k] for k in ("chain_started", "raw_started", "dispatched", "raw_reused", "chain_reused")], [0,0,1,1,1])
+        self.assertEqual([hit.counts[k] for k in ("projection_reused", "projection_built", "projection_only")], [1,0,0])
+        self.assertEqual([project.counts[k] for k in ("projection_reused", "projection_built", "projection_only")], [0,1,1])
+
+    def test_dispatch_log_does_not_count_a_failed_spawn_as_started(self):
+        from server.tools.lgz_core.q0_regional_mapping import RegionalWorkLog
+        log = RegionalWorkLog("candidate")
+        with mock.patch("subprocess.Popen", side_effect=OSError("spawn failed")), self.assertRaises(OSError):
+            log.run(self.run_mapping)
+        self.assertEqual((log.counts["dispatched"],log.counts["raw_started"]), (1,0))
+
+    def test_dispatch_log_counts_a_started_mapper_that_exits_unsuccessfully(self):
+        from server.tools.lgz_core.q0_regional_mapping import RegionalWorkLog
+        log = RegionalWorkLog("partial")
+        process = mock.Mock(); process.wait.return_value = 3
+        with mock.patch("subprocess.Popen", return_value=process), self.assertRaisesRegex(Q0EvidenceError, "mapper failed"):
+            log.run(self.run_mapping)
+        self.assertEqual((log.counts["raw_started"], log.counts["projection_built"]), (1, 0))
+
     def test_complete_receipts_do_not_require_a_duplicate_standalone_scan(self):
         from server.tools.lgz_core import q0_regional_mapping as regional
 

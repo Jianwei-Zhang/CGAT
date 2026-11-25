@@ -78,6 +78,9 @@ class RegionalDiscoveryTests(unittest.TestCase):
         from server.tools.lgz_core.q0_frontier_scope import UnsearchedWindows
         index=mock.Mock();index.parts=self.parts;index.regions.return_value={'chr':(Interval(0,100),)}
         index.targets.return_value={self.ids['t']:(Interval(0,1000),)}
+        from contextlib import redirect_stdout
+        from io import StringIO
+        log = StringIO()
         omissions=UnsearchedWindows()
         query=self.parts[self.ids['q']]
         frontier={query.source:(Interval(0,1),)}
@@ -85,11 +88,13 @@ class RegionalDiscoveryTests(unittest.TestCase):
             self.assertEqual([t.segment_id for t in targets],[self.ids['t']])
             return {'core':query.cores[0][0]}
         with mock.patch.object(regional,'partial_source_intervals',return_value={self.ids['q']:(Interval(0,300000),)}), \
-             mock.patch.object(regional,'prepare_regional_mapping',side_effect=mapper):
+             mock.patch.object(regional,'prepare_regional_mapping',side_effect=mapper), redirect_stdout(log):
             tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},
                 reference_lengths={'chr':5_000_000_000},preset='asm10',threads=2,
                 regional_frontier=frontier,unsearched=omissions)
         self.assertEqual(tasks,[{'core':0}]);self.assertEqual(fallback,[])
+        self.assertIn("phase=partial state=complete candidates=3 frontier_omitted=2 dispatched=1 chain_started=0 raw_started=0", log.getvalue())
+        self.assertNotIn("raw_started",report)
         self.assertEqual(report['frontier_omitted_windows'],2)
         self.assertEqual(dict(omissions.record()),{self.ids['q']:[[90000,300000]],self.ids['t']:[[0,1000]]})
 

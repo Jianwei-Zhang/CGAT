@@ -19,7 +19,7 @@ from .common import sha256_file, stable_id
 from .q0_catalog import ObservedSourcePairs, partial_source_intervals
 from .q0_query_windows import WindowPolicy, TargetWindow, plan_query_windows
 from .q0_reference_index import ReferenceIndex, _signature
-from .q0_regional_mapping import MAX_TARGET_BASES, prepare_regional_mapping
+from .q0_regional_mapping import MAX_TARGET_BASES, RegionalWorkLog, prepare_regional_mapping
 from .q0_frontier_scope import window_touches_frontier
 from .q0_regional_execution import ParentRequest, RegionalExecutor, completed_result
 from .q0_sources import Interval, Q0EvidenceError
@@ -177,6 +177,7 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
         ordinal, task = completed_result(pending)
         tasks.append((ordinal, task))
         if len(tasks)%100 == 0:
+            work.emit("progress")
             print(f"LGZ q0 regional progress: completed={len(tasks)} planned={len(windows)} fallback_sources={len(fallback)}", flush=True)
     def requests():
         for segment_id, group in itertools.groupby(windows, key=lambda w: w.segment_id):
@@ -186,7 +187,7 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                 report[field] += 1
                 continue  # Tested relationships, not an invented coverage/placement assertion.
             yield ParentRequest("partial", segment_id, tuple(group))
-    with execution, ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
+    with RegionalWorkLog("partial") as work, execution, ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
         for parent_number, request, (planned, _, reason) in execution.completed(requests()):
             segment_id = request.segment_id
             parent_order[segment_id] = parent_number
@@ -194,6 +195,7 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})
                 continue
             for window_number, (query, targets) in enumerate(planned):
+                work.add("candidates")
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional supplementary comparisons")
                 if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
@@ -201,9 +203,10 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                         raise Q0EvidenceError("q0 frontier omissions require a bound scope recorder")
                     unsearched.observe(query, targets, catalog.parts)
                     report["frontier_omitted_windows"] += 1
+                    work.add("frontier_omitted")
                     continue
                 if len(pending) >= workers: consume()
-                future = pool.submit(prepare_regional_mapping, root,catalog,query,targets,tool,
+                future = pool.submit(work.run, prepare_regional_mapping, root,catalog,query,targets,tool,
                                      reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
                 pending[future] = (parent_number, window_number)
                 if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
