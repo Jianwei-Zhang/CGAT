@@ -5040,3 +5040,9 @@ Donau 作业 `43029926` 于 21:07:29 正常结束（退出码 0；总墙钟 26 �
 - 运行修订仍为 `44e274a7`。跟踪分支 `8d270fca` 只新增事故放行程序与测试。用 `verify_wheat_graph_release_v2.py review` 复核冻结材料、4D 的全部 22 个路径记录和其他科学字段、原始补证请求、9 个几何对照结果。仅允许已审计的 `maximum_coverage_boundaries: 200000 → None`；旧 `43058370/FAILED`、历史比较和独立审计均原样保留。新科学回执 `gate-v2/science-review.json` SHA `73aa10a8aa9873dc8111189aca8c33417e2f4db17b416a2f5a92658f93a63246`。单次速度不作否决项；删掉独立于冻结样本的固定数字断言、对相同静态对照文件的重复轮询解析和旧日历挡板。未提高路径搜索预算、削弱证据阈值或重跑 mapper/4D。
 - 放行审查和断点/运行器 11 项定向测试通过（含额外科学差异、方向/请求变化、错误输入、时间变慢、缺失或错配断点）；在真实远端，先通过静态科学验收，再实证没有定位完成回执时 `start` 拒绝。新启动清单 SHA `26fcbbd574b891c8972d2b283fec204d5829d275909aed6a88516b6671ac788b`，由新提交的 `gate-v2/whole-v2.dsub` 内固定。启动时绑定实际定位回执和已保存断点尾摘要，完整数据流仍由恢复读取器核验；不额外扫描整份定位列表。
 - 新建图 **`43058410`** 已获 Donau 接单，`WAITING`，唯一调度依赖 `43058366=SUCCEEDED`，`scheduledTime=-`（无 12 月 2 日保护时间）。先验证新作业目录、版本、资源、依赖和无日历限制，再仅撤销从未启动的旧建图 `43058367`；其终态 `FAILED` 原因 `Job was terminated by xbzhang26`，没有计算失败或丢失输出。原 `whole.jobid` 留在 `gate-v2/previous-whole.jobid`，现行指针已原子切换；新分配观察器仅发布真实 `RUNNING` 分配，不轮询/修改验收结果。定位 `43058366` 未动，10:52 已读 54/68 份 PAF。后续监控 `placement/placement_43058366.out` 和 `gate-v2/whole_43058410.out`，不要再监控旧图作为现行图。回退可在启动前撤销新排队项；旧启动脚本、清单和回执均没有被覆盖，不伪造成功。若启动后出现问题先定位保存的断点，不直接重提。
+
+### 11/25 14:18 CST — 真实全麦定位断点已交给新版建图作业
+
+- Donau `43058366` 在 14:17:15 成功退出，`43058410` 在 14:17:18 于 `agent-X86-56` 实际启动，32 CPU / 327680 MiB。实际分配、`control/started.json`、定位完成回执与作业目录相符；两个阶段使用同版 `44e274a7` 和同一冻结快照。
+- `selection/admission.jsonl` 已原子发布，共 275,659,435 字节，尾记录为 8,985 个定位结果、内容流摘要 `deca225b715c0b4ef2c23a5638822371ad999b9c161e557dd018a27b3e957106`，与 `placement/control/placement-complete.json` 相符。图作业记录 `GRAPH_RELEASE_V2_READY ... restorable_placements 8985`。本次检查的是断点尾、宿主与启动身份；完整断点恢复以 `SELECTION_CHECKPOINT_RESTORED admission.jsonl` 为准。
+- 截至 14:18，图阶段仍在自己的节点暂存输入；尚无 `control/staged.json`、逐组路径断点或整麦首轮请求。已走通新准入及调度交接，不代表已进入 3B 或已验证整麦输出。
