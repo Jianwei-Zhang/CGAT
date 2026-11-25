@@ -32,10 +32,16 @@ INPUT_STYLE = """<style>
 .project-dataset-role[data-dataset-role="reference"]{background:var(--ctg-ref-fill);border-color:var(--ctg-ref-stroke);color:var(--ctg-ref-text)}
 .project-dataset-role[data-dataset-role="primary"]{background:var(--ctg-primary-fill);border-color:var(--ctg-primary-stroke);color:var(--ctg-primary-text)}
 .project-dataset-role[data-dataset-role="support"]{background:var(--ctg-companion-fill);border-color:var(--ctg-companion-stroke);color:var(--ctg-companion-text)}
-.input-aux-bar{display:flex;align-items:center;gap:.45rem .65rem;flex-wrap:wrap;margin-top:.65rem;font-size:.8rem;color:var(--text-secondary)}
-.input-aux-lbl{font-size:.78rem;font-weight:600;color:var(--text-muted);margin-right:.1rem}
-.input-qc-tag{display:inline-flex;align-items:center;gap:.3rem;padding:2px 9px;border:1px solid var(--border-subtle);border-radius:999px;background:var(--surface-subtle);color:var(--text-secondary);font-size:.79rem;white-space:nowrap}
+.input-aux-bar{display:flex;align-items:center;gap:.45rem .55rem;flex-wrap:wrap;margin-top:.65rem;font-size:.8rem;color:var(--text-secondary)}
+.input-qc-tag{display:inline-flex;align-items:center;gap:.36rem;padding:3px 10px;border:1px solid var(--border-subtle);border-radius:999px;background:var(--surface-subtle);color:var(--text-secondary);font:500 .79rem/1.35 inherit;white-space:nowrap}
 .input-qc-tag.is-enabled{border-color:var(--tone-ok-line);background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
+button.input-qc-tag.is-clickable{cursor:pointer;transition:background .12s,border-color .12s,box-shadow .12s}
+button.input-qc-tag.is-clickable:hover{border-color:var(--gen-closed);box-shadow:0 1px 3px rgba(15,23,42,.08);filter:brightness(.98)}
+.input-qc-tag .qc-ico{display:inline-flex;align-items:center;opacity:.75}
+.input-ann-note{font-size:.79rem;color:var(--text-secondary);line-height:1.5;max-width:44ch}
+.input-ann-motif{display:inline-block;padding:1px 7px;border:1px solid var(--border-default);border-radius:4px;background:var(--surface-subtle);font:600 .8rem/1.35 var(--font-mono);color:var(--text-primary);letter-spacing:.03em}
+.input-ann-src{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid var(--border-subtle);background:var(--surface-muted);color:var(--text-secondary);font-size:.74rem;font-weight:500;white-space:nowrap}
+.input-ann-src.is-official{border-color:var(--tone-info-line);background:var(--tone-info-bg);color:var(--tone-info-ink)}
 </style>"""
 
 ASSIGN_STYLE = """<style>
@@ -91,6 +97,114 @@ def _fmt_catalog_length(value, missing):
     return f'<span title="{esc(raw_bp)}">{esc(disp)}</span>'
 
 
+def _ann_source_badge(source):
+    key = str(source or "").strip().lower()
+    if key == "official":
+        return '<span class="input-ann-src is-official">' + bi("官方库", "Official") + '</span>'
+    if key in ("user", "local"):
+        return '<span class="input-ann-src">' + bi("用户库", "User library") + '</span>'
+    if key:
+        return f'<span class="input-ann-src">{esc(source)}</span>'
+    return '<span class="muted">—</span>'
+
+
+def _tel_modal_body(ann):
+    items = ann.get("items") or []
+    count = ann.get("row_count")
+    lead = (
+        '<div class="story-verdict" style="margin:0 0 .75rem">'
+        + bi(
+            "用于在序列末端双向扫描端粒串联重复基序（正链与反向互补链），识别染色体 5′ / 3′ 端粒信号。最小重复次数为 CGAT/GPM 检测阈值。",
+            "Scans tandem telomere repeat motifs on both strands (forward and reverse complement) to identify 5′ / 3′ terminal telomere signals. Min repeats is a CGAT/GPM detection threshold.",
+        )
+        + '</div>'
+    )
+    if not items:
+        cnt_note = (
+            bi(f"本次运行配置了 {count:,} 条端粒规则；当前摘要未附带规则明细。", f"{count:,} telomere rule(s) configured; detailed rows were not stored in this summary.")
+            if isinstance(count, int) and count > 0
+            else bi("已启用端粒规则；当前摘要未附带规则明细。", "Telomere rules configured; detailed rows were not stored in this summary.")
+        )
+        return lead + f'<p class="muted">{cnt_note}</p>'
+    rows_html = []
+    for item in items:
+        min_rep = item.get("min_repeat")
+        rep_txt = f'≥ {min_rep:,}×' if isinstance(min_rep, int) else '—'
+        rc_txt = bi("是", "Yes") if item.get("reverse_complement", True) else bi("否", "No")
+        note = esc(item["note"]) if item.get("note") else '<span class="muted">—</span>'
+        rows_html.append(
+            f'<tr><th scope="row"><span class="project-dataset-name">{esc(item.get("id") or "—")}</span></th>'
+            f'<td>{_ann_source_badge(item.get("source"))}</td>'
+            f'<td><span class="input-ann-motif">{esc(item.get("motif") or "—")}</span></td>'
+            f'<td class="numeric">{esc(rep_txt)}</td>'
+            f'<td>{rc_txt}</td>'
+            f'<td><div class="input-ann-note">{note}</div></td></tr>'
+        )
+    return (
+        lead
+        + '<div class="project-dataset-scroll"><table class="project-dataset-table">'
+        '<thead><tr>'
+        f'<th scope="col">{bi("规则 ID", "Rule ID")}</th>'
+        f'<th scope="col">{bi("来源", "Source")}</th>'
+        f'<th scope="col">{bi("重复基序", "Motif")}</th>'
+        f'<th scope="col">{bi("最小重复", "Min repeats")}</th>'
+        f'<th scope="col">{bi("反向互补", "Rev-comp")}</th>'
+        f'<th scope="col">{bi("说明与文献出处", "Notes & reference")}</th>'
+        '</tr></thead><tbody>' + "".join(rows_html) + '</tbody></table></div>'
+    )
+
+
+def _cen_modal_body(ann):
+    items = ann.get("items") or []
+    count = ann.get("row_count")
+    lead = (
+        '<div class="story-verdict" style="margin:0 0 .75rem">'
+        + bi(
+            "将参考着丝粒重复单体序列比对至染色体，用于标记候选着丝粒区域（仅作候选区域证据，不等同于功能着丝粒实验验证）。",
+            "Aligns reference centromeric repeat monomers against chromosomes to mark candidate centromere regions (candidate-region evidence only).",
+        )
+        + '</div>'
+    )
+    if not items:
+        cnt_note = (
+            bi(f"本次运行配置了 {count:,} 条着丝粒参考；当前摘要未附带参考明细。", f"{count:,} centromere reference(s) configured; detailed rows were not stored in this summary.")
+            if isinstance(count, int) and count > 0
+            else bi("已启用着丝粒参考；当前摘要未附带参考明细。", "Centromere reference configured; detailed rows were not stored in this summary.")
+        )
+        return lead + f'<p class="muted">{cnt_note}</p>'
+    rows_html = []
+    for item in items:
+        scope = bi("全染色体 (*)", "All (*)") if item.get("chr_name") in (None, "", "*") else f'<code>{esc(item["chr_name"])}</code>'
+        mlen = f'{item["length_bp"]:,} bp' if isinstance(item.get("length_bp"), int) else '—'
+        thr_bits = []
+        if isinstance(item.get("min_len"), int):
+            thr_bits.append(f'≥ {item["min_len"]:,} bp')
+        if item.get("min_identity"):
+            thr_bits.append(f'≥ {item["min_identity"]}%')
+        thr_txt = esc(" · ".join(thr_bits)) if thr_bits else '<span class="muted">—</span>'
+        note = esc(item["note"]) if item.get("note") else '<span class="muted">—</span>'
+        rows_html.append(
+            f'<tr><th scope="row"><span class="project-dataset-name">{esc(item.get("id") or "—")}</span></th>'
+            f'<td>{_ann_source_badge(item.get("source"))}</td>'
+            f'<td>{scope}</td>'
+            f'<td class="numeric">{esc(mlen)}</td>'
+            f'<td class="numeric">{thr_txt}</td>'
+            f'<td><div class="input-ann-note">{note}</div></td></tr>'
+        )
+    return (
+        lead
+        + '<div class="project-dataset-scroll"><table class="project-dataset-table">'
+        '<thead><tr>'
+        f'<th scope="col">{bi("参考 ID", "Reference ID")}</th>'
+        f'<th scope="col">{bi("来源", "Source")}</th>'
+        f'<th scope="col">{bi("适用范围", "Scope")}</th>'
+        f'<th scope="col">{bi("单体长度", "Monomer")}</th>'
+        f'<th scope="col">{bi("检出阈值", "Thresholds")}</th>'
+        f'<th scope="col">{bi("说明与文献出处", "Notes & reference")}</th>'
+        '</tr></thead><tbody>' + "".join(rows_html) + '</tbody></table></div>'
+    )
+
+
 def input_card(inputs):
     missing = '<span class="muted">' + bi("未记录", "Not recorded") + '</span>'
 
@@ -107,17 +221,16 @@ def input_card(inputs):
             measure_int(st, "sequence_count"),
             _fmt_catalog_length(st.get("length_bp"), missing),
             _fmt_catalog_length(st.get("n50_bp"), missing),
+            _fmt_catalog_length(st.get("n90_bp"), missing),
             measure_int(st, "gap_count"),
         ))
     for index, assembly in enumerate(inputs["assemblies"]):
         st = assembly["stats"]
         raw_role = str(assembly.get("role") or "assembly_candidate")
-        if raw_role in ("support", "companion"):
+        if raw_role in ("support", "companion") or (raw_role == "assembly_candidate" and index > 0):
             role_attr, role_lbl = "support", bi("辅助组装", "Auxiliary")
-        elif raw_role == "primary":
-            role_attr, role_lbl = "primary", bi("主组装", "Primary")
         else:
-            role_attr, role_lbl = "primary", bi("候选组装", "Assembly")
+            role_attr, role_lbl = "primary", bi("主组装", "Primary")
         name_html = (
             f'<span class="project-dataset-name">'
             f'<i class="swatch" style="width:8px;height:8px;background:var(--ds-{index % 6})"></i>'
@@ -130,6 +243,7 @@ def input_card(inputs):
             measure_int(st, "sequence_count"),
             _fmt_catalog_length(st.get("length_bp"), missing),
             _fmt_catalog_length(st.get("n50_bp"), missing),
+            _fmt_catalog_length(st.get("n90_bp"), missing),
             measure_int(st, "gap_count"),
         ))
 
@@ -140,6 +254,7 @@ def input_card(inputs):
         f'<th scope="col">{bi("序列数", "Sequences")}</th>',
         f'<th scope="col">{bi("总长度", "Total length")}</th>',
         '<th scope="col">N50</th>',
+        '<th scope="col">N90</th>',
         f'<th scope="col" title="{gap_tip}">{bi("Gap 数", "Gaps")}</th>',
     ]
     thead = "<thead><tr>" + "".join(headers) + "</tr></thead>"
@@ -150,26 +265,52 @@ def input_card(inputs):
             f'<td class="numeric">{seq_n}</td>'
             f'<td class="numeric">{tot_len}</td>'
             f'<td class="numeric">{n50}</td>'
+            f'<td class="numeric">{n90}</td>'
             f'<td class="numeric">{gaps}</td></tr>'
-            for role_attr, role_lbl, name_html, seq_n, tot_len, n50, gaps in rows
+            for role_attr, role_lbl, name_html, seq_n, tot_len, n50, n90, gaps in rows
         ]
         tbody = "<tbody>" + "".join(body_rows) + "</tbody>"
     else:
-        tbody = f'<tbody><tr><td colspan="6" class="muted">{missing}</td></tr></tbody>'
+        tbody = f'<tbody><tr><td colspan="7" class="muted">{missing}</td></tr></tbody>'
     grid = (
         '<div class="project-dataset-scroll" tabindex="0" role="region" aria-label="Datasets">'
         f'<table class="project-dataset-table">{thead}{tbody}</table></div>'
     )
 
+    info_svg = (
+        '<span class="qc-ico" aria-hidden="true">'
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/>'
+        '<path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>'
+    )
     aux = [f'<span class="input-qc-tag">{esc({"hifi": "HiFi", "ont": "ONT", "reads": "Reads"}[r["technology"]])}: <b class="num">{r["file_count"]}</b> '
            + bi("个文件", "files") + '</span>' for r in inputs["typed_reads"]]
-    for key, zh, en in (("telomere_rules", "端粒规则", "Telomere rules"), ("centromere_reference", "着丝粒参考", "Centromere reference")):
-        if (inputs["annotations"].get(key) or {}).get("configured") is True:
-            aux.append('<span class="input-qc-tag is-enabled">' + bi(zh, en) + " · " + bi("已配置", "configured") + '</span>')
-    aux_html = ('<div class="input-aux-bar"><span class="input-aux-lbl">' + bi("辅助输入", "Auxiliary inputs") + '</span>'
-                + "".join(aux) + '</div>') if aux else ""
+    templates = []
+    annotations = inputs.get("annotations") or {}
+    for key, zh, en, builder in (
+        ("telomere_rules", "端粒规则", "Telomere rules", _tel_modal_body),
+        ("centromere_reference", "着丝粒参考", "Centromere reference", _cen_modal_body),
+    ):
+        ann = annotations.get(key) or {}
+        if ann.get("configured") is True:
+            tid = f"input-ann-{key}"
+            rc = ann.get("row_count")
+            cnt_zh = f" · {rc} 条" if isinstance(rc, int) and rc > 0 else " · 已配置"
+            cnt_en = f" · {rc}" if isinstance(rc, int) and rc > 0 else " · configured"
+            title_zh = f"{zh}（{rc} 条）" if isinstance(rc, int) and rc > 0 else zh
+            title_en = f"{en} ({rc})" if isinstance(rc, int) and rc > 0 else en
+            aux.append(
+                f'<button type="button" class="input-qc-tag is-enabled is-clickable" data-story-open="{tid}">'
+                f'{bi(zh + cnt_zh, en + cnt_en)}{info_svg}</button>'
+            )
+            templates.append(
+                f'<template id="{tid}" data-title="{esc(title_zh)}" '
+                f'data-title-zh="{esc(title_zh)}" data-title-en="{esc(title_en)}">'
+                f'{builder(ann)}</template>'
+            )
+    aux_html = ('<div class="input-aux-bar">' + "".join(aux) + '</div>') if aux else ""
     count_right = bi(f"{len(rows)} 个数据集", f"{len(rows)} datasets") if rows else ""
-    return section("inputs", "01", "输入数据", "Inputs", INPUT_STYLE + grid + aux_html, right=count_right)
+    return section("inputs", "01", "输入数据", "Inputs", INPUT_STYLE + grid + aux_html + "".join(templates), right=count_right)
 
 
 def assignment_card(assignment):

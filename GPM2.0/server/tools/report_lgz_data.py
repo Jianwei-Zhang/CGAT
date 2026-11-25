@@ -12,7 +12,7 @@ from report_inventory import file_href, obj, physical
 from server_report_io import SCHEMA, timing_summary
 from render_server_report import REPORT_PREVIEW_ROWS
 
-STATS = ("length_bp", "sequence_count", "n50_bp", "n_bp", "gap_bp", "gap_count")
+STATS = ("length_bp", "sequence_count", "n50_bp", "n90_bp", "n_bp", "gap_bp", "gap_count")
 
 
 def _extract_version_tracks(facts, stage_id):
@@ -101,7 +101,121 @@ def safe_name(s):
 
 
 def stats(value):
-    return counts(value, STATS) if isinstance(value, dict) else {}
+    if not isinstance(value, dict):
+        return {}
+    out = counts(value, STATS)
+    if "n90_bp" not in out:
+        seqs = value.get("sequences")
+        if isinstance(seqs, list) and seqs:
+            lens = [
+                r["length_bp"]
+                for r in seqs
+                if isinstance(r, dict) and type(r.get("length_bp")) is int and r["length_bp"] >= 0
+            ]
+            if len(lens) == len(seqs):
+                total = sum(lens)
+                cum = 0
+                n90 = 0
+                for length in sorted(lens, reverse=True):
+                    cum += length
+                    if cum * 10 >= total * 9:
+                        n90 = length
+                        break
+                out["n90_bp"] = n90
+    return out
+
+
+def _parse_provenance_entry(raw):
+    if isinstance(raw, list):
+        return raw[0] if raw and isinstance(raw[0], dict) else {}
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            return {}
+        if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+            return parsed[0]
+        if isinstance(parsed, dict):
+            return parsed
+    return {}
+
+
+def extract_input_annotations(facts):
+    """Allow-listed telomere rule & centromere reference details; never forwards raw paths."""
+    snap = facts.get("annotation_library_snapshot") or {}
+    snap_tel = {r.get("rule_id"): r for r in (snap.get("tel") or []) if isinstance(r, dict) and r.get("rule_id")}
+    snap_cen = {r.get("cen_id"): r for r in (snap.get("cen") or []) if isinstance(r, dict) and r.get("cen_id")}
+
+    tel_raw = facts.get("telomere_rules") or {}
+    tel_rows = tel_raw.get("rows") if isinstance(tel_raw.get("rows"), list) else []
+    tel_items = []
+    for row in tel_rows:
+        if not isinstance(row, dict):
+            continue
+        rid = str(row.get("rule_id") or "")
+        prov = _parse_provenance_entry(row.get("provenance"))
+        if not prov and rid in snap_tel:
+            entries = snap_tel[rid].get("entries") or []
+            if entries and isinstance(entries[0], dict):
+                prov = entries[0]
+        motif = str(row.get("motif") or (snap_tel.get(rid) or {}).get("motif") or "").strip().upper()
+        try:
+            min_rep = int(row.get("min_repeat"))
+        except (TypeError, ValueError):
+            raw_rep = (snap_tel.get(rid) or {}).get("min_repeat")
+            min_rep = int(raw_rep) if isinstance(raw_rep, int) else None
+        rc_val = str(row.get("reverse_complement", "true")).strip().lower()
+        tel_items.append({
+            "id": str(prov.get("id") or rid or motif),
+            "source": str(prov.get("source") or ""),
+            "motif": motif,
+            "min_repeat": min_rep,
+            "reverse_complement": rc_val not in ("false", "0", "no"),
+            "note": str(prov.get("note") or ""),
+        })
+
+    cen_raw = facts.get("centromere_reference") or {}
+    cen_rows = cen_raw.get("rows") if isinstance(cen_raw.get("rows"), list) else []
+    cen_items = []
+    for row in cen_rows:
+        if not isinstance(row, dict):
+            continue
+        cid = str(row.get("cen_id") or "")
+        prov = _parse_provenance_entry(row.get("provenance"))
+        snap_item = snap_cen.get(cid) or {}
+        if not prov:
+            entries = snap_item.get("entries") or []
+            if entries and isinstance(entries[0], dict):
+                prov = entries[0]
+        raw_len = snap_item.get("length")
+        length_bp = int(raw_len) if isinstance(raw_len, int) and raw_len > 0 else None
+        try:
+            min_len = int(row.get("min_len"))
+        except (TypeError, ValueError):
+            min_len = None
+        min_id = str(row.get("min_identity") or "").strip()
+        cen_items.append({
+            "id": str(prov.get("id") or row.get("sequence_name") or cid),
+            "source": str(prov.get("source") or ""),
+            "chr_name": str(row.get("chr_name") or "*"),
+            "length_bp": length_bp,
+            "min_len": min_len,
+            "min_identity": min_id,
+            "note": str(prov.get("note") or ""),
+        })
+
+    return {
+        "telomere_rules": dict(
+            configured=tel_raw.get("available"),
+            row_count=tel_raw.get("row_count", len(tel_rows)),
+            items=tel_items,
+        ),
+        "centromere_reference": dict(
+            configured=cen_raw.get("available"),
+            row_count=cen_raw.get("row_count", len(cen_rows)),
+            items=cen_items,
+        ),
+    }
 
 
 def assignment_groups(table, reference_order, complete=None):
@@ -258,12 +372,18 @@ def collect(layout):
         inp = load("inputs.json", run)
         f = inp["facts"]
         datasets = f.get("datasets", [])
+        primary_ds = str((f.get("parameters") or {}).get("grt_primary_dataset") or "").strip()
         for d in datasets:
             if not safe_name(d["name"]) or not safe_name(d["role"]):
                 raise ValueError("invalid dataset")
-            out["inputs"]["reference" if d["role"] == "reference" else "assemblies"].append(
-                dict(name=d["name"], role=d["role"], stats=stats(d.get("stats")))
-            )
+            role = d["role"]
+            if role == "reference":
+                out["inputs"]["reference"].append(dict(name=d["name"], role="reference", stats=stats(d.get("stats"))))
+            else:
+                if role == "assembly_candidate":
+                    is_primary = (d["name"] == primary_ds) if primary_ds else (len(out["inputs"]["assemblies"]) == 0)
+                    role = "primary" if is_primary else "support"
+                out["inputs"]["assemblies"].append(dict(name=d["name"], role=role, stats=stats(d.get("stats"))))
             if d["role"] == "reference":
                 try:
                     ref_tracks.update(references(d.get("stats") or {}))
@@ -285,11 +405,7 @@ def collect(layout):
             for r in typed
             if r.get("technology") in ("ont", "hifi", "reads") and type(r.get("file_count")) is int
         ]
-        for k in ("telomere_rules", "centromere_reference"):
-            t = f.get(k, {})
-            out["inputs"]["annotations"][k] = dict(
-                configured=t.get("available"), row_count=t.get("row_count", len(t.get("rows", [])))
-            )
+        out["inputs"]["annotations"] = extract_input_annotations(f)
         assemblies = out["inputs"]["assemblies"]
         ns = [a["stats"].get("sequence_count") for a in assemblies]
         out["funnel"]["input_contigs"] = sum(ns) if ns and None not in ns else None

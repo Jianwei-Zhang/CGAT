@@ -47,7 +47,7 @@ html:has(#path-event-dialog[open]){overflow:hidden}
 .story-dlg-head{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.85rem 1.15rem;background:var(--surface-panel);border-bottom:1px solid var(--border-subtle)}
 .story-dlg-title-wrap{min-width:0;display:flex;align-items:baseline;gap:.55rem;flex-wrap:wrap}
 #path-event-title{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;line-height:1.35}
-#path-event-title>span{font-size:.85rem;font-weight:500;color:var(--text-muted)}
+#path-event-title>span:not(.t-zh):not(.t-en){font-size:.85rem;font-weight:500;color:var(--text-muted)}
 .story-dlg-close{flex-shrink:0;display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-secondary);font:600 18px/1 sans-serif;cursor:pointer;transition:background .12s,border-color .12s,color .12s}
 .story-dlg-close:hover{background:var(--surface-hover);border-color:var(--border-default);color:var(--text-primary)}
 .story-dlg-body{padding:1rem 1.15rem 1.15rem;font-size:.86rem;line-height:1.55}
@@ -68,7 +68,12 @@ html:has(#path-event-dialog[open]){overflow:hidden}
       const t=document.getElementById(button.dataset.storyOpen);
       if(!t||t.tagName!=='TEMPLATE')return;
       prior=button; scroll=window.scrollY;
-      panel.querySelector('#path-event-title').textContent=t.dataset.title;
+      const titleEl=panel.querySelector('#path-event-title');
+      if(t.dataset.titleZh&&t.dataset.titleEn){
+        const z=document.createElement('span');z.className='t-zh';z.textContent=t.dataset.titleZh;
+        const e=document.createElement('span');e.className='t-en';e.textContent=t.dataset.titleEn;
+        titleEl.replaceChildren(z,e);
+      }else{titleEl.textContent=t.dataset.title||'';}
       panel.querySelector('[data-story-content]').replaceChildren(t.content.cloneNode(true));
       panel.dispatchEvent(new CustomEvent("cgat-story-open",{bubbles:true,detail:{button}}));
       if(!panel.open){panel.showModal();panel.focus({preventScroll:true});}

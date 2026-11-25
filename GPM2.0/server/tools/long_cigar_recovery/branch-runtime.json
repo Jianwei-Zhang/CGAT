@@ -44,7 +44,7 @@
   "recovered_output_admission": "proactive-original-chain-native-selection-v1",
   "native_companion_platform": "linux-x86_64",
   "native_companion_sha256": "00a0cee279f70d1faf35202b9328217226efcbe261bf0ff7e19b5bf4c783ab2e",
-  "handoff_base_sha256": "0b4de1e528ee73b95f5bf4a70cd4f54d82f90dd3ff94f088e222cca3c51558ee",
+  "handoff_base_sha256": "6d267ad316b87275cbbb299471cbcfdc7e78f684685e99e8cce5fe0e3ebaba77",
   "production_ready": false,
   "customer_configuration_required": false,
   "approximate_output_admission": "bounded_native_window_projection_v1",

@@ -103,7 +103,11 @@ def render_overview(vm):
             + terminal_card(vm["lgz_summary"])
             + gap_card(vm)
             + final_card(vm)
-            + (DIALOG if vm["refinement_summary"]["tools"] or any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene", "terminal_scene")) else "")
+            + (DIALOG if vm["refinement_summary"]["tools"]
+               or any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene", "terminal_scene"))
+               or any(((vm["lgz_summary"].get("inputs") or {}).get("annotations") or {}).get(k, {}).get("configured") is True
+                      for k in ("telomere_rules", "centromere_reference"))
+               else "")
         )
 
     brand_icon = (
