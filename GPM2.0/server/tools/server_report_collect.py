@@ -292,6 +292,16 @@ def collect_lgz_result(root: Path, result: dict) -> dict:
             details["step2_evidence"] = capture_step2_evidence(root, result)
         except (KeyError, OSError, ValueError, TypeError):
             details["step2_evidence"] = {}
+    if stage == "step3" and result.get("q_output_version") == "q3":
+        from report_terminal_story import capture_candidates
+        terms = result.get("terminal_rows", [])
+        if len(terms) > REPORT_PREVIEW_ROWS:
+            fields = ("chr","terminal","object_id","q2_start","q2_end","final_status","candidate_count","reason","accepted_event_id")
+            details["terminal_inventory"] = [{k:t.get(k) for k in fields} for t in terms]
+        try:
+            details["terminal_candidates"] = capture_candidates(root, result, versions["q2"])
+        except (KeyError, OSError, ValueError, TypeError):
+            details["terminal_candidates"] = None
     return {**details, "summary": event_summary(result.get("events", [])),
             "parameters": read_json(workspace_join(root, f"grt/checkpoints/{stage}.json"), {}).get("fingerprint_payload"),
             "sequence_versions": versions, "result": result, "tables": tables, "notes": notes}

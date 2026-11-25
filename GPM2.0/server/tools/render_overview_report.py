@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 try:
+    from render_terminal_story import terminal_card
     from render_repair_story import repair_card, DIALOG
     from render_path_story import input_card, assignment_card, q0_card
     from render_refinement_report import (
@@ -24,6 +25,7 @@ try:
         workbench_page,
     )
 except ModuleNotFoundError:
+    from .render_terminal_story import terminal_card
     from .render_repair_story import repair_card, DIALOG
     from .render_path_story import input_card, assignment_card, q0_card
     from .render_refinement_report import (
@@ -1119,6 +1121,7 @@ def render_overview(vm):
         ("alignment-q0", "03", "初始路径 q0", "Initial path q0"),
         ("first-repair", "04", "第一轮修补", "First repair"),
         ("structural-repair", "05", "结构修正", "Structural correction"),
+        ("terminal-process", "", "端粒处理", "Telomeres"),
         ("pseudomolecule-evolution", "", "假分子演化", "Evolution"),
         ("result-files", "", "结果取件", "Result Pickup"),
         ("diagnostics-fold", "", "诊断与明细", "Diagnostics"),
@@ -1131,9 +1134,10 @@ def render_overview(vm):
         + q0_card(vm["lgz_summary"])
         + repair_card(vm["lgz_summary"])
         + repair_card(vm["lgz_summary"], structural=True)
+        + terminal_card(vm["lgz_summary"])
         + _render_pseudomolecule_evolution(vm)
         + _render_result_files_and_diagnostics(vm)
-        + (DIALOG if any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene")) else "")
+        + (DIALOG if any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene", "terminal_scene")) else "")
     )
 
     return workbench_page(

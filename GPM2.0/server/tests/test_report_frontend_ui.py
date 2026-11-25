@@ -186,6 +186,35 @@ class ReportFrontendUITests(unittest.TestCase):
         page=structural_detail(protected); self.assertIn("受保护",page);self.assertIn("未采用移除",page)
         self.assertEqual(protected["protected"],[[299,400]])
 
+    def test_terminal_view_does_not_conflate_failed_hits_missing_or_empty_paf(self):
+        import hashlib, json
+        from report_terminal_story import _alignments
+        from render_terminal_story import _inspection
+        from workspace_layout import WorkspaceLayout
+        layout=WorkspaceLayout.detect(self.parent)
+        file=self.parent/"candidate.paf"
+        row={"candidate_id":"test","source_dataset":"A","source_contig":"ctg","chr":"Chr1","terminal":"3prime",
+             "extract_source_start":"1","extract_source_end":"5000"}
+        ev={"target_chr":"Chr1","source_dataset":"A","source_contig":"ctg","coordinate_system":"paf_0_based_half_open",
+            "raw_artifact_relpath":"candidate.paf","parameters_json":json.dumps({"min_identity":.99,"min_overlap":3000,"min_mapq":20})}
+        def measure(paf):
+            file.write_bytes(paf);sha=hashlib.sha256(paf).hexdigest();ev["raw_artifact_sha256"]=sha
+            return _alignments(layout,{"candidate.paf":sha},row,ev,15000,{"alignment_query_window":5000})
+        c={"status":"rejected","id":"test","name":"ctg","dataset":"A","strand":"+","source":[0,5000],"signals":[],"event":None,
+           "reason":"no_high_stringency_terminal_overlap"}
+        end={"count":1,"state":"unresolved","q2_signals":[],"q3_signals":[],"window":[13000,15000],"selected":None,"candidates":[c]}
+        c["alignment"]=measure(b"test\t5000\t0\t2400\t+\tChr1__3prime__q2\t5000\t100\t2500\t2400\t2400\t60\n"
+                               b"test\t5000\t0\t4000\t+\tChr1__3prime__q2\t5000\t0\t4000\t4000\t4000\t10\n")
+        self.assertEqual([x["failed"] for x in c["alignment"]["hits"]],[["overlap"],["mapq"]]);self.assertEqual(c["alignment"]["hits"][0]["q2"],[10100,12500])
+        html=_inspection(end,"3prime",15000)
+        self.assertIn("2,400 bp &lt; 3,000 bp",html);self.assertIn("MAPQ 10 &lt; 20",html)
+        c["alignment"]=measure(b"");self.assertIn("已核对的 PAF 无匹配记录",_inspection(end,"3prime",15000))
+        c["alignment"]=None;self.assertNotIn("PAF 无匹配记录",_inspection(end,"3prime",15000))
+        self.assertIn("本次未记录",_inspection(None,"3prime",15000))
+        present={**end,"state":"already_present","count":0,"candidates":[],"q2_signals":[[14700,15000]]}
+        view=_inspection(present,"3prime",15000)
+        self.assertIn("原已具备端粒",view);self.assertNotIn("候选 PAF",view);self.assertNotIn("<polygon",view)
+
     def test_large_scenario_stays_bounded_and_preserves_full_chromosome_heatmap(self):
         root = self.parent / "large"
         vm = workspace(root, "large")

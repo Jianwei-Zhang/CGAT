@@ -343,6 +343,29 @@ print(
                 {"assigned", "unplaced"},
             )
             self.assertTrue(all(row["final_path_segment_id"] for row in accepted))
+            # The report uses the same admitted event, normalized to half-open positions.
+            from server_report_collect import collect_lgz_result
+            from report_terminal_story import terminal_scene
+            from render_terminal_story import terminal_card
+            from render_server_report import project_report_facts
+            record=json.loads((server/"grt/evidence/step3/result.json").read_text())
+            facts=project_report_facts(collect_lgz_result(server,record))
+            data=terminal_scene(facts); by_chr={r["chr"]:r["ends"] for r in data}
+            left=by_chr["Chr01"]["5prime"]; right=by_chr["Chr01"]["3prime"]
+            self.assertEqual(left["selected"]["cut"],15000)
+            self.assertEqual(left["selected"]["span"],[0,20000])
+            self.assertEqual(left["q3_signals"],[[0,700]])
+            self.assertEqual(left["candidates"][0]["signals"],[[0,700]])
+            hit = left["candidates"][0]["alignment"]["hits"][0]
+            self.assertEqual(hit["q2"], [0, 15000])
+            self.assertTrue(hit["selected"])
+            self.assertFalse(hit["failed"])
+            self.assertEqual(right["q3_signals"],[[len(q3["Chr01"])-700,len(q3["Chr01"])]])
+            self.assertEqual(by_chr["Chr02"]["5prime"]["state"],"unresolved")
+            preview=terminal_card({"inputs":{"assemblies":[]},"terminal_scene":data})
+            self.assertEqual(preview.count('<button class="tel-end"'),4)
+            self.assertEqual(preview.count('>TEL</button>'),2)
+            self.assertEqual(preview.count('<polygon'),2)
             superseded_patch = next(
                 row
                 for row in events
