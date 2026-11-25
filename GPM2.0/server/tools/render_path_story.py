@@ -516,6 +516,27 @@ def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None
                    title_extra=rule_btn, right=" · ".join(right_bits))
 
 
+def _q0_visual_offset(track, domain):
+    """Compute a bp-weighted median shift so most Ref↔q0 ribbons drop nearly vertically."""
+    qlen = track.get("length_bp")
+    bands = track.get("bands") or []
+    if not isinstance(qlen, int) or qlen <= 0 or not bands:
+        return 0
+    pairs = sorted((b["ref"] - b["q"], b["bp"]) for b in bands if b.get("bp", 0) > 0)
+    if not pairs:
+        return 0
+    total = sum(w for _, w in pairs)
+    acc = 0
+    med = 0
+    for diff, w in pairs:
+        acc += w
+        if acc * 2 >= total:
+            med = diff
+            break
+    clamped = max(0, min(med, max(0, domain - qlen)))
+    return 0 if clamped < domain * 0.001 else clamped
+
+
 def q0_card(lgz):
     tracks = lgz.get("q0_scene")
     if not tracks:
@@ -532,17 +553,17 @@ def q0_card(lgz):
     def pct(pos):
         return format(100 * pos / domain, ".10g")
 
-    def mark(a, b, kind, tip, color=None):
-        style = f"left:{pct(a)}%;width:{pct(b-a)}%" + (f";background:{color}" if color else "")
+    def mark(a, b, kind, tip, color=None, shift=0):
+        style = f"left:{pct(a + shift)}%;width:{pct(b-a)}%" + (f";background:{color}" if color else "")
         return f'<span class="q0-mark {kind}" style="{style}" data-start="{a}" data-end="{b}" title="{esc(tip)}"></span>'
 
     style = """<style>
-.q0-frame{border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden}
+.q0-frame{position:relative;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden;padding-bottom:2.3rem}
 .q0-axis,.q0-row{display:grid;grid-template-columns:168px 34px minmax(0,1fr);gap:.6rem;align-items:center}
 .q0-axis{padding:.52rem .85rem .44rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.78rem;font-weight:600}
 .q0-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.75rem}
 .q0-row{padding:.68rem .85rem;border-bottom:1px solid var(--border-subtle);transition:background .12s}
-.q0-row:last-child{border-bottom:0}
+.q0-row:last-of-type{border-bottom:0}
 .q0-row:hover{background:var(--surface-subtle)}
 .q0-chr-meta{min-width:0}
 .q0-chr-head{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
@@ -566,19 +587,43 @@ def q0_card(lgz):
 .q0-bands polygon:hover{fill-opacity:.52}
 .q0-key{display:inline-block;width:11px;height:8px;border-radius:2px;vertical-align:middle;flex-shrink:0}
 .q0-key.is-band{background:var(--brand);opacity:.28;transform:skewX(-18deg)}
+.q0-zoom-btn{position:absolute;right:10px;bottom:8px;z-index:4;display:inline-flex;align-items:center;gap:.32rem;height:26px;padding:0 8px;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-secondary);font:500 .75rem/1 inherit;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.07);transition:border-color .12s,background .12s,color .12s}
+.q0-zoom-btn:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.q0-zoom-bar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.65rem}
+.q0-zoom-ctrl{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem}
+.q0-zoom-ctrl button{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 .5rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-primary);font:600 .8rem/1 var(--font-mono);cursor:pointer;transition:border-color .12s,background .12s,color .12s}
+.q0-zoom-ctrl button:hover:not(:disabled){border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.q0-zoom-ctrl button:disabled{opacity:.42;cursor:not-allowed}
+.q0-zoom-pct{min-width:44px;text-align:center;font:600 .8rem/1 var(--font-mono);color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.q0-zoom-stage{overflow:auto;max-height:72vh;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel)}
+.q0-zoom-stage .q0-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--q0-scale, 1))}
+.q0-zoom-stage .q0-axis,.q0-zoom-stage .q0-row{grid-template-columns:186px 40px minmax(0,1fr);gap:.75rem}
+.q0-zoom-stage .q0-axis{position:sticky;top:0;z-index:6}
+.q0-zoom-stage .q0-axis>:first-child{position:sticky;left:0;z-index:7;background:var(--surface-subtle)}
+.q0-zoom-stage .q0-row{padding:.95rem 1rem}
+.q0-zoom-stage .q0-chr-meta{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding-right:.45rem}
+.q0-zoom-stage .q0-row:hover .q0-chr-meta{background:var(--surface-subtle)}
+.q0-zoom-stage .q0-chr-meta b{font-size:.9rem}
+.q0-zoom-stage .q0-role-col{height:82px;font-size:.75rem}
+.q0-zoom-stage .q0-rail{height:18px}
+.q0-zoom-stage .q0-bands{height:46px}
+.q0-zoom-stage .q0-mark.ctg{min-width:7px}
+.q0-zoom-stage .q0-mark.input-gap,.q0-zoom-stage .q0-mark.ref-gap,.q0-zoom-stage .q0-mark.unknown-gap,.q0-zoom-stage .q0-mark.unspecified-gap{min-width:6px}
 @media (max-width:760px){
   .q0-axis,.q0-row{grid-template-columns:104px 26px minmax(0,1fr);gap:.4rem;padding-left:.65rem;padding-right:.65rem}
   .q0-chr-meta b{font-size:.8rem}
 }
 </style>"""
 
+    has_unknown_gap = any(p["kind"] == "reference_unknown" for t in tracks for p in t["parts"])
     legend = [
         '<span class="legend-item"><i class="q0-key is-ref"></i>Ref</span>',
         *[f'<span class="legend-item"><i class="q0-key" style="background:{color}"></i>{esc(ds)}</span>' for ds, color in colors.items()],
         '<span class="legend-item"><i class="q0-key is-band"></i>' + bi("证据投影带", "Projected anchor") + "</span>",
         '<span class="legend-item"><i class="q0-key input-gap"></i>' + bi("原有 Gap", "Original gap") + "</span>",
-        '<span class="legend-item"><i class="q0-key unknown-gap"></i>' + bi("新增占位 N", "New placeholder Ns") + "</span>",
     ]
+    if has_unknown_gap:
+        legend.append('<span class="legend-item"><i class="q0-key unknown-gap"></i>' + bi("新增占位 N", "New placeholder Ns") + "</span>")
     gap_kind_tip = {
         "input_assembly_gap": "原有 Gap / Original gap",
         "reference_unknown": "新增占位 N / Placeholder Ns",
@@ -590,6 +635,7 @@ def q0_card(lgz):
     constructed = 0
     for track in tracks:
         name, ref = track["chr"], track["ref"]
+        q_offset = _q0_visual_offset(track, domain)
         ref_marks = ""
         if ref:
             ref_marks = mark(0, ref["length_bp"], "ref", f"Ref · {name} · {ref['length_bp']:,} bp")
@@ -598,7 +644,7 @@ def q0_card(lgz):
         bands = []
         for band in track["bands"]:
             v, q, n = band["ref"], band["q"], band["bp"]
-            points = f"{pct(v)},0 {pct(v+n)},0 {pct(q+n)},1 {pct(q)},1"
+            points = f"{pct(v)},0 {pct(v+n)},0 {pct(q+n+q_offset)},1 {pct(q+q_offset)},1"
             bands.append(f'<polygon points="{points}"><title>Ref {v+1:,}–{v+n:,} → q0 {q+1:,}–{q+n:,} · {esc(band["via"])}</title></polygon>')
         parts = []
         chr_gaps = 0
@@ -606,11 +652,11 @@ def q0_card(lgz):
             a, b, kind = seg["start"], seg["end"], seg["kind"]
             if kind == "source":
                 tip = f"{seg['dataset']} / {seg['name']}:{seg['source_start']+1:,}–{seg['source_end']:,} ({seg['strand']}) · q0 {a+1:,}–{b:,}"
-                parts.append(mark(a, b, "ctg", tip, colors[seg["dataset"]]))
+                parts.append(mark(a, b, "ctg", tip, colors[seg["dataset"]], shift=q_offset))
             else:
                 chr_gaps += 1
                 cls_name = {"input_assembly_gap": "input-gap", "reference_unknown": "unknown-gap", "unspecified_gap": "unspecified-gap"}[kind]
-                parts.append(mark(a, b, cls_name, f"{gap_kind_tip[kind]} · q0 {a+1:,}–{b:,} · {b-a:,} N"))
+                parts.append(mark(a, b, cls_name, f"{gap_kind_tip[kind]} · q0 {a+1:,}–{b:,} · {b-a:,} N", shift=q_offset))
         if isinstance(track.get("length_bp"), int):
             total_q0_bp += track["length_bp"]
             constructed += 1
@@ -656,11 +702,74 @@ def q0_card(lgz):
         + "".join(f"<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>" for i in range(5))
         + "</span></div>"
     )
-    frame_html = f'<div class="q0-frame">{axis_html}{"".join(rows_html)}</div>'
+    zoom_btn = (
+        '<button type="button" class="q0-zoom-btn" data-q0-zoom="1" '
+        'title="放大查看 / Enlarge view" aria-label="放大查看 / Enlarge view">'
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>'
+        '<line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+        f'<span>{bi("放大", "Zoom")}</span></button>'
+    )
+    zoom_script = """<script data-cgat-ui="1" data-q0-zoom-ui="1">(()=>{
+  document.addEventListener('click',(ev)=>{
+    const btn=ev.target.closest('[data-q0-zoom="1"]');
+    if(!btn)return;
+    const dlg=document.getElementById('path-event-dialog');
+    const sec=btn.closest('#alignment-q0');
+    const srcFrame=sec&&sec.querySelector('.q0-frame');
+    if(!dlg||!srcFrame)return;
+    const wrap=document.createElement('div');
+    const bar=document.createElement('div');
+    bar.className='q0-zoom-bar';
+    const srcLegend=sec.querySelector('.legend-row');
+    if(srcLegend)bar.appendChild(srcLegend.cloneNode(true));
+    const ctrl=document.createElement('div');
+    ctrl.className='q0-zoom-ctrl';
+    const steps=[1,1.5,2,3,4];
+    let idx=0;
+    const outBtn=document.createElement('button');outBtn.type='button';outBtn.textContent='−';outBtn.title='Zoom out';
+    const pctEl=document.createElement('span');pctEl.className='q0-zoom-pct';pctEl.textContent='100%';
+    const inBtn=document.createElement('button');inBtn.type='button';inBtn.textContent='+';inBtn.title='Zoom in';
+    const rstBtn=document.createElement('button');rstBtn.type='button';
+    const rz=document.createElement('span');rz.className='t-zh';rz.textContent='重置';
+    const re=document.createElement('span');re.className='t-en';re.textContent='Reset';
+    rstBtn.append(rz,re);
+    ctrl.append(outBtn,pctEl,inBtn,rstBtn);
+    bar.appendChild(ctrl);
+    const stage=document.createElement('div');
+    stage.className='q0-zoom-stage';
+    const clone=srcFrame.cloneNode(true);
+    const cBtn=clone.querySelector('.q0-zoom-btn');
+    if(cBtn)cBtn.remove();
+    stage.appendChild(clone);
+    function applyZoom(){
+      const s=steps[idx];
+      clone.style.setProperty('--q0-scale',String(s));
+      pctEl.textContent=Math.round(s*100)+'%';
+      outBtn.disabled=idx<=0;
+      inBtn.disabled=idx>=steps.length-1;
+      rstBtn.disabled=idx===0;
+    }
+    outBtn.addEventListener('click',()=>{if(idx>0){idx--;applyZoom();}});
+    inBtn.addEventListener('click',()=>{if(idx<steps.length-1){idx++;applyZoom();}});
+    rstBtn.addEventListener('click',()=>{idx=0;applyZoom();stage.scrollLeft=0;});
+    applyZoom();
+    wrap.append(bar,stage);
+    dlg.dispatchEvent(new CustomEvent('cgat-open-custom',{detail:{
+      trigger:btn,wide:true,
+      titleZh:'03 初始路径 q0 · 放大视图',
+      titleEn:'03 Initial path q0 · Enlarged view',
+      content:wrap
+    }}));
+  });
+})();</script>"""
+    frame_html = f'<div class="q0-frame">{axis_html}{"".join(rows_html)}{zoom_btn}</div>'
     body_html = (
         style
         + '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + "</div></div>"
         + frame_html
+        + zoom_script
     )
     right_bits = [bi(f"{len(tracks)} 条染色体", f"{len(tracks)} chrs")]
     if constructed:
