@@ -10,6 +10,7 @@ import {
   previewImageFormats, previewImageStillCurrent, renderProjectPreviewPng, syncPreviewExportActions,
 } from "./project-preview-image-export.js";
 import { previewProjectKey } from "./project-preview-state.js";
+import { renderExportJobDialog } from "./export-job-dialog.js";
 import { getMessages } from "../i18n/index.js";
 import { projectIcon } from "./project-icons.js";
 import { syncFinalPathStripGeometry } from "./assembly/final-path-visual-layout.js";
@@ -456,8 +457,6 @@ function getLabels(state) {
       exportAgp: "Layout",
       exportLog: "Contig Usage",
       exportRefinementAll: "Refinement Tasks",
-      exportDialogTitle: "Export Assembly Outputs",
-      exportRunning: "Running: {step}",
       refDisabled: "A Final Path in this assembly contains reference objects. Assembly statistics cannot be displayed, and Contig Usage cannot be exported. Other outputs remain available.",
       placedStats: "Placed statistics",
       countLabel: "Count",
@@ -492,9 +491,6 @@ function getLabels(state) {
       expand: "Expand",
       noRows: "No rows",
       exporting: "Exporting...",
-      completed: "Export completed",
-      failed: "Export failed",
-      canceled: "Canceled. Already exported files were kept.",
       all: "All",
     };
   }
@@ -522,8 +518,6 @@ function getLabels(state) {
     exportAgp: "组装结构",
     exportLog: "Contig 使用统计",
     exportRefinementAll: "精修任务",
-    exportDialogTitle: "导出组装结果",
-    exportRunning: "正在执行：{step}",
     refDisabled: "当前组装的 Final Path 包含参考序列对象，无法显示装配统计，也不能导出 Contig 使用统计。其他结果仍可导出。",
     placedStats: "已放置统计",
     countLabel: "数目",
@@ -558,9 +552,6 @@ function getLabels(state) {
     expand: "展开",
     noRows: "暂无记录",
     exporting: "正在导出...",
-    completed: "已完成导出",
-    failed: "导出失败",
-    canceled: "已终止，已保留已导出的文件",
     all: "全部",
   };
 }
@@ -1398,132 +1389,6 @@ function resolveProjectExportJumpTarget(state, target) {
 const exportLabelKeys = { agp: "exportAgp", fasta: "exportFasta", tsv: "exportTsv", log: "exportLog",
   png: "exportImage", all: "exportAll", "refinement-all": "exportRefinementAll" };
 
-function projectExportStepLabel(step, labels) {
-  const name = labels[exportLabelKeys[step?.kind]];
-  return name ? `${name} (.${step.kind})` : normalizeString(step?.label);
-}
-
-function resolveProjectExportStatusText(job, labels) {
-  if (job?.status === "success") {
-    return labels.completed || "已完成导出";
-  }
-  if (job?.status === "error") {
-    return labels.failed || "导出失败";
-  }
-  if (job?.status === "canceled") {
-    return labels.canceled || "已终止，已保留已导出的文件";
-  }
-  const template = labels.exportRunning || "正在执行：{step}";
-  const step = job?.steps?.find(item => item.label === job.currentStep);
-  return template.replace("{step}", step ? projectExportStepLabel(step, labels) : normalizeString(job?.currentStep));
-}
-
-function renderProjectExportStepIcon(status) {
-  if (status === "running") {
-    return `<span class="pipeline-spinner" aria-hidden="true"></span>`;
-  }
-  if (status === "done") {
-    return `<span class="pipeline-done" aria-hidden="true">&#10003;</span>`;
-  }
-  if (status === "error") {
-    return `<span class="pipeline-error" aria-hidden="true">&#10007;</span>`;
-  }
-  if (status === "skipped") {
-    return `<span class="pipeline-skipped" aria-hidden="true">-</span>`;
-  }
-  return `<span class="pipeline-pending" aria-hidden="true">&#9675;</span>`;
-}
-
-function resolveProjectExportStepStatus(job, step) {
-  const completedOutputs = Array.isArray(job?.completedOutputs) ? job.completedOutputs : [];
-  const currentStep = normalizeString(job?.currentStep);
-  const stepLabel = normalizeString(step?.label);
-  if (completedOutputs.includes(step?.outputPath)) {
-    return "done";
-  }
-  if (job?.status === "running" && currentStep && stepLabel && currentStep.includes(stepLabel)) {
-    return "running";
-  }
-  if (job?.status === "error" && currentStep && stepLabel && currentStep.includes(stepLabel)) {
-    return "error";
-  }
-  if (job?.status === "canceled") {
-    return "skipped";
-  }
-  return "pending";
-}
-
-function renderProjectExportSteps(job, labels) {
-  const steps = Array.isArray(job?.steps) ? job.steps : [];
-  if (!steps.length) {
-    return "";
-  }
-  return `
-    <div class="assembly-final-path-export-steps">
-      ${steps.map((step) => {
-        const stepStatus = resolveProjectExportStepStatus(job, step);
-        return `
-          <div
-            class="pipeline-step-row assembly-final-path-export-step ${escapeAttr(stepStatus)}"
-            data-project-export-step-status="${escapeAttr(stepStatus)}"
-          >
-            <span class="pipeline-step-label">${escapeHtml(projectExportStepLabel(step, labels))}</span>
-            <span class="pipeline-step-icon">${renderProjectExportStepIcon(stepStatus)}</span>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-}
-
-function renderProjectExportCompletedOutputs(job) {
-  const outputs = Array.isArray(job?.completedOutputs) ? job.completedOutputs : [];
-  if (!outputs.length) {
-    return "";
-  }
-  return `
-    <ul class="assembly-final-path-export-output-list">
-      ${outputs.map((outputPath) => `<li>${escapeHtml(String(outputPath || ""))}</li>`).join("")}
-    </ul>
-  `;
-}
-
-function renderProjectExportJobModal(job, labels) {
-  if (!job?.open) {
-    return "";
-  }
-  const kindLabel = labels[exportLabelKeys[job.kind]] || job.kind;
-  const statusText = resolveProjectExportStatusText(job, labels);
-  const statusClass = job?.status === "success" ? "success" : "";
-  return `
-    <div class="modal-overlay assembly-final-path-export-overlay" data-project-export-overlay="true">
-      <article
-        class="card modal-dialog assembly-final-path-export-dialog"
-        data-project-export-modal="true"
-        role="dialog"
-        aria-modal="true"
-        aria-label="${escapeAttr(labels.exportDialogTitle)}"
-      >
-        <button
-          type="button"
-          class="button ghost tiny assembly-final-path-export-close"
-          data-project-export-close="true"
-        >x</button>
-        <div class="assembly-final-path-export-body">
-          <header class="assembly-final-path-export-head">
-            <h4>${escapeHtml(labels.exportDialogTitle)}</h4>
-            <p class="muted">${escapeHtml(`${normalizeString(job?.projectName)} · ${kindLabel}`)}</p>
-          </header>
-          ${renderProjectExportSteps(job, labels)}
-          <p class="muted assembly-final-path-export-status ${escapeAttr(statusClass)}">${escapeHtml(statusText)}</p>
-          ${job?.error ? `<p class="error-text">${escapeHtml(String(job.error || ""))}</p>` : ""}
-          ${renderProjectExportCompletedOutputs(job)}
-        </div>
-      </article>
-    </div>
-  `;
-}
-
 function renderProjectExportMenu({ labels, fresh, previewReady, canExportFasta, canExportLog }) {
   const item = (action, ext, attrs = "") => `<button type="button" class="final-path-export-item" data-project-export-action="${action}"${attrs}>
     <span>${escapeHtml(labels[exportLabelKeys[action]])}</span>${ext ? `<span class="project-export-extension">.${ext}</span>` : ""}</button>`;
@@ -1574,7 +1439,10 @@ function renderProjectOverviewSummary(state) {
           <button type="button" class="button ghost tiny" data-project-export-refresh="1">${escapeHtml(labels.refresh)}</button>
         </div>
       ` : ""}
-      ${renderProjectExportJobModal(exportState.job, labels)}
+      ${renderExportJobDialog({
+        job: exportState.job, locale: state, scope: "project", escapeHtml,
+        stepLabel: kind => labels[exportLabelKeys[kind]] || kind,
+      })}
       ${renderManualRefinementExportPreviewModal(exportState.refinementExportModal, state)}
       ${fresh ? renderStats(model, labels, normalizeDetailTableState(state)) : ""}
       </section>
@@ -2068,13 +1936,12 @@ function planProjectExportSteps({
   targetPath,
   canExportFasta = true,
   canExportLog = true,
-  labels = getLabels({ locale: "zh" }),
 }) {
   // Keep the existing batch write order and cancellation / partial-output semantics.
   const available = ["png", "tsv", ...(canExportLog ? ["log"] : []), ...(canExportFasta ? ["fasta"] : []), "agp"];
   const action = normalizeString(kind).toLowerCase();
   const kinds = action === "all" ? available : available.filter(k => k !== "png" && k === action);
-  return kinds.map(kind => ({ kind, label: projectExportStepLabel({ kind }, labels),
+  return kinds.map(kind => ({ kind,
     outputPath: action === "all" ? joinOutputPath(targetPath, `${baseName}.${kind}`) : targetPath,
   }));
 }
@@ -2129,7 +1996,6 @@ async function runProjectExport(host, store, kind, deps = {}) {
     targetPath,
     canExportFasta: canProjectExportFasta(state),
     canExportLog: model.canExportLog,
-    labels: getLabels(state),
   });
   if (!steps.length) {
     return false;
@@ -2163,7 +2029,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
     const exportEntries = enrichProjectFinalPathEntriesForExport(entries, state);
     const finalPathByChr = buildProjectFinalPathByChr(exportEntries);
     for (const step of steps) {
-      let currentJob = readJob();
+      const currentJob = readJob();
       if (currentJob.cancelRequested) {
         publish({
           ...currentJob,
@@ -2176,7 +2042,7 @@ async function runProjectExport(host, store, kind, deps = {}) {
       publish({
         ...currentJob,
         status: "running",
-        currentStep: step.label || step.kind,
+        currentStep: step.kind,
         completedOutputs: [...completedOutputs],
         error: "",
       });
@@ -2209,16 +2075,6 @@ async function runProjectExport(host, store, kind, deps = {}) {
         });
       }
       completedOutputs.push(step.outputPath);
-      currentJob = readJob();
-      if (currentJob.cancelRequested) {
-        publish({
-          ...currentJob,
-          status: "canceled",
-          completedOutputs: [...completedOutputs],
-          error: "",
-        });
-        return false;
-      }
     }
     publish({
       ...readJob(),

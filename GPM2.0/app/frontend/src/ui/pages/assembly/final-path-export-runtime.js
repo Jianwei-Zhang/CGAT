@@ -526,46 +526,12 @@ export function planFinalPathExportSteps({
   canExportLog = true,
 }) {
   const normalizedKind = normalizeString(kind).toLowerCase();
-  if (normalizedKind === "png") {
-    return [{ kind: "png", label: "图(.png)", outputPath: targetPath }];
-  }
-  if (normalizedKind === "tsv") {
-    return [{ kind: "tsv", label: "表(.tsv)", outputPath: targetPath }];
-  }
-  if (normalizedKind === "log") {
-    return canExportLog ? [{ kind: "log", label: "日志(.log)", outputPath: targetPath }] : [];
-  }
-  if (normalizedKind === "agp") {
-    return [{ kind: "agp", label: "AGP (.agp)", outputPath: targetPath }];
-  }
-  if (normalizedKind === "fasta") {
-    return [{ kind: "fasta", label: "序列(.fasta)", outputPath: targetPath }];
-  }
-  if (normalizedKind === "refinement-current-chr" || normalizedKind === "refine-jobs") {
-    return [{ kind: normalizedKind, label: "refine-jobs", outputPath: targetPath }];
-  }
-  if (normalizedKind === "degap-jobs") {
-    return [{ kind: "degap-jobs", label: "DEGAP-JOBS", outputPath: targetPath }];
-  }
+  const kinds = ["png", "tsv", ...(canExportLog ? ["log"] : []), ...(canExportFasta ? ["fasta"] : []), "agp"];
   if (normalizedKind === "all") {
-    const steps = [
-      { kind: "png", label: "图(.png)", outputPath: joinOutputPath(targetPath, `${baseName}.png`) },
-      { kind: "tsv", label: "表(.tsv)", outputPath: joinOutputPath(targetPath, `${baseName}.tsv`) },
-    ];
-    if (canExportLog) {
-      steps.push({ kind: "log", label: "日志(.log)", outputPath: joinOutputPath(targetPath, `${baseName}.log`) });
-    }
-    if (canExportFasta) {
-      steps.push({
-        kind: "fasta",
-        label: "序列(.fasta)",
-        outputPath: joinOutputPath(targetPath, `${baseName}.fasta`),
-      });
-    }
-    steps.push({ kind: "agp", label: "AGP (.agp)", outputPath: joinOutputPath(targetPath, `${baseName}.agp`) });
-    return steps;
+    return kinds.map(kind => ({ kind, outputPath: joinOutputPath(targetPath, `${baseName}.${kind}`) }));
   }
-  return [];
+  return [...kinds, "refinement-current-chr", "refine-jobs", "degap-jobs"].includes(normalizedKind)
+    ? [{ kind: normalizedKind, outputPath: targetPath }] : [];
 }
 
 function resolveDegapJobDisplayLabel(job) {
@@ -676,20 +642,21 @@ export async function renderFinalPathViewportPng(snapshot) {
   }
 }
 
-export async function runFinalPathExportJob({ job, runStep, onUpdate }) {
+export async function runFinalPathExportJob({ job, runStep, onUpdate, isCancelRequested = () => false }) {
   const nextJob = {
     ...job,
     status: "running",
     completedOutputs: Array.isArray(job?.completedOutputs) ? job.completedOutputs : [],
     completedStepIds: Array.isArray(job?.completedStepIds) ? job.completedStepIds : [],
   };
-  for (const step of Array.isArray(job?.steps) ? job.steps : []) {
-    if (nextJob.cancelRequested) {
+  const steps = Array.isArray(job?.steps) ? job.steps : [];
+  for (const step of steps) {
+    if (nextJob.cancelRequested || isCancelRequested()) {
       nextJob.status = "canceled";
       await onUpdate({ ...nextJob });
       return nextJob;
     }
-    nextJob.currentStep = step.label;
+    nextJob.currentStep = step.kind;
     await onUpdate({ ...nextJob });
     const result = await runStep(step, nextJob);
     const outputPaths = Array.isArray(result?.outputPaths) ? result.outputPaths : [result?.outputPath];
@@ -713,11 +680,6 @@ export async function runFinalPathExportJob({ job, runStep, onUpdate }) {
     }
     if (Number.isFinite(Number(result?.tasksCount))) {
       nextJob.tasksCount = Number(result.tasksCount);
-    }
-    if (nextJob.cancelRequested) {
-      nextJob.status = "canceled";
-      await onUpdate({ ...nextJob });
-      return nextJob;
     }
   }
   nextJob.status = "success";
@@ -1072,6 +1034,7 @@ export async function launchFinalPathExportJob({
     }
     const finalJob = await runFinalPathExportJob({
       job,
+      isCancelRequested: () => Boolean(store.getState().assembly?.finalPathExportJob?.cancelRequested),
       runStep: async (step) => {
         if (refinementScope && !isSameProjectSession(store.getState(), frozenRefinement)) {
           throw new Error(state?.locale === "en"

@@ -176,9 +176,12 @@ for (const [locale, names] of Object.entries({
   assert.match(html, /class="context-menu-submenu" data-context-submenu role="menu"/);
   assert.deepEqual([...html.matchAll(/data-preview-format="([^"]+)"/g)].map(m => m[1]), ["svg", "png", "pdf"]);
   assert.doesNotMatch(html, /<details|<summary/);
-  const plan = __test.planProjectExportSteps({ kind: "all", baseName: "test", targetPath: "/out", labels: __test.getLabels({ locale }) });
-  const namesByKind = { png: names[4], tsv: names[2], log: names[3], fasta: names[1], agp: names[0] };
-  assert.deepEqual(plan.map(step => step.label), Object.entries(namesByKind).map(([kind, name]) => `${name} (.${kind})`));
+  const plan = __test.planProjectExportSteps({ kind: "all", baseName: "test", targetPath: "/out" });
+  for (const [index, name] of [names[4], names[2], names[3], names[1], names[0]].entries()) {
+    const job = { open: true, status: "running", steps: plan, currentStep: plan[index].kind, kind: "all" };
+    const progress = renderProjectExportPage(createState({ locale, projectExport: { ...createState().projectExport, job } }));
+    assert.ok(progress.includes(` · ${name}</p>`));
+  }
 });
 
 test("Export opens on AGP and resets the image submenu when leaving the export root", async () => {
@@ -699,7 +702,7 @@ test("project export page renders export progress as a final-path style modal", 
         kind: "all",
         projectName: "p1",
         status: "running",
-        currentStep: "图(.png)",
+        currentStep: "png",
         completedOutputs: [],
         error: "",
         steps: [
@@ -713,14 +716,48 @@ test("project export page renders export progress as a final-path style modal", 
 
   assert.match(html, /data-project-export-modal="true"/);
   assert.match(html, /data-project-export-overlay="true"/);
-  assert.match(html, /导出组装结果/);
-  assert.match(html, /p1 · 全部组装结果/);
-  assert.match(html, /正在执行：假分子预览图 \(\.png\)/);
-  assert.match(html, /class="pipeline-step-label">路径明细 \(\.tsv\)/);
-  assert.match(html, /data-project-export-step-status="running"/);
-  assert.match(html, /class="pipeline-spinner"/);
+  const modal = html.split('data-project-export-overlay="true"')[1].split("</article>")[0];
+  assert.match(modal, /正在导出…/);
+  assert.match(modal, /第 1 \/ 3 步 · 假分子预览图/);
+  assert.match(modal, /取消导出/);
+  assert.doesNotMatch(modal, /路径明细|图\(\.png\)|project_path/);
   assert.match(html, /data-project-export-close="true"/);
   assert.doesNotMatch(html, /project-export-job/);
+});
+
+test("Home receipts use the active language and only confirmed paths, grouped by directory", () => {
+  const job = { open: true, kind: "all", status: "success", currentStep: "png",
+    steps: [{ kind: "png", label: "图(.png)", outputPath: "/never/planned.png" }],
+    completedOutputs: [String.raw`D:\out\a.agp`, String.raw`D:\out\a.agp`, String.raw`D:\out\b.tsv`, "/<dir>/a.agp"],
+  };
+  const render = (locale, overrides = {}) => renderProjectExportPage(createState({ locale,
+    projectExport: { ...createState().projectExport, job: { ...job, ...overrides } },
+  })).split('data-project-export-overlay="true"')[1].split("</article>")[0];
+  const en = render("en");
+  assert.match(en, /Exported 3 files/);
+  assert.equal(en.split(String.raw`D:\out`).length - 1, 1);
+  assert.match(en, /Saved to: <bdi>\/&lt;dir&gt;<\/bdi>/);
+  assert.equal(en.split("<li>a.agp</li>").length - 1, 2);
+  assert.doesNotMatch(en, /planned|图|\.png|Export complete|Exporting/);
+  assert.match(render("zh"), /已导出 3 个文件/);
+
+  const single = render("en", { completedOutputs: ["/Chr<01>.agp"] });
+  assert.match(single, /Export complete/);
+  assert.match(single, /<li>Chr&lt;01&gt;\.agp<\/li>/);
+  assert.match(single, /Saved to: <bdi>\/<\/bdi>/);
+  assert.match(render("en", { completedOutputs: [String.raw`D:\a.agp`] }), /<bdi>D:\\<\/bdi>/);
+  assert.match(render("en", { completedOutputs: [String.raw`/export/a\b.agp`] }), /<li>a\\b\.agp<\/li>/);
+  assert.match(render("en", { completedOutputs: [] }), /No files exported/);
+  for (const [status, title] of [["error", "Export failed"], ["canceled", "Export canceled"]]) {
+    const result = render("en", { status, completedOutputs: ["/out/kept.tsv"], error: status === "error" ? "<write failed>" : "" });
+    assert.ok(result.includes(title));
+    assert.match(result, /1 file kept/);
+    assert.match(result, /<li>kept.tsv<\/li>/);
+    assert.doesNotMatch(result, /planned|Export complete|Cancel export/);
+    if (status === "error") assert.match(result, /&lt;write failed&gt;/);
+  }
+  assert.doesNotMatch(render("en", { status: "running" }), /Step 1 of|planned|Saved to|<li>/);
+  assert.match(render("en", { status: "running", cancelRequested: true }), /Canceling…/);
 });
 
 test("project export page hides log action and stats when any final path contains ref", () => {

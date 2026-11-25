@@ -106,58 +106,45 @@
   padding: 32px;
 }
 
-.assembly-final-path-export-dialog {
-  position: relative;
-  width: min(680px, calc(100vw - 64px));
-  display: block;
-  padding: 28px 32px;
+.export-job-dialog {
+  width: min(460px, 100%);
+  max-height: calc(100vh - 64px);
   box-sizing: border-box;
-}
-
-.assembly-final-path-export-close {
-  position: absolute;
-  top: 24px;
-  right: 24px;
-}
-
-.assembly-final-path-export-body {
-  width: min(100%, 560px);
-  margin: 0 auto 0 24px;
+  padding: 18px 20px;
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  overflow-wrap: anywhere;
 }
 
-.assembly-final-path-export-head {
+.export-job-dialog > header,
+.export-job-dialog h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.export-job-dialog > header { justify-content: space-between; }
+.export-job-dialog h4, .export-job-dialog p { margin: 0; }
+.export-job-dialog > header button { flex: none; }
+
+.export-result-files {
   display: grid;
-  gap: 6px;
-  padding-right: 48px;
+  gap: 12px;
+  max-height: 45vh;
+  overflow: auto;
+  user-select: text;
 }
 
-.assembly-final-path-export-head h4 {
+.export-result-files ul {
+  list-style: none;
+  padding: 0;
   margin: 0;
-}
-
-.assembly-final-path-export-head .muted {
-  margin: 0;
-}
-
-.assembly-final-path-export-output-list {
-  margin: 0;
-  padding-left: 18px;
   display: grid;
   gap: 4px;
+  font-weight: 600;
 }
 
-.assembly-final-path-export-steps {
-  display: grid;
-  gap: 10px;
-}
-
-.assembly-final-path-export-step {
-  grid-template-columns: minmax(0, 1fr) 20px;
-  width: 100%;
-  gap: 16px;
-}
+.export-result-files .export-result-dir { margin-top: 4px; }
 
 .pipeline-step-label {
   display: block;
@@ -166,14 +153,6 @@
 
 .pipeline-step-icon {
   justify-self: end;
-}
-
-.assembly-final-path-export-status {
-  margin: 0;
-}
-
-.assembly-final-path-export-status.success {
-  color: var(--theme-green-ink, #2c6b2f);
 }
 
 .pipeline-done,

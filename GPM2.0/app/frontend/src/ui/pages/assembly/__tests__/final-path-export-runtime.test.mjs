@@ -1510,25 +1510,21 @@ test("planFinalPathExportSteps expands all export into png tsv log fasta agp ord
     [
       {
         kind: "png",
-        label: "图(.png)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.png",
       },
       {
         kind: "tsv",
-        label: "表(.tsv)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.tsv",
       },
       {
         kind: "log",
-        label: "日志(.log)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.log",
       },
       {
         kind: "fasta",
-        label: "序列(.fasta)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.fasta",
       },
-      { kind: "agp", label: "AGP (.agp)", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
+      { kind: "agp", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
     ],
   );
 });
@@ -1544,20 +1540,17 @@ test("planFinalPathExportSteps retains AGP in all export when fasta is unavailab
     [
       {
         kind: "png",
-        label: "图(.png)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.png",
       },
       {
         kind: "tsv",
-        label: "表(.tsv)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.tsv",
       },
       {
         kind: "log",
-        label: "日志(.log)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.log",
       },
-      { kind: "agp", label: "AGP (.agp)", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
+      { kind: "agp", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
     ],
   );
 });
@@ -1574,15 +1567,13 @@ test("planFinalPathExportSteps omits log when log export is unavailable", () => 
     [
       {
         kind: "png",
-        label: "图(.png)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.png",
       },
       {
         kind: "tsv",
-        label: "表(.tsv)",
         outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.tsv",
       },
-      { kind: "agp", label: "AGP (.agp)", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
+      { kind: "agp", outputPath: "D:\\Desktop\\GPM\\exports\\project1_Chr01_path.agp" },
     ],
   );
   assert.deepEqual(
@@ -1679,9 +1670,9 @@ test("runFinalPathExportJob stops before the next step after cancel is requested
   });
 
   assert.deepEqual(updates, [
-    ["status", "running", "图(.png)", []],
+    ["status", "running", "png", []],
     ["step", "png"],
-    ["status", "canceled", "图(.png)", ["a.png"]],
+    ["status", "canceled", "png", ["a.png"]],
   ]);
 });
 
@@ -1723,6 +1714,26 @@ test("runFinalPathExportJob records expanded DEGAP-JOBS outputs and completed st
     "degap-job:CtgA_vs_CtgB_Left-job",
     "degap-manifest",
   ]);
+});
+
+test("a cancel from the Assembly dialog keeps the in-flight file but skips remaining writes", async () => {
+  const store = createStore({ session: { projectName: "project" }, assembly: {
+    selectedChrName: "Chr01", finalPathByChr: { Chr01: { mode: "segments", chrName: "Chr01", segments: [
+      { segmentId: "s1", type: "ctg", assemblyCtgId: 1, ctgName: "a", start: 1, end: 100 },
+    ] } },
+  } });
+  const written = [];
+  await launchFinalPathExportJob({ store, host: {}, kind: "all", deps: {
+    resolveFinalPathExportTarget: async () => "/exports",
+    runFinalPathExportStep: async ({ step }) => {
+      written.push(step.outputPath);
+      store.setState({ assembly: requestCancelFinalPathExport(store.getState().assembly) });
+      return { outputPath: step.outputPath };
+    },
+  } });
+  assert.equal(written.length, 1);
+  assert.equal(store.getState().assembly.finalPathExportJob.status, "canceled");
+  assert.deepEqual(store.getState().assembly.finalPathExportJob.completedOutputs, written);
 });
 
 test("launchFinalPathExportJob opens no dialog when target picking is canceled", async () => {

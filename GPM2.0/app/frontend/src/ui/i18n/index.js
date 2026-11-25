@@ -3,9 +3,11 @@ import { zh as importerZh, en as importerEn } from "./messages/importer.js";
 import { zh as workspaceZh, en as workspaceEn } from "./messages/workspace.js";
 import { zh as projectPreviewZh, en as projectPreviewEn } from "./messages/project-preview.js";
 import { zh as assemblyZh, en as assemblyEn } from "./messages/assembly.js";
+import { zh as exportDialogZh, en as exportDialogEn } from "./messages/export-dialog.js";
 
 const catalogs = {
   zh: {
+    exportDialog: exportDialogZh,
     shell: shellZh,
     projectPreview: projectPreviewZh,
     importer: importerZh,
@@ -13,6 +15,7 @@ const catalogs = {
     assembly: assemblyZh,
   },
   en: {
+    exportDialog: exportDialogEn,
     shell: shellEn,
     projectPreview: projectPreviewEn,
     importer: importerEn,

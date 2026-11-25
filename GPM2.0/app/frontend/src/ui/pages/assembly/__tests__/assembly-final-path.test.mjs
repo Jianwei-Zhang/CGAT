@@ -608,13 +608,14 @@ test("assembly main view renders ref final-path rows as fixed-name bounded segme
 test("assembly page renders a blocking final-path export modal when export job is open", () => {
   const html = renderAssemblyPage(
     createState({
+      locale: "en",
       assembly: {
         finalPathExportJob: {
           open: true,
           kind: "all",
           chrName: "Chr01",
           status: "running",
-          currentStep: "导出图(.png)",
+          currentStep: "png",
           completedOutputs: [],
           cancelRequested: false,
           error: "",
@@ -630,13 +631,11 @@ test("assembly page renders a blocking final-path export modal when export job i
 
   assert.match(html, /data-final-path-export-modal="true"/);
   assert.match(html, /data-final-path-export-overlay="true"/);
-  assert.match(html, /正在导出 Final Path/);
-  assert.match(html, /Chr01/);
-  assert.match(html, /data-final-path-export-step-status="running"/);
-  assert.match(html, /class="pipeline-spinner"/);
-  assert.match(html, /图\(.png\)/);
-  assert.match(html, /表\(.tsv\)/);
-  assert.match(html, /序列\(.fasta\)/);
+  const modal = html.split('data-final-path-export-overlay="true"')[1].split("</article>")[0];
+  assert.match(modal, /Exporting…/);
+  assert.match(modal, /Step 1 of 3 · Graph \(\.png\)/);
+  assert.match(modal, /Cancel export/);
+  assert.doesNotMatch(modal, /图|表|序列|a\.tsv/);
   assert.match(html, /data-final-path-export-close="true"/);
 });
 
@@ -856,7 +855,7 @@ test("batch delete progress modal close removes stale overlays outside the route
   assert.deepEqual(removed, ["stale"]);
 });
 
-test("assembly page renders completed export steps with a check mark icon", () => {
+test("assembly page shows confirmed filenames instead of the completed export steps", () => {
   const html = renderAssemblyPage(
     createState({
       assembly: {
@@ -879,28 +878,27 @@ test("assembly page renders completed export steps with a check mark icon", () =
     }),
   );
 
-  assert.match(html, /class="assembly-final-path-export-body"/);
-  assert.match(html, /data-final-path-export-step-status="done"/);
-  assert.match(html, /class="pipeline-done"/);
-  assert.match(html, /class="muted assembly-final-path-export-status success"/);
-  assert.match(html, /&#10003;/);
+  const modal = html.split('data-final-path-export-overlay="true"')[1].split("</article>")[0];
+  assert.match(modal, /已导出 3 个文件/);
+  assert.match(modal, /aria-label="关闭"/);
+  assert.deepEqual([...modal.matchAll(/<li>([^<]+)<\/li>/g)].map(m => m[1]), ["a.png", "a.tsv", "a.fasta"]);
+  assert.doesNotMatch(modal, /正在导出|图\(\.png\)|表\(\.tsv\)|序列\(\.fasta\)/);
 });
 
-test("export dialog css centers its content block and keeps step icons pinned on the right", () => {
-  const css = readStylesheetTree(
-    new URL("../../../../styles/components.css", import.meta.url),
-    "utf8",
-  );
+test("the refinement export keeps its batch and Server command after the file list", () => {
+  const job = { open: true, status: "success", kind: "refinement-current-chr", completedOutputs: ["/out/tasks.zip"],
+    batchSha256: "abcdef0123456789", lociCount: 2, tasksCount: 3, serverCommand: "python refine.py tasks.zip" };
+  const modal = renderAssemblyPage(createState({ locale: "en", assembly: { finalPathExportJob: job } }))
+    .split('data-final-path-export-overlay="true"')[1].split("</article>")[0];
+  assert.match(modal, /Export complete/);
+  assert.match(modal, /<li>tasks.zip<\/li>[\s\S]+batch abcdef012345[\s\S]+2 \/ 3[\s\S]+python refine.py tasks.zip/);
+});
 
-  assert.match(css, /\.assembly-final-path-export-dialog\s*\{[^}]*width:\s*min\(680px,\s*calc\(100vw - 64px\)\);/);
-  assert.match(css, /\.assembly-final-path-export-dialog\s*\{[^}]*padding:\s*28px 32px;/);
-  assert.match(css, /\.assembly-final-path-export-body\s*\{[^}]*width:\s*min\(100%,\s*560px\);/);
-  assert.match(css, /\.assembly-final-path-export-body\s*\{[^}]*margin:\s*0 auto 0 24px;/);
-  assert.match(css, /\.assembly-final-path-export-step\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+20px;/);
-  assert.match(css, /\.assembly-final-path-export-step\s*\{[^}]*width:\s*100%;/);
-  assert.match(css, /\.pipeline-step-label\s*\{[^}]*white-space:\s*nowrap;/);
-  assert.match(css, /\.pipeline-step-icon\s*\{[^}]*justify-self:\s*end;/);
-  assert.match(css, /\.assembly-final-path-export-status\.success\s*\{[^}]*color:\s*var\(--theme-green-ink,\s*#2c6b2f\);/);
+test("export receipts constrain dialog width, wrap paths and scroll long file lists", () => {
+  const css = readStylesheetTree(new URL("../../../../styles/components.css", import.meta.url), "utf8");
+  assert.match(css, /\.export-job-dialog\s*\{[^}]*width:\s*min\(460px,\s*100%\)/);
+  assert.match(css, /\.export-job-dialog\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  assert.match(css, /\.export-result-files\s*\{[^}]*max-height:[^}]*overflow:\s*auto/);
 });
 
 test("bindings commit edits from the editable empty final-path row", async () => {

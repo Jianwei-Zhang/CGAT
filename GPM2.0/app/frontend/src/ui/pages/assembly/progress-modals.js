@@ -1,52 +1,12 @@
+import { renderExportJobDialog } from "../export-job-dialog.js";
+import { getAssemblyLocale } from "./i18n.js";
+
 export function createAssemblyProgressModalRenderer({
   escapeAttr,
   escapeHtml,
   getAssemblyI18n,
 }) {
-  function resolveFinalPathExportKindLabel(job, labels) {
-    const kind = String(job?.kind || "").trim().toLowerCase();
-    if (kind === "png") {
-      return labels.finalPathExportPng || "图(.png)";
-    }
-    if (kind === "tsv") {
-      return labels.finalPathExportTsv || "表(.tsv)";
-    }
-    if (kind === "agp") {
-      return labels.finalPathExportAgp || "AGP (.agp)";
-    }
-    if (kind === "fasta") {
-      return labels.finalPathExportFasta || "序列(.fasta)";
-    }
-    if (kind === "log") {
-      return labels.finalPathExportLog || "日志(.log)";
-    }
-    if (kind === "refinement-current-chr" || kind === "refine-jobs") {
-      return labels.finalPathExportRefineJobs || "refine-jobs";
-    }
-    if (kind === "degap-jobs") {
-      return labels.finalPathExportDegapJobs || "旧版 DEGAP-JOBS（脚本包）";
-    }
-    if (kind === "all") {
-      return labels.finalPathExportAll || "All";
-    }
-    return kind || (labels.finalPathExport || "Export");
-  }
-
-  function resolveFinalPathExportStatusText(job, labels) {
-    if (job?.status === "success") {
-      return labels.finalPathExportCompleted || "已完成导出";
-    }
-    if (job?.status === "error") {
-      return labels.finalPathExportFailed || "导出失败";
-    }
-    if (job?.status === "canceled") {
-      return labels.finalPathExportCanceled || "已终止，已保留已导出的文件";
-    }
-    const template = labels.finalPathExportRunning || "正在执行：{step}";
-    return template.replace("{step}", String(job?.currentStep || "").trim());
-  }
-
-  function renderFinalPathExportStepIcon(status) {
+  function renderProgressStepIcon(status) {
     if (status === "running") {
       return `<span class="pipeline-spinner" aria-hidden="true"></span>`;
     }
@@ -60,77 +20,6 @@ export function createAssemblyProgressModalRenderer({
       return `<span class="pipeline-skipped" aria-hidden="true">-</span>`;
     }
     return `<span class="pipeline-pending" aria-hidden="true">&#9675;</span>`;
-  }
-
-  function resolveFinalPathExportStepStatus(job, step) {
-    const completedOutputs = Array.isArray(job?.completedOutputs) ? job.completedOutputs : [];
-    const completedStepIds = Array.isArray(job?.completedStepIds) ? job.completedStepIds : [];
-    const currentStep = String(job?.currentStep || "").trim();
-    const stepLabel = String(step?.label || "").trim();
-    const stepId = String(step?.id || "").trim();
-    if (stepId && completedStepIds.includes(stepId)) {
-      return "done";
-    }
-    if (completedOutputs.includes(step?.outputPath)) {
-      return "done";
-    }
-    if (
-      job?.kind === "degap-jobs"
-      && ["degap-prepare", "degap-job", "degap-manifest"].includes(step?.kind)
-    ) {
-      if (job?.status === "running") {
-        return "running";
-      }
-      if (job?.status === "error") {
-        return "error";
-      }
-    }
-    if (job?.status === "running" && currentStep && stepLabel && currentStep.includes(stepLabel)) {
-      return "running";
-    }
-    if (job?.status === "error" && currentStep && stepLabel && currentStep.includes(stepLabel)) {
-      return "error";
-    }
-    if (job?.status === "canceled") {
-      return "skipped";
-    }
-    return "pending";
-  }
-
-  function renderFinalPathExportSteps(job) {
-    const displaySteps = Array.isArray(job?.displaySteps) ? job.displaySteps : [];
-    const steps = displaySteps.length ? displaySteps : Array.isArray(job?.steps) ? job.steps : [];
-    if (!steps.length) {
-      return "";
-    }
-    return `
-      <div class="assembly-final-path-export-steps">
-        ${steps.map((step) => {
-          const stepStatus = resolveFinalPathExportStepStatus(job, step);
-          return `
-            <div
-              class="pipeline-step-row assembly-final-path-export-step ${stepStatus}"
-              data-final-path-export-step-status="${escapeAttr(stepStatus)}"
-            >
-              <span class="pipeline-step-label">${escapeHtml(String(step?.label || ""))}</span>
-              <span class="pipeline-step-icon">${renderFinalPathExportStepIcon(stepStatus)}</span>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  function renderFinalPathExportCompletedOutputs(job) {
-    const outputs = Array.isArray(job?.completedOutputs) ? job.completedOutputs : [];
-    if (!outputs.length) {
-      return "";
-    }
-    return `
-      <ul class="assembly-final-path-export-output-list">
-        ${outputs.map((outputPath) => `<li>${escapeHtml(String(outputPath || ""))}</li>`).join("")}
-      </ul>
-    `;
   }
 
   function resolveProgressIconStatus(status) {
@@ -228,13 +117,13 @@ export function createAssemblyProgressModalRenderer({
         return `
           <div class="pipeline-step-row import-progress-step add-ctg-import-progress-step ${escapeAttr(rowStatus)}">
             <span class="pipeline-step-label">${escapeHtml(formatAssemblyImportProgressStage(stage, absoluteIndex, progressMeta))}</span>
-            <span class="pipeline-step-icon">${renderFinalPathExportStepIcon(iconStatus)}</span>
+            <span class="pipeline-step-icon">${renderProgressStepIcon(iconStatus)}</span>
           </div>
         `;
       }).join("")
       : `<div class="pipeline-step-row import-progress-step add-ctg-import-progress-step running">
           <span class="pipeline-step-label">${escapeHtml(runtimeI18n.addCtgImportNotStarted || "准备导入...")}</span>
-          <span class="pipeline-step-icon">${renderFinalPathExportStepIcon("running")}</span>
+          <span class="pipeline-step-icon">${renderProgressStepIcon("running")}</span>
         </div>`;
     const closeButton = isTerminal
       ? `<button type="button" class="button ghost tiny import-progress-close" data-add-ctg-import-close="1" data-app-tooltip="${escapeAttr(runtimeI18n.addCtgImportClose || "关闭")}">x</button>`
@@ -327,7 +216,7 @@ export function createAssemblyProgressModalRenderer({
                     <span class="muted">${escapeHtml(idText)}</span>
                     ${item?.error ? `<span class="error-text">${escapeHtml(String(item.error))}</span>` : ""}
                   </span>
-                  <span class="pipeline-step-icon">${renderFinalPathExportStepIcon(iconStatus)}</span>
+                  <span class="pipeline-step-icon">${renderProgressStepIcon(iconStatus)}</span>
                 </div>
               `;
             }).join("")}
@@ -344,47 +233,20 @@ export function createAssemblyProgressModalRenderer({
     }
     const pageI18n = getAssemblyI18n(state).page || {};
     const kind = String(job?.kind || "").trim().toLowerCase();
-    const isRefinementExport = kind === "refinement-current-chr";
-    const dialogTitle = isRefinementExport
-      ? (pageI18n.finalPathExportRefinementDialogTitle || "导出精修任务")
-      : (pageI18n.finalPathExportDialogTitle || "正在导出 final path");
-    const kindLabel = resolveFinalPathExportKindLabel(job, pageI18n);
-    const statusText = resolveFinalPathExportStatusText(job, pageI18n);
-    const statusClass = job?.status === "success" ? "success" : "";
+    const isRefinementExport = kind === "refinement-current-chr" || kind === "refine-jobs";
     const refinementReceipt = isRefinementExport && job?.status === "success" && (job?.batchSha256 || job?.serverCommand)
       ? `<div class="manual-ref-receipt">
           ${job.batchSha256 ? `<p class="muted"><code>batch ${escapeHtml(String(job.batchSha256).slice(0, 12))}</code>${Number.isFinite(Number(job.lociCount)) ? ` · ${escapeHtml(`${job.lociCount} / ${job.tasksCount ?? job.lociCount}`)}` : ""}</p>` : ""}
           ${job.serverCommand ? `<div class="manual-ref-cmd-row"><code class="manual-ref-cmd">${escapeHtml(String(job.serverCommand))}</code></div>` : ""}
         </div>`
       : "";
-    return `
-      <div class="modal-overlay assembly-final-path-export-overlay" data-final-path-export-overlay="true">
-        <article
-          class="card modal-dialog assembly-final-path-export-dialog"
-          data-final-path-export-modal="true"
-          role="dialog"
-          aria-modal="true"
-          aria-label="${escapeAttr(dialogTitle)}"
-        >
-          <button
-            type="button"
-            class="button ghost tiny assembly-final-path-export-close"
-            data-final-path-export-close="true"
-          >x</button>
-          <div class="assembly-final-path-export-body">
-            <header class="assembly-final-path-export-head">
-              <h4>${escapeHtml(dialogTitle)}</h4>
-              <p class="muted">${escapeHtml(`${String(job?.chrName || "").trim()} · ${kindLabel}`)}</p>
-            </header>
-            ${renderFinalPathExportSteps(job)}
-            <p class="muted assembly-final-path-export-status ${escapeAttr(statusClass)}">${escapeHtml(statusText)}</p>
-            ${job?.error ? `<p class="error-text">${escapeHtml(String(job.error || ""))}</p>` : ""}
-            ${renderFinalPathExportCompletedOutputs(job)}
-            ${refinementReceipt}
-          </div>
-        </article>
-      </div>
-    `;
+    return renderExportJobDialog({
+      job, locale: getAssemblyLocale(state), scope: "assembly", escapeHtml, receipt: refinementReceipt,
+      stepLabel: kind => pageI18n[{
+        png: "finalPathExportPng", tsv: "finalPathExportTsv", log: "finalPathExportLog",
+        fasta: "finalPathExportFasta", agp: "finalPathExportAgp",
+      }[kind]] || kind,
+    });
   }
 
   return {
