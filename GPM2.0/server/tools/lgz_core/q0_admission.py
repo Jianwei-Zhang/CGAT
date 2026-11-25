@@ -16,7 +16,7 @@ import math
 from operator import attrgetter
 from pathlib import Path
 from threading import Event, Lock, Thread
-from time import monotonic
+from time import monotonic, strftime
 from typing import Callable, Mapping
 
 from .common import read_fasta, sha256_file, stable_id
@@ -988,17 +988,23 @@ def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = 
 
 
 def select_request_paths(data: EvidenceInput, *, progress: Callable[[str], None] = _quiet,
-                         screen_threads: int = 1) -> FirstRequestSelection:
+                         screen_threads: int = 1, checkpoint=None) -> FirstRequestSelection:
     """Initial threshold routing only; never publish this selection as ordinary Q0."""
-    return _select_paths(data, AdmissionPolicy(), PathPolicy(), None, progress, screen_threads, first_request=True)
+    return _select_paths(data, AdmissionPolicy(), PathPolicy(), None, progress, screen_threads, first_request=True, checkpoint=checkpoint)
 
 
-def _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, *, first_request):
+def _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, *, first_request, checkpoint=None):
     progress(f"placing candidate segments · pair links={len(data.pair_links)}")
     if first_request:
-        with _PlacementProgress(progress) as phases:
-            admission = _admit_placements(data, admission_policy, path_policy, quality_pass, screen_threads,
-                                          phases, first_request=True)
+        admission = checkpoint.load_admission() if checkpoint is not None else None
+        if admission is None:
+            with _PlacementProgress(progress) as phases:
+                admission = _admit_placements(data, admission_policy, path_policy, quality_pass, screen_threads,
+                                              phases, first_request=True)
+            if checkpoint is not None:
+                checkpoint.save_admission(admission)
+        if checkpoint is not None:
+            checkpoint.after_admission()
     else:
         admission = admit_placements(data, policy=admission_policy, path_policy=path_policy, quality_pass=quality_pass,
                                      screen_threads=screen_threads, screen_progress=progress)
@@ -1018,21 +1024,26 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
         graph_links = _links_for_path_graphs(admission.placements, data.pair_links)
     progress(f"chromosome path link index ready: index_s={monotonic()-index_started:.2f}")
     for index, chromosome in enumerate(sorted(data.reference_lengths), 1):
-        progress(f"chromosome path {index}/{len(data.reference_lengths)}: {chromosome}")
-        if first_request and chromosome not in seeded:
-            searches[chromosome] = RequestPathResult(None)
-            progress(f"chromosome {chromosome}: no admitted seed; request graph not built")
-            continue
-        started = monotonic()
-        report = None if progress is _quiet else lambda message: progress(f"chromosome {chromosome} {message}")
-        graph = PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy,
-                          progress=report, first_request=first_request)
-        progress(f"chromosome {chromosome} graph ready: placements={len(graph.placements)} "
-                 f"coverage_atoms={len(graph.coverage.atoms)} graph_s={monotonic()-started:.2f}")
-        search = search_request_path(graph, progress=report) if first_request else search_paths(graph, progress=report)
-        del graph  # do not keep the previous chromosome graph while building the next
+        progress(f"chromosome path {index}/{len(data.reference_lengths)}: {chromosome} started_at={strftime('%Y-%m-%dT%H:%M:%S%z')}")
+        search = checkpoint.load_group(index, chromosome) if checkpoint is not None else None
+        restored = search is not None
+        if not restored:
+            if first_request and chromosome not in seeded:
+                search = RequestPathResult(None)
+                progress(f"chromosome {chromosome}: no admitted seed; request graph not built")
+            else:
+                started = monotonic()
+                report = None if progress is _quiet else lambda message: progress(f"chromosome {chromosome} {message}")
+                graph = PathGraph(groups[chromosome], graph_links.get(chromosome, ()), data.original_adjacencies, path_policy,
+                                  progress=report, first_request=first_request)
+                progress(f"chromosome {chromosome} graph ready: placements={len(graph.placements)} "
+                         f"coverage_atoms={len(graph.coverage.atoms)} graph_s={monotonic()-started:.2f}")
+                search = search_request_path(graph, progress=report) if first_request else search_paths(graph, progress=report)
+                del graph  # do not keep the previous chromosome graph while building the next
         searches[chromosome] = search
         if search.path is None:
+            if checkpoint is not None and not restored:
+                checkpoint.save_group(index, chromosome, search)
             continue
         for item in search.path.slices:
             if item.interval.end > len(data.sources[item.source]):
@@ -1045,6 +1056,8 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
                 if any(join.gap_interval.intersection(previous) for previous in occupied[join.gap_source]):
                     raise Q0EvidenceError("original N source interval selected more than once")
                 occupied[join.gap_source].append(join.gap_interval)
+        if checkpoint is not None and not restored:
+            checkpoint.save_group(index, chromosome, search)  # only after canonical occupancy checks
     return FirstRequestSelection(admission, searches) if first_request else PathSelection(admission, searches, occupied)
 
 

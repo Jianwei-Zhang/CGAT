@@ -108,7 +108,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         return first
 
 
-def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1):
+def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1, selection_checkpoint=None):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_request_paths
     from .q0_threshold_questions import questions
@@ -158,7 +158,8 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
         del hits
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     del links, edges  # the immutable selection input now owns these references
-    selected = select_request_paths(data, screen_threads=threads, progress=log)
+    selected = select_request_paths(data, screen_threads=threads, progress=log,
+                                    **({"checkpoint": selection_checkpoint} if selection_checkpoint is not None else {}))
     log("paths selected; calculating first supplement request")
     need, counts = questions(data, selected, assignments)
     have_path = any(row.path is not None for row in selected.paths.values())

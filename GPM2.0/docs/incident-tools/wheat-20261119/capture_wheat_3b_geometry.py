@@ -7,11 +7,10 @@ import os
 from pathlib import Path
 import re
 import socket
+import tarfile
 from tempfile import NamedTemporaryFile
 from unittest.mock import patch
 
-REV = 'd08efdffd93decce7ec8761907c8cc54f4b215f8'
-SNAP = '2552917a975e345d03095bc7d25a14353802e547fa84c5d41eac05cf0d73019c'
 LIMIT = 64 << 20
 
 
@@ -29,24 +28,30 @@ def small(p):
 
 
 def provenance(ctrl, expected, runner, modules):
-    home = Path.home()/'cgat-reads-debug/jm19-compare-614589f-20261118/q0-request-ready.d08efdff'
-    require(ctrl == home/'control' and expected == SNAP and Path.cwd() == home, 'wrong recording workspace')
+    home = ctrl.parent
+    require(re.fullmatch(r'q0-request-ready\.[a-f0-9]{8}', home.name) and
+            home.parent == Path.home()/'cgat-reads-debug/jm19-compare-614589f-20261118' and
+            ctrl == home/'control' and Path.cwd() == home, 'wrong recording workspace')
     snapshot, started, staged, allocation = (small(p) for p in
         (ctrl/'snapshot.json', ctrl/'started.json', ctrl/'staged.json', home/'allocation.json'))
     s, owner, copied = map(json.loads, (snapshot, started, staged))
-    require(sha256(snapshot).hexdigest() == SNAP and s['revision'] == owner['revision'] == REV and
+    rev = small(home/'latest.rev').decode().strip()
+    require(re.fullmatch('[a-f0-9]{40}', rev) and home.name.endswith(rev[:8]) and
+            sha256(snapshot).hexdigest() == expected and s['revision'] == owner['revision'] == rev and
             owner['pid'] == os.getpid() and owner['source_run'] == s['source_run'] and
-            owner['snapshot_sha256'] == copied['snapshot_sha256'] == SNAP and owner['workspace'] == copied['workspace'] and
+            owner['snapshot_sha256'] == copied['snapshot_sha256'] == expected and owner['workspace'] == copied['workspace'] and
             copied['complete_for'] == 'first_request_only', 'unexpected producer/staging identity')
     j, = json.loads(allocation)['data']['successData']; jid = small(home/'whole.jobid').decode().strip()
     require(re.fullmatch(r'[0-9]+', jid) and j['jobId'] == jid and j['state'] == 'RUNNING' and j['user'] == 'xbzhang26' and
             j['queue'] == 'x86' and j['execPath'] == str(home) and j['taskExecNodes'] == owner['hostname'] == copied['hostname'] == socket.gethostname() and
             re.search(r'(?<![0-9])'+jid+r'(?![0-9])', Path('/proc/self/cgroup').read_text()), 'unexpected allocation')
     code = {m.__name__.split('.')[-1]: sha256(small(Path(m.__file__))).hexdigest() for m in modules}
-    require(code == {'q0_admission':'f59d90b2657850fa058d17c80bc561e26cb967f58f1779eb0cde9f95bdec2456',
-                     'q0_paths':'82d887830c1ff292b7d991ff19244e2d39981f07850e2a811acf22b1b36f46cd',
-                     'q0_coverage':'9f83b2d52c985e8101a5865493371b1383d188896662953cc6ff422e3afbaee0'}, 'different live graph code')
-    return dict(revision=REV, snapshot_sha256=SNAP, job=jid, source_run=s['source_run'], graph_modules=code,
+    with tarfile.open(home/'latest.tgz', 'r:gz') as archive:
+        for module, actual in code.items():
+            member = archive.getmember('GPM2.0/server/tools/lgz_core/' + module + '.py')
+            require(member.isfile() and member.size <= 1 << 20 and
+                    sha256(archive.extractfile(member).read()).hexdigest() == actual, 'different live graph code')
+    return dict(revision=rev, snapshot_sha256=expected, job=jid, source_run=s['source_run'], graph_modules=code,
                 started_sha256=sha256(started).hexdigest(), staged_sha256=sha256(staged).hexdigest(),
                 allocation_sha256=sha256(allocation).hexdigest(), runner_sha256=sha256(small(runner)).hexdigest(),
                 recorder_sha256=sha256(small(Path(__file__))).hexdigest())
@@ -66,7 +71,7 @@ def save(ctrl, header, required, relations):
                     digest.update(raw)
                 out.write(raw)
             put(dict(header, schema='wheat_preliminary_coverage_geometry_v1', chromosome='3B',
-                     coordinates='0-based half-open, original source axes', compact_first=True, maximum_boundaries=200000,
+                     coordinates='0-based half-open, original source axes', compact_first=True, maximum_boundaries=None,
                      sources=len(required), relations=len(relations)))
             for source, spans in required.items():
                 put(['source', source.dataset, source.contig, len(spans)])
@@ -84,7 +89,7 @@ def save(ctrl, header, required, relations):
 @contextmanager
 def observe(ctrl, expected, runner):
     from lgz_core import q0_admission as adm, q0_paths as paths, q0_coverage as cov
-    original_graph, original_model = adm.PathGraph, paths.CoverageModel
+    original_graph, original_preliminary = adm.PathGraph, paths.preliminary_ambiguity
     attempted = False
 
     def graph(placements, *args, **kw):
@@ -97,14 +102,14 @@ def observe(ctrl, expected, runner):
                 attempted = True  # record the initial global geometry, never its filtered rebuild
                 try:
                     require(isinstance(relations, list) and options.get('compact_first') is True and
-                            options.get('maximum_boundaries') == 200000, 'unexpected preliminary model')
+                            'maximum_boundaries' in options and options['maximum_boundaries'] is None, 'unexpected preliminary model')
                     digest = save(ctrl, provenance(ctrl, expected, runner, (adm, paths, cov)), required, relations)
                     print('CAPTURED_3B_GEOMETRY', digest, flush=True)
-                except (OSError, ValueError, KeyError, TypeError, MemoryError) as exc:
+                except (OSError, ValueError, KeyError, TypeError, MemoryError, tarfile.TarError) as exc:
                     print('3B_GEOMETRY_NOT_CAPTURED', str(exc), flush=True)
-            return original_model(required, relations, **options)  # scientific errors must propagate unchanged
+            return original_preliminary(required, relations, **options)  # scientific errors must propagate unchanged
 
-        with patch.object(paths, 'CoverageModel', model):
+        with patch.object(paths, 'preliminary_ambiguity', model):
             return original_graph(placements, *args, **kw)
 
     with patch.object(adm, 'PathGraph', graph):

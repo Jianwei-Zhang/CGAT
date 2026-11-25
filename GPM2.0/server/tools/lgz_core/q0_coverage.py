@@ -133,7 +133,7 @@ class _BoundaryLimit(CoverageBoundaryLimit):
                          f"largest_component_cuts={max(sizes, default=0)}")
 
 
-def _close_cuts(required, maps, limit, *, fewer_seeds_than=None):
+def _close_cuts(required, maps, limit, *, fewer_seeds_than=None, progress=None):
     points = {key: {p for i in value for p in (i.start, i.end)} for key, value in required.items()}
     incident = defaultdict(list)
     for r in maps:
@@ -146,19 +146,27 @@ def _close_cuts(required, maps, limit, *, fewer_seeds_than=None):
     count = seeds = sum(map(len, points.values()))
     if fewer_seeds_than is not None and seeds >= fewer_seeds_than:
         return None  # compact seeds are a subset; identical seeds imply identical closure
-    if count > limit:
+    if limit is not None and count > limit:
         raise _BoundaryLimit(limit, seeds, points, maps)
     queue = deque((source, point) for source in sorted(points) for point in sorted(points[source]))
     indexes = {source: _IncidentRelations(rows) for source, rows in incident.items()}
     del incident
+    if progress:
+        progress(f"cut propagation: seeds={seeds} limit={limit if limit is not None else 'none'}")
+    next_report = monotonic() + 60
+    processed = 0
     while queue:
+        processed += 1
+        if progress and not (processed & 4095) and monotonic() >= next_report:
+            progress(f"cut propagation: processed={processed} cuts={count} pending={len(queue)}")
+            next_report = monotonic() + 60
         source, point = queue.popleft()
         index = indexes.get(source)
         if index is None:
             continue
         for other, mapped in index.at(point):
             if mapped not in points[other]:
-                if count >= limit:
+                if limit is not None and count >= limit:
                     raise _BoundaryLimit(limit, seeds, points, maps, pending=(other, mapped))
                 points[other].add(mapped)
                 count += 1
@@ -172,14 +180,14 @@ def _partition(required, maps, limit, progress, compact_first):
         if progress:
             progress(f"request coverage: exact maps={len(maps)}->{len(compact)} before cut propagation")
         # Only representation changes. Every raw evidence span is still used
-        # for ambiguity attribution; all required endpoints and the cap remain.
+        # for ambiguity attribution; all required endpoints remain.
         try:
-            points, count = _close_cuts(required, compact, limit)
+            points, count = _close_cuts(required, compact, limit, progress=progress)
         except _BoundaryLimit as exc:
             raise CoverageBoundaryLimit(f"{exc}; exact request geometry exceeds budget") from None
         return compact, points, count
     try:
-        points, count = _close_cuts(required, maps, limit)
+        points, count = _close_cuts(required, maps, limit, progress=progress)
         return maps, points, count
     except _BoundaryLimit as exc:
         original, seeds = str(exc), exc.seeds
@@ -240,36 +248,81 @@ def _relation_islands(relations):
     return sorted(islands.values(), key=len, reverse=True)
 
 
-def ambiguity_after_overflow(relations, limit, progress, compact_first):
-    """Recover the preliminary ambiguity verdict only. Never score an island as a chromosome."""
+def _consistent_source_axes(rows):
+    """Sufficient, not necessary: one injective signed coordinate frame per source.
+
+    Each map says y=s*x+d on its own domain. If these equations compose to
+    identity around every cycle, no atom can return to another locus or with
+    reversed parity in its own source. Never infer extra aligned bases here.
+    """
+    if len(rows) == 1 and rows[0].left_source != rows[0].right_source:
+        return True
+    edges = defaultdict(list)
+    for row in rows:
+        a, b, reverse, delta = _affine_key(row)
+        sign = -1 if reverse else 1
+        edges[a].append((b, sign, delta))
+        edges[b].append((a, sign, -sign * delta))
+    frames = {}
+    for source in edges:
+        if source in frames:
+            continue
+        frames[source] = (1, 0)
+        todo = [source]
+        while todo:
+            a = todo.pop()
+            orientation, origin = frames[a]
+            for b, sign, delta in edges[a]:
+                want = (sign * orientation, sign * origin + delta)
+                if b not in frames:
+                    frames[b] = want
+                    todo.append(b)
+                elif frames[b] != want:
+                    return False  # Only failure to prove; never an evidence rejection.
+    return True
+
+
+def preliminary_ambiguity(required, relations, *, maximum_boundaries=None, progress=None, compact_first=False):
+    """Prove simple islands; solve the remaining domains exactly, one at a time."""
+    # Validate even rows skipped by the affine proof or excluded from the final
+    # model. Required intervals were normalized by PathGraph. Within a mapped
+    # span no required interval can introduce an interior seed of its own.
+    for r in relations:
+        for source, span in ((r.left_source, r.left), (r.right_source, r.right)):
+            if not any(i.contains(span) for i in required.get(source, ())):
+                raise Q0EvidenceError("homology relation escapes required source intervals")
     islands = _relation_islands(relations)
     if progress:
-        progress(f"coverage ambiguity recovery: islands={len(islands)} maps_with_ids={len(relations)} "
-                 f"largest_island_relations={len(islands[0]) if islands else 0} limit={limit}")
+        progress(f"preliminary ambiguity: islands={len(islands)} evidence_spans={len(relations)} "
+                 f"largest_island_relations={len(islands[0]) if islands else 0}")
     excluded = set()
+    simple = 0
     for n, rows in enumerate(islands, 1):
-        if len(rows) == 1 and rows[0].left_source != rows[0].right_source:
-            continue  # One isometry between distinct sources cannot alias a source with itself.
-        # The failed global closure already checked that each relation is inside its
-        # required source interval. Unmapped bases are singleton units: omitting them
-        # here cannot hide an ambiguity. Footprint ends are existing relation cuts.
+        if _consistent_source_axes(rows):
+            simple += 1
+            continue
         footprint = defaultdict(list)
         for r in rows:
             footprint[r.left_source].append(r.left)
             footprint[r.right_source].append(r.right)
-        try:
-            model = CoverageModel(footprint, rows, maximum_boundaries=limit, compact_first=compact_first)
-        except CoverageBoundaryLimit as exc:
-            raise CoverageBoundaryLimit(f"{exc}; ambiguity island {n}/{len(islands)}, "
-                                        f"relations={len(rows)} sources={len(footprint)}") from None
+        # Emit inner progress for substantial domains without flooding logs for tiny ones.
+        report = None
+        if progress and (n == 1 or len(rows) >= 256):
+            prefix = f"ambiguity island {n}/{len(islands)} relations={len(rows)}: "
+            report = lambda message: progress(prefix + message)
+        model = CoverageModel(footprint, rows, maximum_boundaries=maximum_boundaries,
+                              progress=report, compact_first=compact_first)
         excluded.update(model.ambiguous_evidence_ids)
-        del model  # Never keep two islands' closures in memory.
+        del model
+    if progress:
+        progress(f"preliminary ambiguity complete: simple_islands={simple} exact_islands={len(islands)-simple} "
+                 f"excluded_evidence_ids={len(excluded)}")
     return excluded
 
 
 class CoverageModel:
     def __init__(self, required: Mapping[SourceKey, Iterable[Interval]], relations: Iterable[Equivalence],
-                 *, maximum_boundaries: int = 200000, progress: Callable[[str], None] | None = None,
+                 *, maximum_boundaries: int | None = None, progress: Callable[[str], None] | None = None,
                  compact_first: bool = False):
         started = monotonic() if progress else 0.0
         self.required = {key: merged_intervals(value) for key, value in required.items()}

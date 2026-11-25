@@ -144,7 +144,7 @@ def draft_thread_options(reader, requested=None):
     return {'threads':budget}
 
 
-def stage_and_draft(control, expected, workspace, rate_mib, threads=None, *, capture_3b=False):
+def stage_and_draft(control, expected, workspace, rate_mib, threads=None, *, capture_3b=False, selection=None, placement_only=False):
     from lgz_core import q0_preparation as prep, q0_threshold_prepare as threshold
     from lgz_core.q0_threshold_acceptance import record
     options = draft_thread_options(threshold.initial_questions, threads)  # reject incompatible requests before staging
@@ -193,13 +193,31 @@ def stage_and_draft(control, expected, workspace, rate_mib, threads=None, *, cap
     if capture_3b:
         from capture_wheat_3b_geometry import observe
         recording = observe(ctrl, expected, Path(__file__).resolve())
-    with recording, patch.object(threshold,reader_name,observed):
-        need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],**options)
+    checkpoints = nullcontext()
+    if selection is not None:
+        from wheat_selection_checkpoint import opened, PlacementSaved
+        checkpoints = opened(selection, ctrl, expected, s['revision'], options.get('threads', 1), placement_only)
+    require(not placement_only or selection is not None, 'placement-only requires a persistent selection checkpoint')
+    with recording, checkpoints as store, patch.object(threshold,reader_name,observed):
+        if store is None:
+            need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],**options)
+        else:
+            try:
+                need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],
+                                                         selection_checkpoint=store,**options)
+            except PlacementSaved as done:
+                require(placement_only, 'unexpected placement-only exit')
+                write(ctrl/'placement-complete.json', {'revision':s['revision'], 'snapshot_sha256':expected,
+                      'admission_sha256':str(done), 'stage':'global_placement_only', 'published_q0':False})
+                print('GLOBAL_PLACEMENT_CHECKPOINT_ONLY', done, flush=True)
+                return
     write(ctrl/'global-first-request.json',{'schema':'wheat_threshold_global_first_request_v1','snapshot_sha256':expected,'revision':s['revision'],'threshold_contract':prep.supplement_policy('positive_threshold')['decision_frontier'],'has_path':has_path,'request':record(need),'published_q0':False,'mapper_calls':0});print('GLOBAL_FIRST_REQUEST',None if need is None else len(need),'sources; has_path',has_path,flush=True)
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__); subs=p.add_subparsers(dest='op',required=True);q=subs.add_parser('freeze');q.add_argument('workspace',type=Path);q.add_argument('log',type=Path);q.add_argument('run_id');q.add_argument('control',type=Path);q.add_argument('revision');q=subs.add_parser('run');q.add_argument('control',type=Path);q.add_argument('snapshot_sha');q.add_argument('workspace',type=Path);q.add_argument('--rate-mib',type=int,default=80)
     q.add_argument('--threads', type=int, help='fork CPU ceiling; honors GPM_RUN_THREADS, otherwise defaults to one when omitted')
-    q.add_argument('--capture-3b-geometry', action='store_true', help='save replay geometry for the bound d08efdff whole run only; not a resume checkpoint')
-    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib,a.threads,capture_3b=a.capture_3b_geometry)
+    q.add_argument('--capture-3b-geometry', action='store_true', help='save prefilter geometry for offline incident replay; not a resume checkpoint')
+    q.add_argument('--selection-checkpoints', type=Path, help='private same-version placement and chromosome checkpoints')
+    q.add_argument('--placement-only', action='store_true', help='checkpoint global placement and exit without producing a path/request')
+    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib,a.threads,capture_3b=a.capture_3b_geometry,selection=a.selection_checkpoints,placement_only=a.placement_only)

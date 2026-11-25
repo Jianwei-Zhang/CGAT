@@ -18,7 +18,7 @@ from typing import Callable, Iterable, Mapping
 
 from .common import reverse_complement, stable_id
 from .q0_alignments import PafAlignment
-from .q0_coverage import CoverageBoundaryLimit, CoverageModel, Equivalence, ambiguity_after_overflow
+from .q0_coverage import CoverageModel, Equivalence, preliminary_ambiguity
 from .q0_sources import Interval, OriginalAdjacency, Q0EvidenceError, SourceKey, merged_intervals
 
 
@@ -34,13 +34,15 @@ class PathPolicy:
     maximum_replaced_nodes: int = 3
     maximum_edge_variants: int = 4
     maximum_seed_positions: int = 8
-    maximum_coverage_boundaries: int = 200000
+    maximum_coverage_boundaries: int | None = None  # optional diagnostic budget, never a production cutoff
 
     def __post_init__(self):
         if not 0 < self.minimum_pair_identity <= 1:
             raise Q0EvidenceError("q0 pair identity must be in (0, 1]")
         for name in ("version", "minimum_anchor_bp", "unknown_join_n", "beam_width",
                      "maximum_evaluations", "maximum_rounds", "maximum_replaced_nodes", "maximum_edge_variants", "maximum_seed_positions", "maximum_coverage_boundaries"):
+            if name == "maximum_coverage_boundaries" and getattr(self, name) is None:
+                continue
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
                 raise Q0EvidenceError(f"q0 path policy requires positive integer {name}")
 
@@ -438,32 +440,17 @@ class PathGraph:
             progress(f"graph paired relations ready: evidence_spans={len(relations)} "
                      f"relations_s={monotonic()-relations_started:.2f}")
         limit = policy.maximum_coverage_boundaries
-        overflow = None
-        try:
-            preliminary = CoverageModel(self.required, relations, maximum_boundaries=limit,
-                                        progress=progress, compact_first=first_request)
-        except CoverageBoundaryLimit as exc:
-            overflow = str(exc)  # Drop the failed global model/traceback before processing islands.
-        if overflow is None:
-            if not preliminary.ambiguous_evidence_ids:
-                self.coverage = preliminary
-                return
-            self.ambiguous_equivalence_ids.update(preliminary.ambiguous_evidence_ids)
-            del preliminary
-        else:
-            if not relations or 2 * sum(map(len, self.required.values())) > limit:
-                raise CoverageBoundaryLimit(f"{overflow}; required endpoints alone exceed budget")
-            if progress:
-                progress(f"coverage: {overflow}; isolating preliminary ambiguity checks")
-            self.ambiguous_equivalence_ids = ambiguity_after_overflow(relations, limit, progress, first_request)
-            if not self.ambiguous_equivalence_ids:
-                raise CoverageBoundaryLimit(f"{overflow}; no ambiguous evidence to exclude")
-        self._blocks.clear()
-        if progress:
-            progress(f"coverage: rebuilding after excluding {len(self.ambiguous_equivalence_ids)} ambiguous IDs")
-        # Only this full, globally budgeted chromosome model can be used to score paths.
-        self.coverage = CoverageModel(self.required, [r for r in relations if r.evidence_id not in self.ambiguous_equivalence_ids],
-                                      maximum_boundaries=limit, progress=progress, compact_first=first_request)
+        self.ambiguous_equivalence_ids = preliminary_ambiguity(
+            self.required, relations, maximum_boundaries=limit, progress=progress, compact_first=first_request)
+        if self.ambiguous_equivalence_ids:
+            self._blocks.clear()
+            relations = [r for r in relations if r.evidence_id not in self.ambiguous_equivalence_ids]
+        # Only the full chromosome model is used to score paths. In particular,
+        # the affine proof must NOT erase equivalence among nonambiguous slices.
+        self.coverage = CoverageModel(self.required, relations, maximum_boundaries=limit,
+                                      progress=progress, compact_first=first_request)
+        if self.coverage.ambiguous_evidence_ids:
+            raise Q0EvidenceError("preliminary ambiguity disagrees with the full chromosome coverage model")
 
     def homologous_blocks(self, left: Placement, right: Placement) -> tuple[tuple[Block, str], ...]:
         key = (left.placement_id, right.placement_id)
