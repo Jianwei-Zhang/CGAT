@@ -252,7 +252,7 @@
         "tools/render_manual_report.py": "e5ba78618547f622c28825a9a8da003243619d558fb09f07fbb345ee146a5d56",
         "tools/render_manual_story.py": "2ba05893a8ab1ff626ef13978dc2d6a798fb9f1b77644620abf553658decfeaa",
         "tools/render_overview_report.py": "797a99086a157f76cf0558e8a894a9615f34b7ae02a3b3ed0742a752502737a4",
-        "tools/render_path_story.py": "03f6fbaaefa20c34387aea34ec35480ec56d6bf4f22af8d81ea8b3ec95f540fe",
+        "tools/render_path_story.py": "4281cec443226ef2acca952f4454ea977a79a89b730c016fa2e2af5a9dfc10ad",
         "tools/render_refinement_report.py": "c16593f9ec31cf340e46ffb702f686883b48704d7cd890eeb5e4fb95ea133ae5",
         "tools/render_repair_story.py": "b5a4dc6657e4cfc00e2b245771be2746e612acff10baab5865f4795cd47a957c",
         "tools/render_server_report.py": "e053fb2bcdbdd3c63951e96654db4e284c83f47cc942bcb8e0007993ff522b0c",

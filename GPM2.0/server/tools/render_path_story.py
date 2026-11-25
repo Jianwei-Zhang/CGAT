@@ -596,15 +596,20 @@ def q0_card(lgz):
 .q0-zoom-ctrl button:disabled{opacity:.42;cursor:not-allowed}
 .q0-zoom-pct{min-width:44px;text-align:center;font:600 .8rem/1 var(--font-mono);color:var(--text-secondary);font-variant-numeric:tabular-nums}
 .q0-zoom-stage{overflow:auto;max-height:72vh;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel)}
+.q0-zoom-stage.is-pannable{cursor:grab}
+.q0-zoom-stage.is-dragging{cursor:grabbing;user-select:none}
 .q0-zoom-stage .q0-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--q0-scale, 1))}
-.q0-zoom-stage .q0-axis,.q0-zoom-stage .q0-row{grid-template-columns:186px 40px minmax(0,1fr);gap:.75rem}
-.q0-zoom-stage .q0-axis{position:sticky;top:0;z-index:6}
-.q0-zoom-stage .q0-axis>:first-child{position:sticky;left:0;z-index:7;background:var(--surface-subtle)}
-.q0-zoom-stage .q0-row{padding:.95rem 1rem}
-.q0-zoom-stage .q0-chr-meta{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding-right:.45rem}
-.q0-zoom-stage .q0-row:hover .q0-chr-meta{background:var(--surface-subtle)}
+.q0-zoom-stage .q0-axis,.q0-zoom-stage .q0-row{grid-template-columns:196px 46px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.q0-zoom-stage .q0-axis{position:sticky;top:0;z-index:8;background:var(--surface-subtle)}
+.q0-zoom-stage .q0-axis>:nth-child(1){position:sticky;left:0;z-index:9;background:var(--surface-subtle);padding:.55rem .6rem .45rem 1rem;display:flex;align-items:center;box-shadow:1px 0 0 var(--surface-subtle)}
+.q0-zoom-stage .q0-axis>:nth-child(2){position:sticky;left:196px;z-index:9;background:var(--surface-subtle);padding:.55rem .65rem .45rem .25rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;align-items:center;justify-content:flex-end}
+.q0-zoom-stage .q0-axis .story-ruler{margin:.55rem 1rem .45rem .75rem;min-width:0}
+.q0-zoom-stage .q0-chr-meta{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding:.9rem .6rem .9rem 1rem;display:flex;flex-direction:column;justify-content:center;box-shadow:1px 0 0 var(--surface-panel)}
+.q0-zoom-stage .q0-role-col{position:sticky;left:196px;z-index:5;height:auto;background:var(--surface-panel);padding:.95rem .65rem .95rem .25rem;font-size:.75rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12)}
+.q0-zoom-stage .q0-row:hover .q0-chr-meta{background:var(--surface-subtle);box-shadow:1px 0 0 var(--surface-subtle)}
+.q0-zoom-stage .q0-row:hover .q0-role-col{background:var(--surface-subtle)}
 .q0-zoom-stage .q0-chr-meta b{font-size:.9rem}
-.q0-zoom-stage .q0-role-col{height:82px;font-size:.75rem}
+.q0-zoom-stage .q0-rails{margin:.9rem 1rem .9rem .75rem;z-index:1}
 .q0-zoom-stage .q0-rail{height:18px}
 .q0-zoom-stage .q0-bands{height:46px}
 .q0-zoom-stage .q0-mark.ctg{min-width:7px}
@@ -612,6 +617,8 @@ def q0_card(lgz):
 @media (max-width:760px){
   .q0-axis,.q0-row{grid-template-columns:104px 26px minmax(0,1fr);gap:.4rem;padding-left:.65rem;padding-right:.65rem}
   .q0-chr-meta b{font-size:.8rem}
+  .q0-zoom-stage .q0-axis,.q0-zoom-stage .q0-row{grid-template-columns:132px 34px minmax(0,1fr);gap:0;padding:0}
+  .q0-zoom-stage .q0-axis>:nth-child(2),.q0-zoom-stage .q0-role-col{left:132px}
 }
 </style>"""
 
@@ -750,7 +757,22 @@ def q0_card(lgz):
       outBtn.disabled=idx<=0;
       inBtn.disabled=idx>=steps.length-1;
       rstBtn.disabled=idx===0;
+      stage.classList.toggle('is-pannable',s>1);
     }
+    let drag=null;
+    stage.addEventListener('mousedown',(e)=>{
+      if(e.button!==0||steps[idx]<=1||!e.target.closest('.q0-rails,.story-ruler'))return;
+      drag={x:e.clientX,y:e.clientY,sl:stage.scrollLeft,st:stage.scrollTop};
+      stage.classList.add('is-dragging');
+    });
+    stage.addEventListener('mousemove',(e)=>{
+      if(!drag)return;
+      stage.scrollLeft=drag.sl-(e.clientX-drag.x);
+      stage.scrollTop=drag.st-(e.clientY-drag.y);
+    });
+    const endDrag=()=>{if(drag){drag=null;stage.classList.remove('is-dragging');}};
+    stage.addEventListener('mouseup',endDrag);
+    stage.addEventListener('mouseleave',endDrag);
     outBtn.addEventListener('click',()=>{if(idx>0){idx--;applyZoom();}});
     inBtn.addEventListener('click',()=>{if(idx<steps.length-1){idx++;applyZoom();}});
     rstBtn.addEventListener('click',()=>{idx=0;applyZoom();stage.scrollLeft=0;});
