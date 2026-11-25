@@ -21,6 +21,7 @@ def contract():
             'rule_sha256': sha256_file(here.with_name('q0_threshold_questions.py')),
             'paf_chunks_sha256': sha256_file(here.with_name('q0_paf_chunks.py')),
             'retained_hit_sha256': sha256_file(here.with_name('q0_retained_hits.py')),
+            'native_frontier_sha256': sha256_file(here.with_name('q0_native_frontier.py')),
             'acceptance_sha256': sha256_file(here), 'preparer_sha256': sha256_file(here.with_name('q0_threshold_prepare.py'))}
 
 
@@ -60,12 +61,13 @@ class VerifiedScope:
 
 class ThresholdRepairRequired(UnsearchedQ0Context):
     """Private handoff of this selection's exact demand (None means full search)."""
-    def __init__(self, reason, demand):
+    def __init__(self, reason, demand, native_ids=()):
         super().__init__(reason)
         self.demand = demand
+        self.native_ids = tuple(native_ids)
 
     def __reduce__(self):
-        return type(self), (self.args[0], self.demand)
+        return type(self), (self.args[0], self.demand, self.native_ids)
 
 
 def complete_window_accounting(catalog):
@@ -108,6 +110,8 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
         raise Q0EvidenceError('threshold acceptance contract differs from catalog')
     frontier=decode(report['threshold_request'],{s:len(seq) for s,seq in data.sources.items()})
     axes=_unsearched_axes(report,data.parts)
+    from .q0_native_frontier import omitted, touches
+    pending = omitted(report,data.parts)
     if mode=='full':
         if axes or frontier is not None: raise Q0EvidenceError('full threshold fallback contains omissions or a scoped request')
         return {'full_discovery': True}
@@ -116,7 +120,10 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
     assignments=({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in binding.assignments)
     need,counts=questions(data,selection,assignments)
     if need is None: raise ThresholdRepairRequired('threshold selector needs full supplemental evidence', need)
-    enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog)
+    affected = [row['id'] for row in pending if touches(row,data.parts,need)]
+    if affected:
+        raise ThresholdRepairRequired('updated Q0 needs a deferred native fallback matrix', need, affected)
+    enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog) and not pending
     covered_without_repair = 0
     for s,spans in need.items():
         for span in spans:
@@ -144,6 +151,8 @@ def validate_catalog(root, manifest, catalog):
         raise Q0EvidenceError('missing threshold evidence contract')
     lengths={SourceKey(**r['source']):r['length'] for r in catalog['sources']}
     q=decode(scope['threshold_request'],lengths)
+    from .q0_native_frontier import validate_inventory
+    validate_inventory(catalog)
     if mode=='base_only':
         if q!={} or scope['unsearched_part_intervals'] or catalog['supplementary_alignments'] or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery')):
             raise Q0EvidenceError('base-only threshold evidence claims supplemental discovery')

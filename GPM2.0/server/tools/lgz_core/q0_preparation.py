@@ -834,7 +834,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
 def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                            requested_scope=None, scope_decision=None,
                            draft=False, frontier_override=None, repair_round=0, fallback_reason=None,
-                           expected_input=None, repair_inputs=None):
+                           expected_input=None, repair_inputs=None, forced_native=()):
     root = root.resolve()
     if threads < 1:
         raise Q0EvidenceError("q0 evidence threads must be positive")
@@ -911,6 +911,23 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             scope_report.update(acceptance=SEMANTICS, threshold_request=record(regional_frontier))
         if scope_report is not None:
             catalog.payload["supplement_scope"] = scope_report
+        native_gate = None
+        if supplement_scope == 'positive_threshold' and regional_frontier:
+            from .q0_native_frontier import FallbackGate
+            from .q0_threshold_prepare import initial_questions
+            def refresh_native(tasks):
+                repair_inputs.verify()
+                result = initial_questions(root,sources,lengths,assignments,base_alignments,threads=threads,
+                                           existing_catalog=catalog,supplementary=tasks)
+                repair_inputs.verify()
+                return result
+            native_gate = FallbackGate(catalog.parts,regional_frontier,refresh_native,forced_native)
+        def native_fallbacks(phase, requests, available):
+            def run(request, cache_only):
+                return _supplement(root,catalog,request,tool,options.get('minimap_preset','asm10'),threads,
+                                   skip_self=options.get('skip_self')=='true',cache_only=cache_only)
+            if native_gate is None: return [run(r,False) for r in requests]
+            return native_gate.dispatch(phase,requests,available,run)
         tasks = []
         # Each productive round adds at least one segment to the anchor set. The
         # monotone loop terminates after at most the number of source segments.
@@ -975,8 +992,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 catalog.payload["regional_partial_discovery"] = report
                 if fallback_ids:
                     fallback_request = {**request, "query_ids": fallback_ids}
-                    partial_tasks.append(_supplement(root, catalog, fallback_request, tool, preset, threads,
-                                                    skip_self=options.get("skip_self") == "true"))
+                    partial_tasks.extend(native_fallbacks('regional_partial_discovery',[fallback_request],[*tasks,*partial_tasks]))
             if not partial_consumed:tasks.extend(partial_tasks)
             # One discovery round, not one full catalog rebuild per window.
             # Keep each PAF's own declared geometry/artifact while accumulating
@@ -1015,9 +1031,13 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 report["unroutable_seed_task_ids"] = seed_ids
             tasks.extend(regional_tasks)
             catalog.payload["regional_candidate_discovery"] = report
-            for request in native_requests:
-                tasks.append(_supplement(root,catalog,request,tool,options.get("minimap_preset", "asm10"),threads,
-                                         skip_self=options.get("skip_self") == "true"))
+            if native_requests:
+                tasks.extend(native_fallbacks('regional_candidate_discovery',native_requests,tasks))
+        if native_gate is not None:
+            if native_gate.omissions:
+                scope_report['deferred_native_matrices'] = native_gate.omissions
+            for phase, matrix_ids in native_gate.planned.items():
+                catalog.payload[phase]['native_fallback_matrix_ids'] = matrix_ids
         if _partition_sha256(Path(tool["resolved"])) != tool["sha256"]:
             raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
         if repair_inputs is not None:

@@ -10,7 +10,7 @@ from .common import stable_id
 from .q0_alignments import read_paf_observations as _native_observations
 from .q0_retained_hits import read_retained_paf, retained_geometry_cache, retained_names
 from .q0_paths import PairLink
-from .q0_sources import Q0EvidenceError, merged_intervals, split_source
+from .q0_sources import Interval, OriginalAdjacency, Q0EvidenceError, SourceKey, merged_intervals, split_source
 from .q0_threshold_acceptance import MAX_REPAIRS, SCOPE, SEMANTICS, ThresholdRepairRequired, audit
 
 
@@ -108,16 +108,39 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         return first
 
 
-def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1, selection_checkpoint=None):
+def _supplement_links(root, parts, tasks, short_geometry, threads):
+    """Exactly the final loader's task partition, artifact IDs and both source-part offsets."""
+    seen = set()
+    for task in tasks:
+        rel = task['paf']
+        if rel in seen: continue
+        seen.add(rel)
+        names = lambda ids: {k:(k, parts[k].interval.length) for k in ids}
+        path = prep.artifact_path(root, rel); signature = prep.file_signature(path)
+        for hit in read_retained_paf(path, artifact=rel, query_names=names(task['query_ids']),
+                                     target_names=names(task['target_ids']), short_geometry=short_geometry,threads=threads):
+            q,t = parts[hit.query_name],parts[hit.target_name]
+            yield PairLink(hit,q.source,t.source,q.interval.start,t.interval.start)
+        if prep.file_signature(path) != signature: raise Q0EvidenceError('completed fallback-draft PAF changed while reading')
+
+
+def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1, selection_checkpoint=None,
+                      existing_catalog=None, supplementary=()):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_request_paths
     from .q0_threshold_questions import questions
 
     def log(msg):
-        print("LGZ q0 first draft: " + msg, flush=True)
+        print(("LGZ q0 first draft: " if existing_catalog is None else "LGZ q0 updated fallback draft: ") + msg, flush=True)
 
     keys = {(s.dataset, s.contig): s for s in seqs}
     parts, edges, refs, links, by_dataset = {}, [], defaultdict(list), [], defaultdict(dict)
+    if existing_catalog is not None:
+        if existing_catalog.sequences is not seqs or matrices is not None or selection_checkpoint is not None:
+            raise Q0EvidenceError('updated fallback draft cannot reuse a foreign source or a base-only selection checkpoint')
+        parts = existing_catalog.parts
+        edges = [OriginalAdjacency(**{**v, 'source':SourceKey(**v['source']), 'gap_interval':Interval(**v['gap_interval'])})
+                 for v in existing_catalog.payload['original_connections']]
     started = monotonic()
     total = len(seqs)
     log(f"source indexing before reference PAF: starting {total} sequences")
@@ -128,6 +151,7 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
             log(f"source indexing: processed={completed}/{total} elapsed_s={now-started:.1f}")
             next_report = now + 60
         by_dataset[key.dataset][key.contig] = len(seq)
+        if existing_catalog is not None: continue  # This pass already split these original FASTAs.
         try:
             info = split_source(key, seq, min_gap=prep.POLICY['min_gap'])
         except Q0EvidenceError:
@@ -156,6 +180,7 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
             left, right = keys[q, hit.query_name], keys[t, hit.target_name]
             links.append(PairLink(hit, left, right))
         del hits
+    links.extend(_supplement_links(root, parts, supplementary, short_geometry, threads))
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     del links, edges  # the immutable selection input now owns these references
     selected = select_request_paths(data, screen_threads=threads, progress=log,
@@ -214,11 +239,12 @@ def prepare(root, threads, mapper):
     snapshot = _ThresholdInputs(root)
     request, receipt, cached, wanted = initial_generation(root, snapshot, mapper, threads=threads)
     full = wanted is None and receipt is None
+    forced_native = frozenset()
     for n in range(MAX_REPAIRS+3):
         if receipt is None:
             receipt,_,_ = prep._prepare_evidence_pass(root,threads=threads,minimap2=mapper,supplement_scope=SCOPE,
                 draft=True,frontier_override=None if full else wanted,fallback_reason='threshold_full_fallback' if full else None,
-                expected_input=request,repair_inputs=snapshot)
+                expected_input=request,repair_inputs=snapshot,forced_native=forced_native)
         output_paths = [prep.workspace_artifact_path(root, row['path']) for row in receipt['outputs']]
         before = [prep.file_signature(p) for p in output_paths]
         data = load_evidence_input(root,_draft=receipt); selection = select_q0_paths(data)
@@ -227,6 +253,8 @@ def prepare(root, threads, mapper):
         except ThresholdRepairRequired as stopped:
             if full: raise
             need = stopped.demand
+            newly_forced = set(stopped.native_ids) - forced_native
+            forced_native = forced_native.union(newly_forced)
         else:
             if not any(r.path is not None for r in selection.paths.values()):
                 raise Q0EvidenceError('no chromosome has a trustworthy q0 path')
@@ -245,7 +273,7 @@ def prepare(root, threads, mapper):
             full = True
         else:
             widened = {**wanted, **{s:merged_intervals((*wanted.get(s,()),*v)) for s,v in need.items()}}
-            full = widened == wanted
+            full = widened == wanted and not newly_forced
             wanted = widened
         receipt, cached = None, False
     raise Q0EvidenceError('threshold preparation ended without a verified Q0')
