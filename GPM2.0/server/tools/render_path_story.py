@@ -537,33 +537,65 @@ def q0_card(lgz):
         return f'<span class="q0-mark {kind}" style="{style}" data-start="{a}" data-end="{b}" title="{esc(tip)}"></span>'
 
     style = """<style>
-.q0-axis,.q0-row{display:grid;grid-template-columns:148px 30px minmax(0,1fr);gap:.55rem;align-items:center}
-.q0-axis{padding:0 0 .32rem;border-bottom:1px solid var(--border-default);color:var(--text-muted);font-size:.76rem}
-.q0-row{padding:.62rem 0;border-bottom:1px solid var(--border-subtle)}
-.q0-row:last-of-type{border-bottom:1px solid var(--border-default)}
+.q0-frame{border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden}
+.q0-axis,.q0-row{display:grid;grid-template-columns:168px 34px minmax(0,1fr);gap:.6rem;align-items:center}
+.q0-axis{padding:.52rem .85rem .44rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.78rem;font-weight:600}
+.q0-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.75rem}
+.q0-row{padding:.68rem .85rem;border-bottom:1px solid var(--border-subtle);transition:background .12s}
+.q0-row:last-child{border-bottom:0}
+.q0-row:hover{background:var(--surface-subtle)}
 .q0-chr-meta{min-width:0}
-.q0-chr-meta b{display:block;font:600 .86rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.q0-chr-meta small{display:block;margin-top:.12rem;font-size:.76rem;color:var(--text-muted);font-variant-numeric:tabular-nums;line-height:1.35}
+.q0-chr-head{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.q0-chr-meta b{font:600 .85rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q0-gap-pill{display:inline-flex;align-items:center;padding:1px 6px;border-radius:999px;font-size:.71rem;font-weight:500;font-variant-numeric:tabular-nums;border:1px solid var(--border-subtle);background:var(--surface-subtle);color:var(--text-muted);white-space:nowrap}
+.q0-gap-pill.is-clean{border-color:var(--tone-ok-line);background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
+.q0-chr-meta small{display:block;margin-top:.16rem;font-size:.75rem;color:var(--text-muted);font-variant-numeric:tabular-nums;line-height:1.35}
 .q0-chr-meta small.q0-warn{color:var(--tone-warn-ink);font-weight:500}
-.q0-role-col{display:flex;flex-direction:column;justify-content:space-between;height:44px;font:600 .7rem/1 var(--font-mono);color:var(--text-muted);text-align:right;user-select:none}
+.q0-role-col{display:flex;flex-direction:column;justify-content:space-between;height:50px;font:600 .7rem/1.1 var(--font-mono);color:var(--text-muted);text-align:right;user-select:none}
 .q0-rails{position:relative;overflow:hidden;padding:1px 0;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
-.q0-rail{position:relative;height:10px;border-radius:2px}
-.q0-mark{position:absolute;display:block;height:100%;border-radius:1.5px}
+.q0-rail{position:relative;height:11px;border-radius:2px}
+.q0-mark{position:absolute;display:block;height:100%;border-radius:2px}
 .q0-mark.ctg{min-width:3px;box-shadow:inset 0 0 0 .6px rgba(255,255,255,.45)}
-.q0-mark.ref,.q0-key.is-ref{background:var(--border-strong);box-shadow:inset 0 0 0 1px rgba(15,23,42,.14)}
+.q0-mark.ref,.q0-key.is-ref{background:var(--ctg-ref-fill);box-shadow:inset 0 0 0 1px var(--ctg-ref-stroke)}
 .q0-mark.input-gap,.q0-mark.ref-gap,.q0-key.input-gap{background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 4px);z-index:1}
 .q0-mark.unknown-gap,.q0-key.unknown-gap{background:var(--gen-gap);z-index:1}
 .q0-mark.unspecified-gap{background:var(--gen-unfilled);z-index:1}
-.q0-bands{width:100%;height:24px;display:block;color:var(--ds-1);fill:currentColor;fill-opacity:.24}
-.q0-bands polygon{transition:fill-opacity .1s}
-.q0-bands polygon:hover{fill-opacity:.58}
+.q0-bands{width:100%;height:28px;display:block;color:var(--brand);fill:currentColor;fill-opacity:.18}
+.q0-bands polygon{transition:fill-opacity .12s}
+.q0-bands polygon:hover{fill-opacity:.52}
 .q0-key{display:inline-block;width:11px;height:8px;border-radius:2px;vertical-align:middle;flex-shrink:0}
-.q0-key.is-band{background:var(--ds-1);opacity:.38;transform:skewX(-18deg)}
+.q0-key.is-band{background:var(--brand);opacity:.28;transform:skewX(-18deg)}
+.q0-rule-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.55rem;font-size:.83rem;line-height:1.5;color:var(--text-secondary)}
+.q0-rule-cards li{display:flex;flex-direction:column;gap:.12rem;padding:.55rem .75rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
+.q0-rule-cards strong{color:var(--text-primary);font-size:.82rem;font-weight:600}
 @media (max-width:760px){
-  .q0-axis,.q0-row{grid-template-columns:96px 26px minmax(0,1fr);gap:.4rem}
+  .q0-axis,.q0-row{grid-template-columns:104px 26px minmax(0,1fr);gap:.4rem;padding-left:.65rem;padding-right:.65rem}
   .q0-chr-meta b{font-size:.8rem}
 }
 </style>"""
+
+    rule_btn = (
+        '<button type="button" class="story-help-btn" data-story-open="q0-rule-modal" '
+        'title="初始路径说明 / About q0 tracks" aria-label="初始路径说明 / About q0 tracks">?</button>'
+    )
+    rule_modal = (
+        '<template id="q0-rule-modal" data-title="初始路径 q0 说明" data-title-zh="初始路径 q0 说明" data-title-en="About Initial Path q0">'
+        '<ul class="q0-rule-cards">'
+        '<li><strong>' + bi("共用比例尺", "Shared scale") + '</strong><span>'
+        + bi("所有染色体的 Ref（上轨）与 q0（下轨）采用同一 bp/像素比例绘制，短染色体不拉满，便于直观对比长度。",
+             "All Ref (top) and q0 (bottom) tracks share one bp/pixel scale; shorter chromosomes are not stretched.")
+        + '</span></li>'
+        '<li><strong>' + bi("证据投影带", "Projected anchors") + '</strong><span>'
+        + bi("灰蓝连带将已选来源片段对参考的已验证比对投影到 q0（非 q0 直接重比对），悬停可查看精确区间。",
+             "Slate ribbons project verified source-to-reference anchors onto q0 (not a direct q0 realignment); hover for exact coordinates.")
+        + '</span></li>'
+        '<li><strong>' + bi("Gap 真实坐标", "True-scale gaps") + '</strong><span>'
+        + bi("区分来源自带的「原有 Gap」与拼接新放的「新增占位 N」（如 100 N 仅表占位）；Gap 严格按真实坐标绘制不放大。",
+             "Distinguishes original source gaps from new placeholder Ns (e.g. 100 N join placeholders); gaps keep true coordinates without inflation.")
+        + '</span></li>'
+        '</ul></template>'
+    )
+
     legend = [
         '<span class="legend-item"><i class="q0-key is-ref"></i>Ref</span>',
         *[f'<span class="legend-item"><i class="q0-key" style="background:{color}"></i>{esc(ds)}</span>' for ds, color in colors.items()],
@@ -571,32 +603,42 @@ def q0_card(lgz):
         '<span class="legend-item"><i class="q0-key input-gap"></i>' + bi("原有 Gap", "Original gap") + "</span>",
         '<span class="legend-item"><i class="q0-key unknown-gap"></i>' + bi("新增占位 N", "New placeholder Ns") + "</span>",
     ]
-    body = [
-        style,
-        '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + "</div></div>",
-        '<div class="q0-axis"><small>' + bi("共用比例尺", "Shared scale") + '</small><span></span><small class="story-ruler">'
-        + "".join(f"<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>" for i in range(5)) + "</small></div>",
-    ]
+    gap_kind_tip = {
+        "input_assembly_gap": "原有 Gap / Original gap",
+        "reference_unknown": "新增占位 N / Placeholder Ns",
+        "unspecified_gap": "未分类 Gap / Gap",
+    }
+    rows_html = []
+    total_q0_bp = 0
+    total_gaps = 0
+    constructed = 0
     for track in tracks:
         name, ref = track["chr"], track["ref"]
         ref_marks = ""
         if ref:
-            ref_marks = mark(0, ref["length_bp"], "ref", f"{name} · {ref['length_bp']:,} bp")
+            ref_marks = mark(0, ref["length_bp"], "ref", f"Ref · {name} · {ref['length_bp']:,} bp")
             for a, b in ref["gaps"] or []:
-                ref_marks += mark(a, b, "ref-gap", f"Ref {a+1:,}–{b:,} · {b-a:,} N")
+                ref_marks += mark(a, b, "ref-gap", f"Ref Gap · {a+1:,}–{b:,} · {b-a:,} N")
         bands = []
         for band in track["bands"]:
             v, q, n = band["ref"], band["q"], band["bp"]
             points = f"{pct(v)},0 {pct(v+n)},0 {pct(q+n)},1 {pct(q)},1"
             bands.append(f'<polygon points="{points}"><title>Ref {v+1:,}–{v+n:,} → q0 {q+1:,}–{q+n:,} · {esc(band["via"])}</title></polygon>')
         parts = []
+        chr_gaps = 0
         for seg in track["parts"]:
             a, b, kind = seg["start"], seg["end"], seg["kind"]
             if kind == "source":
                 tip = f"{seg['dataset']} / {seg['name']}:{seg['source_start']+1:,}–{seg['source_end']:,} ({seg['strand']}) · q0 {a+1:,}–{b:,}"
                 parts.append(mark(a, b, "ctg", tip, colors[seg["dataset"]]))
             else:
-                parts.append(mark(a, b, {"input_assembly_gap": "input-gap", "reference_unknown": "unknown-gap", "unspecified_gap": "unspecified-gap"}[kind], f"{kind} · q0 {a+1:,}–{b:,} · {b-a:,} N"))
+                chr_gaps += 1
+                cls_name = {"input_assembly_gap": "input-gap", "reference_unknown": "unknown-gap", "unspecified_gap": "unspecified-gap"}[kind]
+                parts.append(mark(a, b, cls_name, f"{gap_kind_tip[kind]} · q0 {a+1:,}–{b:,} · {b-a:,} N"))
+        if isinstance(track.get("length_bp"), int):
+            total_q0_bp += track["length_bp"]
+            constructed += 1
+        total_gaps += chr_gaps
         notes = []
         if track["status"] == "not_constructed":
             notes.append(bi("q0 未构建", "q0 not constructed"))
@@ -609,19 +651,45 @@ def q0_card(lgz):
         elif ref["gaps"] is None:
             notes.append(bi("参考 Gap 位置未记录", "Reference gap positions not recorded"))
         note_html = f'<small class="q0-warn">{" · ".join(notes)}</small>' if notes else ""
-        title = (f'<div class="q0-chr-meta"><b>{esc(name)}</b>'
-                 f'<small>Ref {esc(fmt_bp_short(ref["length_bp"] if ref else None))} · q0 {esc(fmt_bp_short(track["length_bp"]))}</small>'
-                 f'{note_html}</div>')
+        gap_pill = ""
+        if isinstance(track.get("length_bp"), int):
+            if chr_gaps == 0:
+                gap_pill = f'<span class="q0-gap-pill is-clean">{bi("无 Gap", "0 gaps")}</span>'
+            else:
+                gap_pill = f'<span class="q0-gap-pill">{bi(f"{chr_gaps} Gap", f"{chr_gaps} gap" + ("s" if chr_gaps != 1 else ""))}</span>'
+        ref_len_txt = fmt_bp_short(ref["length_bp"] if ref else None)
+        q0_len_txt = fmt_bp_short(track["length_bp"])
+        title = (
+            f'<div class="q0-chr-meta">'
+            f'<div class="q0-chr-head"><b>{esc(name)}</b>{gap_pill}</div>'
+            f'<small>Ref {esc(ref_len_txt)} · q0 {esc(q0_len_txt)}</small>'
+            f'{note_html}</div>'
+        )
         roles = '<div class="q0-role-col" aria-hidden="true"><span>Ref</span><span>q0</span></div>'
-        body += [
-            f'<div class="q0-row">{title}{roles}<div class="q0-rails"><div class="q0-rail">{ref_marks}</div>',
-            '<svg class="q0-bands" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true">' + "".join(bands) + "</svg>",
-            '<div class="q0-rail">' + "".join(parts) + "</div></div></div>",
-        ]
-    body.append('<p class="story-foot">' + bi(
-        "上轨 Ref、下轨 q0 均按同一 bp/像素绘制；连带为已选来源片段向参考坐标的证据投影（非 q0 直接重比对），Gap 按真实坐标绘制不放大。",
-        "Top: Ref; bottom: q0 on one shared bp/pixel scale. Ribbons project verified source-to-reference anchors (not a direct q0 realignment); gaps keep true coordinates without inflation.",
-    ) + "</p>")
-    return section("alignment-q0", "03", "初始路径 q0", "Initial path q0", "".join(body),
-                   sub_zh="Ref ↔ q0 证据投影", sub_en="Ref ↔ q0 projection",
-                   right=bi(f"最大跨度 {fmt_bp_short(domain)}", f"Scale {fmt_bp_short(domain)}"))
+        rows_html.append(
+            f'<div class="q0-row">{title}{roles}<div class="q0-rails"><div class="q0-rail">{ref_marks}</div>'
+            '<svg class="q0-bands" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true">' + "".join(bands) + "</svg>"
+            '<div class="q0-rail">' + "".join(parts) + "</div></div></div>"
+        )
+
+    axis_html = (
+        '<div class="q0-axis">'
+        f'<span>{bi("染色体", "Chromosome")}</span>'
+        f'<span class="muted" style="text-align:right;font-weight:500">{bi("轨道", "Track")}</span>'
+        '<span class="story-ruler">'
+        + "".join(f"<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>" for i in range(5))
+        + "</span></div>"
+    )
+    frame_html = f'<div class="q0-frame">{axis_html}{"".join(rows_html)}</div>'
+    body_html = (
+        style
+        + '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + "</div></div>"
+        + frame_html
+        + rule_modal
+    )
+    right_bits = [bi(f"{len(tracks)} 条染色体", f"{len(tracks)} chrs")]
+    if constructed:
+        right_bits.append(bi(f"q0 总长 {fmt_bp_short(total_q0_bp)}", f"q0 {fmt_bp_short(total_q0_bp)}"))
+        right_bits.append(bi(f"{total_gaps} Gap", f"{total_gaps} gaps"))
+    return section("alignment-q0", "03", "初始路径 q0", "Initial path q0", body_html,
+                   title_extra=rule_btn, right=" · ".join(right_bits))
