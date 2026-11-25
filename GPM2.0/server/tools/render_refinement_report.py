@@ -162,20 +162,36 @@ small,.muted{color:var(--text-muted);font-size:.84rem}
 .cgat-nav a:hover{background:var(--surface-subtle);color:var(--text-primary);text-decoration:none}
 
 /* Clean Frameless-Sidebar / Centered Single-Column Layout */
-.wb-shell{max-width:1280px;margin:0 auto;padding:1.35rem 1.5rem 2.5rem;display:grid;grid-template-columns:168px minmax(0,1fr);gap:1.75rem;align-items:start}
+.wb-shell{max-width:1280px;margin:0 auto;padding:1.35rem 1.5rem 2.5rem;display:grid;grid-template-columns:184px minmax(0,1fr);gap:1.65rem;align-items:start}
 .wb-shell.no-sidebar{display:block;max-width:1140px}
-.wb-sidebar{position:sticky;top:18px;padding-top:.2rem}
-.wb-toc{list-style:none;margin:0;padding:0;border-left:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:.1rem}
-.wb-toc a{display:block;padding:.34rem .75rem;margin-left:-1px;border-left:2px solid transparent;color:var(--text-muted);font-size:.84rem;font-weight:500;transition:color .12s,border-color .12s}
-.wb-toc a:hover{color:var(--text-primary);text-decoration:none}
-.wb-toc a.is-current{color:var(--brand);border-left-color:var(--brand);font-weight:600}
-.cgat-main{min-width:0;display:flex;flex-direction:column;gap:1.15rem}
+.wb-sidebar{position:sticky;top:18px;padding-top:.15rem}
+.wb-toc{list-style:none;margin:0;padding:0;border-left:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:.12rem}
+.wb-toc a{display:flex;align-items:baseline;gap:.42rem;padding:.34rem .72rem;margin-left:-1px;border-left:2px solid transparent;color:var(--text-muted);font-size:.83rem;font-weight:500;line-height:1.35;transition:color .12s,border-color .12s,background .12s;border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.wb-toc a:hover{color:var(--text-primary);background:var(--surface-hover);text-decoration:none}
+.wb-toc a.is-current{color:var(--brand);border-left-color:var(--brand);background:var(--brand-soft);font-weight:600}
+.toc-num{display:inline-block;min-width:1.45rem;font:600 .74rem/1 var(--font-mono);color:var(--text-muted);font-variant-numeric:tabular-nums;flex-shrink:0}
+.wb-toc a.is-current .toc-num{color:var(--brand)}
+.cgat-main{min-width:0;display:flex;flex-direction:column;gap:1.1rem}
 
-/* Crisp Paper Panels */
-.panel{background:var(--surface-panel);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:1.15rem 1.35rem;min-width:0;scroll-margin-top:18px}
+/* Crisp Paper Panels & Shared Story Kit */
+.panel{background:var(--surface-panel);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:1.1rem 1.35rem;min-width:0;scroll-margin-top:18px;box-shadow:0 1px 2px rgba(15,23,42,.03)}
 .panel.is-alert{border-color:var(--tone-err-line)}
-.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.8rem;padding-bottom:.5rem;border-bottom:1px solid var(--border-subtle)}
-.panel-head-right{font-size:.84rem;color:var(--accent);font-weight:500}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.8rem;padding-bottom:.55rem;border-bottom:1px solid var(--border-subtle)}
+.panel-head-right{font-size:.82rem;color:var(--text-muted);font-weight:500;display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.story-head h2{display:inline-flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-size:1.06rem;font-weight:650;letter-spacing:-.01em}
+.story-num{display:inline-flex;align-items:center;padding:.08rem .38rem;border-radius:3px;background:var(--brand-soft);color:var(--brand);font:600 .76rem/1.3 var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:0}
+.story-sub{font-size:.82rem;font-weight:500;color:var(--text-muted)}
+.story-toolbar{display:flex;align-items:center;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap;margin:0 0 .55rem;font-size:.81rem;color:var(--text-secondary)}
+.story-scale-row{display:grid;grid-template-columns:148px minmax(0,1fr);gap:.75rem;align-items:end;padding:0 0 .28rem;margin-bottom:.15rem;border-bottom:1px solid var(--border-subtle);color:var(--text-muted);font-size:.76rem}
+.story-ruler{position:relative;display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;padding-bottom:4px}
+.story-ruler span{position:relative;line-height:1.1}
+.story-ruler span::after{content:"";position:absolute;left:50%;bottom:-5px;width:1px;height:4px;background:var(--border-strong)}
+.story-ruler span:first-child::after{left:0}
+.story-ruler span:last-child::after{left:auto;right:0}
+.story-foot{margin:.6rem 0 0;padding-top:.45rem;border-top:1px dashed var(--border-subtle);color:var(--text-muted);font-size:.79rem;line-height:1.45}
+.swatch.is-orig-gap{background:repeating-linear-gradient(135deg,var(--border-strong) 0 2px,var(--surface-panel) 2px 4.5px);border:1px solid var(--border-strong)}
+.swatch.is-unk-gap{background:repeating-linear-gradient(135deg,var(--gen-gap) 0 2.5px,var(--surface-panel) 2.5px 5px);border:1px solid var(--gen-gap)}
+.num-col{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 
 /* Subtle Formal Status Indicators */
 .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.12rem .5rem;border-radius:3px;font-size:.78rem;font-weight:500;line-height:1.35;border:1px solid transparent;white-space:nowrap}
@@ -361,15 +377,18 @@ details.tree-node[open]>summary .tree-caret{transform:rotate(90deg)}
 .pager a:hover{background:var(--surface-subtle);text-decoration:none}
 
 @media (max-width:1024px){
-  .wb-shell{grid-template-columns:1fr;padding:1rem;gap:.9rem}
-  .wb-sidebar{position:static;padding:0}
+  .wb-shell{grid-template-columns:minmax(0,1fr);padding:1rem;gap:.9rem}
+  .wb-sidebar{position:static;padding:0;min-width:0}
   .wb-toc{flex-direction:row;overflow-x:auto;border-left:0;border-bottom:1px solid var(--border-subtle);gap:.2rem}
-  .wb-toc a{white-space:nowrap;margin-left:0;border-left:0;border-bottom:2px solid transparent;padding:.38rem .65rem}
+  .wb-toc a{white-space:nowrap;margin-left:0;border-left:0;border-bottom:2px solid transparent;border-radius:var(--radius-sm) var(--radius-sm) 0 0;padding:.38rem .62rem}
   .wb-toc a.is-current{border-bottom-color:var(--brand)}
+  .toc-num{min-width:auto}
   .split-grid{grid-template-columns:1fr}
 }
 @media (max-width:760px){
   .cgat-header-inner{padding:.85rem 1rem}
+  .panel{padding:.9rem 1rem}
+  .story-scale-row{grid-template-columns:104px minmax(0,1fr);gap:.5rem}
   .ideo-row>summary{grid-template-columns:84px minmax(120px,1fr) 64px 66px}
   .ideo-detail{padding-left:.75rem}
 }
@@ -953,11 +972,13 @@ def workbench_page(
     sidebar_html = ""
     shell_cls = "wb-shell"
     if sidebar_items:
+        has_nums = any(item[1] for item in sidebar_items)
         toc_rows = []
         for idx, item in enumerate(sidebar_items):
-            sec_id, _, l_zh, l_en = item
+            sec_id, num, l_zh, l_en = item
             cur = ' class="is-current"' if idx == 0 else ""
-            toc_rows.append(f'<li><a href="#{esc(sec_id)}"{cur}>{bi(l_zh, l_en)}</a></li>')
+            prefix = f'<span class="toc-num">{esc(num or "·")}</span>' if has_nums else ""
+            toc_rows.append(f'<li><a href="#{esc(sec_id)}"{cur}>{prefix}<span>{bi(l_zh, l_en)}</span></a></li>')
         sidebar_html = (
             '<aside class="wb-sidebar" aria-label="Report sections">'
             '<ol class="wb-toc">' + "".join(toc_rows) + '</ol></aside>'

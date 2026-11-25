@@ -1,96 +1,257 @@
 """q3 end markers and local before/candidate/result views. Never connect a missing PAF."""
-from render_path_story import section
-from render_refinement_report import bi, esc, fmt_bp_short
-from render_repair_story import _coord
+try:
+    from render_path_story import section
+    from render_refinement_report import bi, esc, fmt_bp_short
+    from render_repair_story import _coord
+except ModuleNotFoundError:
+    from .render_path_story import section
+    from .render_refinement_report import bi, esc, fmt_bp_short
+    from .render_repair_story import _coord
 
 
-def _axis(lo,hi):
-    return lambda x: 24+750*(x-lo)/max(1,hi-lo)
+TERMINAL_STYLE = """<style>
+.tel-axis,.tel-row{display:grid;grid-template-columns:148px minmax(0,1fr);gap:.75rem;align-items:center}
+.tel-axis{align-items:end;padding:0 0 .32rem;border-bottom:1px solid var(--border-default);color:var(--text-muted);font-size:.76rem}
+.tel-axis-pad{padding-inline:2.35rem}
+.tel-row{border-bottom:1px solid var(--border-subtle);padding:.55rem 0}
+.tel-row:last-of-type{border-bottom:1px solid var(--border-default)}
+.tel-chr-col{min-width:0}
+.tel-chr-col b{display:block;font:600 .86rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tel-chr-col small{display:block;margin-top:.12rem;font-size:.76rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.tel-gutter{padding-inline:2.35rem;min-width:0}
+.tel-canvas{background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%;padding:.25rem 0}
+.tel-bar-wrap{position:relative;min-width:6px;height:22px;display:flex;align-items:center}
+.tel-bar{position:relative;width:100%;height:10px;border-radius:2px;background:var(--border-strong);overflow:hidden}
+.tel-part{position:absolute;top:0;height:10px}
+.tel-part.is-ctg{box-shadow:inset 0 0 0 .6px rgba(255,255,255,.42)}
+.tel-part.is-gap{background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 4px)!important}
+.tel-end{position:absolute;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;font:700 .7rem/1 var(--font-mono);cursor:pointer;border-radius:3px;padding:.2rem .34rem;white-space:nowrap;transition:transform .1s,border-color .12s,background .12s}
+.tel-end.is-5p{right:calc(100% + 4px)}
+.tel-end.is-3p{left:calc(100% + 4px)}
+.tel-end.is-present{color:var(--tone-ok-ink);background:var(--tone-ok-bg);border:1px solid var(--tone-ok-line)}
+.tel-end.is-present:hover{background:var(--gen-tel);border-color:var(--gen-tel);color:#fff}
+.tel-end.is-missing{color:var(--text-secondary);background:var(--surface-panel);border:1px solid var(--border-strong);border-radius:999px;padding:.16rem .34rem;font-size:.74rem}
+.tel-end.is-missing:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.tel-cand-fold{margin-top:.55rem;padding-top:.45rem;border-top:1px dashed var(--border-subtle)}
+.tel-cand-fold>summary{cursor:pointer;font-size:.82rem;font-weight:600;color:var(--accent)}
+.tel-gate-list{margin:.35rem 0;padding-left:1.15rem;font-size:.81rem;color:var(--tone-warn-ink)}
+@media (max-width:760px){
+  .tel-axis,.tel-row{grid-template-columns:96px minmax(0,1fr);gap:.4rem}
+  .tel-axis-pad,.tel-gutter{padding-inline:2.05rem}
+}
+</style>"""
 
 
-def _rect(span,axis,y,fill):
-    start,end=map(axis,span)
-    return f'<rect x="{min(start,end):.5f}" y="{y}" width="{abs(end-start):.5f}" height="8" fill="{fill}"/>'
+def _axis(lo, hi, pad_l=96, width=676):
+    return lambda x: pad_l + width * (x - lo) / max(1, hi - lo)
+
+
+def _rect(span, axis, y, fill, h=9, rx=2):
+    start, end = map(axis, span)
+    return f'<rect x="{min(start, end):.5f}" y="{y}" width="{max(1.8, abs(end - start)):.5f}" height="{h}" rx="{rx}" fill="{fill}"/>'
 
 
 def _zoom(t, cand, side, outsize):
-    sel=t["selected"]; hits=((cand or {}).get("alignment") or {}).get("hits",[]); w=t["window"]
-    qrange=[*w,*([sel["cut"]] if sel else []),*(n for h in hits for n in h["q2"])]; qax=_axis(min(qrange),max(qrange))
-    svg=['<svg class="repair-zoom" viewBox="0 0 800 112" role="img" aria-label="Terminal evidence / 末端证据">']
+    sel = t["selected"]
+    hits = ((cand or {}).get("alignment") or {}).get("hits", [])
+    w = t["window"]
+    qrange = [*w, *([sel["cut"]] if sel else []), *(n for h in hits for n in h["q2"])]
+    qlo, qhi = min(qrange), max(qrange)
+    qax = _axis(qlo, qhi)
+    pad_l, plot_w = 96, 676
+    svg_h = 142 if sel else (98 if cand else 52)
+    svg = [f'<svg class="repair-zoom" viewBox="0 0 800 {svg_h}" role="img" aria-label="Terminal evidence / 末端证据">']
+
+    # Track 1: q2 terminal inspection window
+    svg.append('<text x="8" y="31" font-size="11.5" font-weight="600" fill="var(--text-primary)">q2</text>')
+    svg.append(f'<text x="{pad_l}" y="15" font-size="10" fill="var(--text-muted)">{qlo+1:,}</text>')
+    svg.append(f'<text x="{pad_l + plot_w}" y="15" text-anchor="end" font-size="10" fill="var(--text-muted)">{qhi:,}</text>')
+
     if cand:
-        extract=cand["source"][1]-cand["source"][0];dax=_axis(0,extract)
+        extract = cand["source"][1] - cand["source"][0]
+        dax = _axis(0, extract)
         for h in hits:
-            a,b=h["q2"];u,v=h["extract"] if h["strand"]=="+" else reversed(h["extract"])
-            svg.append(f'<polygon points="{qax(a):.4f},19 {qax(b):.4f},19 {dax(v):.4f},55 {dax(u):.4f},55" opacity=".3" fill="var(--{("tone-warn-ink" if h["failed"] else ("ds-1" if h.get("selected") and cand["status"]=="accepted" else "text-muted"))})"/>')
-        svg.append(_rect([0,extract],dax,55,"var(--border-strong)"))
-        if sel and cand["event"]==sel["event"] and cand["status"]=="accepted" and cand["used"]:
-            svg.append(_rect(cand["used"],dax,55,"var(--ds-1)"))
-        for interval in cand["signals"] or []: svg.append(_rect(interval,dax,52,"var(--ds-2)"))
-    svg.extend([_rect([min(qrange),max(qrange)],qax,11,"var(--text-muted)"),_rect(w,qax,11,"var(--gen-unfilled)")]);
-    for interval in t["q2_signals"] or []: svg.append(_rect(interval,qax,10,"var(--ds-2)"))
+            a, b = h["q2"]
+            u, v = h["extract"] if h["strand"] == "+" else reversed(h["extract"])
+            tone = "tone-warn-ink" if h["failed"] else ("ds-0" if h.get("selected") and cand["status"] == "accepted" else "text-muted")
+            svg.append(f'<polygon points="{qax(a):.4f},32 {qax(b):.4f},32 {dax(v):.4f},68 {dax(u):.4f},68" opacity=".26" fill="var(--{tone})"/>')
+        cname = cand["name"] if len(cand["name"]) <= 12 else cand["name"][:11] + "…"
+        svg.append(f'<text x="8" y="76" font-size="11" font-weight="600" fill="var(--text-secondary)">{esc(cname)}</text>')
+        svg.append(_rect([0, extract], dax, 68, "var(--border-strong)"))
+        if sel and cand["event"] == sel["event"] and cand["status"] == "accepted" and cand["used"]:
+            svg.append(_rect(cand["used"], dax, 67, "var(--ds-0)", h=11))
+        for interval in cand["signals"] or []:
+            svg.append(_rect(interval, dax, 63, "var(--gen-tel)", h=5, rx=1))
+
+    svg.append(_rect([qlo, qhi], qax, 23, "var(--border-default)"))
+    svg.append(_rect(w, qax, 23, "var(--tone-info-line)"))
+    for interval in t["q2_signals"] or []:
+        svg.append(_rect(interval, qax, 21, "var(--gen-tel)", h=13))
+
     if sel:
-        cut=qax(sel["cut"]);svg.append(f'<path d="M{cut:.4f} 4v22" stroke="var(--gen-patch)" stroke-width="2"/>')
-        span=sel["span"]; lo=max(0,span[0]-(2000 if side=="3prime" else 0));hi=min(outsize,span[1]+(2000 if side=="5prime" else 0))
-        ax=_axis(lo,hi);svg.extend([_rect([lo,hi],ax,91,"var(--text-muted)"),_rect(span,ax,91,"var(--ds-1)")]);
-        for u,v in t["q3_signals"] or []:
-            if min(hi,v)>max(lo,u):svg.append(_rect([max(lo,u),min(hi,v)],ax,89,"var(--ds-2)"))
-    svg.append("</svg>");return "".join(svg)
+        cut = qax(sel["cut"])
+        svg.append(f'<path d="M{cut:.4f} 17v21" stroke="var(--gen-patch)" stroke-width="2.2"/>')
+        span = sel["span"]
+        lo = max(0, span[0] - (2000 if side == "3prime" else 0))
+        hi = min(outsize, span[1] + (2000 if side == "5prime" else 0))
+        ax = _axis(lo, hi)
+        svg.append('<text x="8" y="121" font-size="11.5" font-weight="600" fill="var(--text-primary)">q3</text>')
+        svg.append(f'<text x="{pad_l}" y="138" font-size="10" fill="var(--text-muted)">{lo+1:,}</text>')
+        svg.append(f'<text x="{pad_l + plot_w}" y="138" text-anchor="end" font-size="10" fill="var(--text-muted)">{hi:,}</text>')
+        svg.append(_rect([lo, hi], ax, 113, "var(--border-strong)"))
+        svg.append(_rect(span, ax, 112, "var(--ds-0)", h=11))
+        for u, v in t["q3_signals"] or []:
+            if min(hi, v) > max(lo, u):
+                svg.append(_rect([max(lo, u), min(hi, v)], ax, 108, "var(--gen-tel)", h=5, rx=1))
+
+    svg.append("</svg>")
+    return f'<div class="story-plot-frame">{"".join(svg)}</div>'
 
 
-def _inspection(t,side,size):
-    if t is None:return bi("本次未记录此末端的检测结果。", "No assessment recorded for this end.")
-    state=t["state"]; sel=t["selected"]; count=t["count"]
-    names={"already_present":("原已具备端粒，未修改", "Telomere already present; unchanged"),"recovered":("已恢复端粒", "Terminal signal restored"),"unresolved":("未恢复，保留原末端", "Not recovered; original end retained")}
-    msg=[f'<p><strong>{bi(*names[state])}</strong> · q2 {_coord(t["window"])}</p>'];cs=t["candidates"] or []
+def _inspection(t, side, size):
+    if t is None:
+        return '<p class="muted">' + bi("本次未记录此末端的检测结果。", "No assessment recorded for this end.") + '</p>'
+    state = t["state"]
+    sel = t["selected"]
+    count = t["count"]
+    names = {
+        "already_present": ("原已具备端粒，未修改", "Telomere already present; unchanged"),
+        "recovered": ("本次已恢复端粒", "Terminal signal restored"),
+        "unresolved": ("未恢复，保留原末端", "Not recovered; original end retained"),
+    }
+    tone_cls = "is-ok" if state in ("already_present", "recovered") else ""
+    win_bp = t["window"][1] - t["window"][0]
+    msg = [
+        f'<div class="story-verdict {tone_cls}"><strong>{bi(*names[state])}</strong>'
+        f' · <span class="muted">q2 {bi("检查窗口", "inspection window")} <code>{_coord(t["window"])}</code> ({win_bp:,} bp)</span></div>'
+    ]
+    cs = t["candidates"] or []
+
     def one(c):
-        rows=[_zoom(t,c,side,size),bi("上轨：q2 检查窗口", "Top: q2 inspection window")]
+        rows = [_zoom(t, c, side, size)]
+        meta_bits = [f'<span>{bi("上轨：q2 检查窗口", "Top: q2 inspection window")} <code>{_coord(t["window"])}</code></span>']
         if c:
-            rows.append(f'<p>{bi("中轨：定向候选", "Middle: oriented candidate")}　{esc(c["dataset"])} / {esc(c["name"])} ({esc(c["strand"])}) · {_coord(c["source"])}</p>')
+            meta_bits.append(
+                f'<span>{bi("中轨：定向候选", "Middle: oriented candidate")} <b>{esc(c["dataset"])} / {esc(c["name"])}</b> '
+                f'({esc(c["strand"])}) <code>{_coord(c["source"])}</code></span>'
+            )
         if sel:
-            rows.append(f'<p>q2 {bi("切点", "cut")} {sel["cut"]:,} · {bi("下轨：实际写入 q3", "Bottom: inserted into q3")} {_coord(sel["span"])} · {esc(sel["dataset"])} / {esc(sel["name"])} ({esc(sel["strand"])}) {_coord(sel["source"])}</p>')
-        if c and c["status"]!="accepted":
-            reasons={"no_high_stringency_terminal_overlap":("没有比对同时通过末端重叠的全部门槛。","No alignment passed all terminal overlap gates."),
-                     "validated_overlap_does_not_extend_terminal":("比对通过，但按切点取用后没有净延伸。","The overlap passed, but the cut would not extend the end."),
-                     "telomere_repeat_not_at_external_end":("候选外端未检出合格的端粒重复。","No qualifying repeat was detected at the outer end of the candidate.")}
-            reason=bi(*reasons[c["reason"]]) if c["reason"] in reasons else esc(c["reason"])
-            rows.append(f'<p>{bi("未采用", "Not admitted")} · {reason}</p>')
+            meta_bits.append(
+                f'<span>q2 {bi("切点", "cut")} <code>{sel["cut"]:,}</code> · {bi("下轨：写入 q3", "Bottom: inserted into q3")} '
+                f'<code>{_coord(sel["span"])}</code> ({esc(sel["dataset"])}/{esc(sel["name"])} {esc(sel["strand"])} <code>{_coord(sel["source"])}</code>)</span>'
+            )
+        rows.append('<div class="story-meta-strip">' + "".join(meta_bits) + '</div>')
+        if c and c["status"] != "accepted":
+            reasons = {
+                "no_high_stringency_terminal_overlap": ("没有比对同时通过末端重叠的全部门槛。", "No alignment passed all terminal overlap gates."),
+                "validated_overlap_does_not_extend_terminal": ("比对通过，但按切点取用后没有净延伸。", "The overlap passed, but the cut would not extend the end."),
+                "telomere_repeat_not_at_external_end": ("候选外端未检出合格的端粒重复。", "No qualifying repeat was detected at the outer end of the candidate."),
+            }
+            reason = bi(*reasons[c["reason"]]) if c["reason"] in reasons else f'<code>{esc(c["reason"])}</code>'
+            rows.append(f'<p><b>{bi("未采用", "Not admitted")}</b> · {reason}</p>')
         if c and c["alignment"]:
-            gates=c["alignment"]["gates"]; hh=c["alignment"]["hits"]
-            if not hh:rows.append(bi("已核对的 PAF 无匹配记录。", "Verified PAF contains no alignments."))
+            gates = c["alignment"]["gates"]
+            hh = c["alignment"]["hits"]
+            if not hh:
+                rows.append('<p class="muted">' + bi("已核对的 PAF 无匹配记录。", "Verified PAF contains no alignments.") + '</p>')
+            gate_items = []
             for h in hh:
-                limits=[]
-                if "overlap" in h["failed"]: limits.append(f'{h["extract"][1]-h["extract"][0]:,} bp &lt; {gates["overlap"]:,} bp')
-                if "mapq" in h["failed"]: limits.append(f'MAPQ {h["mapq"]} &lt; {gates["mapq"]}')
-                if "identity" in h["failed"]: limits.append(f'{h["identity"]:.2%} &lt; {gates["identity"]:.2%}')
-                if "strand" in h["failed"]:limits.append(bi("匹配方向不符","Wrong orientation"))
-                if limits:rows.append("<p>q2 "+_coord(h["q2"])+" · "+" · ".join(limits)+"</p>")
-        elif c: rows.append(bi("未记录可核对的候选 PAF；不绘制比对带。", "No verified candidate PAF available; no ribbon drawn."))
+                limits = []
+                if "overlap" in h["failed"]:
+                    limits.append(f'{h["extract"][1]-h["extract"][0]:,} bp &lt; {gates["overlap"]:,} bp')
+                if "mapq" in h["failed"]:
+                    limits.append(f'MAPQ {h["mapq"]} &lt; {gates["mapq"]}')
+                if "identity" in h["failed"]:
+                    limits.append(f'{h["identity"]:.2%} &lt; {gates["identity"]:.2%}')
+                if "strand" in h["failed"]:
+                    limits.append(bi("匹配方向不符", "Wrong orientation"))
+                if limits:
+                    gate_items.append(f'<li>q2 <code>{_coord(h["q2"])}</code> · {" · ".join(limits)}</li>')
+            if gate_items:
+                rows.append('<ul class="tel-gate-list">' + "".join(gate_items) + '</ul>')
+        elif c:
+            rows.append('<p class="muted">' + bi("未记录可核对的候选 PAF；不绘制比对带。", "No verified candidate PAF available; no ribbon drawn.") + '</p>')
         return "".join(rows)
-    primary=next((c for c in cs if sel and c["status"]=="accepted" and c["event"]==sel["event"]),None) or next(iter(cs),None)
-    msg.append(one(primary));
-    if t["q2_signals"] or t["q3_signals"] or primary and primary["signals"]:
-        msg.append('<p><i class="q0-key" style="background:var(--ds-2)"></i> '+bi("已检测的端粒重复区间", "Measured terminal repeat intervals")+"</p>")
-    elif state!="unresolved":msg.append(bi("历史记录未保存重复区间坐标。", "Repeat positions were not recorded in this snapshot."))
-    if state=="unresolved" and not cs:
-        msg.append(bi("本末端没有候选。", "No candidate recorded for this end.") if count==0 else bi("有候选，但缺少可核验的位点详情。", "Candidates were recorded, but their details are unavailable."))
+
+    primary = next((c for c in cs if sel and c["status"] == "accepted" and c["event"] == sel["event"]), None) or next(iter(cs), None)
+    msg.append(one(primary))
+    if t["q2_signals"] or t["q3_signals"] or (primary and primary["signals"]):
+        msg.append('<p class="muted"><i class="swatch" style="background:var(--gen-tel);margin-right:.35rem"></i>' + bi("绿色标记：已检测的端粒重复区间", "Green highlight: measured terminal repeat intervals") + "</p>")
+    elif state != "unresolved":
+        msg.append('<p class="muted">' + bi("历史记录未保存重复区间坐标。", "Repeat positions were not recorded in this snapshot.") + '</p>')
+    if state == "unresolved" and not cs:
+        msg.append('<p class="muted">' + (
+            bi("本末端没有候选供体，保留 q2 原始末端。", "No candidate recorded for this end; original q2 terminal retained.")
+            if count == 0 else bi("有候选记录，但缺少可核验的位点详情。", "Candidates were recorded, but locus-level details are unavailable.")
+        ) + '</p>')
     for c in cs:
-        if c is not primary:msg.append("<details><summary>"+bi("另一候选", "Other candidate")+" · "+esc(c["name"])+"</summary>"+one(c)+"</details>")
+        if c is not primary:
+            msg.append('<details class="tel-cand-fold"><summary>' + bi("查看另一候选", "Other candidate") + " · " + esc(c["name"]) + "</summary>" + one(c) + "</details>")
     return "".join(msg)
 
 
 def terminal_card(lgz):
-    rows=lgz.get("terminal_scene"); head=("terminal-process","q2 → q3","端粒处理","Telomere processing")
-    if not rows:return section(*head,bi("本次没有可核验的 q2 → q3 末端检测记录。", "No verifiable q2 → q3 end assessment is available."))
-    m=max(r["length_bp"] for r in rows);path=lgz.get("stage_paths",{}).get("q3",{}); tracks={t["chr"]:t for t in (path.get("tracks") or [])}
-    colors={v["name"]:f"var(--ds-{i%6})" for i,v in enumerate(lgz["inputs"]["assemblies"])}; body=[];templates=[]
+    rows = lgz.get("terminal_scene")
+    head = ("terminal-process", "q2 → q3", "端粒处理", "Telomere processing")
+    if not rows:
+        return section(*head, '<p class="muted">' + bi("本次没有可核验的 q2 → q3 末端检测记录。", "No verifiable q2 → q3 end assessment is available.") + '</p>')
+    m = max([1] + [r["length_bp"] for r in rows])
+    path = lgz.get("stage_paths", {}).get("q3", {})
+    tracks = {t["chr"]: t for t in (path.get("tracks") or [])}
+    colors = {v["name"]: f"var(--ds-{i%6})" for i, v in enumerate(lgz["inputs"]["assemblies"])}
+
+    present_ends = sum(1 for r in rows for k in ("5prime", "3prime") if (r["ends"].get(k) or {}).get("state") in ("already_present", "recovered"))
+    recovered_ends = sum(1 for r in rows for k in ("5prime", "3prime") if (r["ends"].get(k) or {}).get("state") == "recovered")
+    total_ends = len(rows) * 2
+    right_txt = bi(f"{present_ends} / {total_ends} 个末端具备 TEL", f"{present_ends} / {total_ends} ends with TEL")
+    if recovered_ends:
+        right_txt += " · " + bi(f"恢复 {recovered_ends}", f"{recovered_ends} restored")
+
+    legend = [
+        '<span class="legend-item"><span class="badge tone-ok" style="padding:.04rem .32rem;font:700 .68rem/1.2 var(--font-mono)">TEL</span>' + bi("已检出端粒（点击查看）", "Telomere detected (click)") + '</span>',
+        '<span class="legend-item"><span class="badge tone-neutral" style="padding:.04rem .32rem;border-radius:999px;font:700 .7rem/1.1 var(--font-mono)">○</span>' + bi("未检出端粒（点击查看原因）", "Absent (click for reason)") + '</span>',
+        *[f'<span class="legend-item"><i class="swatch" style="background:{c}"></i>{esc(ds)}</span>' for ds, c in colors.items()],
+    ]
+
+    body = [
+        TERMINAL_STYLE,
+        '<div class="story-toolbar"><div class="legend-row" style="margin:0">' + "".join(legend) + '</div></div>',
+        '<div class="tel-axis"><small>q3 ' + bi("比例尺", "scale") + '</small><div class="tel-axis-pad"><small class="story-ruler">'
+        + "".join(f"<span>{esc(fmt_bp_short(round(m * i / 4)))}</span>" for i in range(5)) + "</small></div></div>",
+    ]
+    templates = []
     for row in rows:
-        c=row["chr"];n=row["length_bp"];marks=[]; buttons=[];t=tracks.get(c)
-        if path.get("sha256")==row["sha256"] and t and t["length_bp"]==n:
+        c = row["chr"]
+        n = row["length_bp"]
+        marks = []
+        buttons = []
+        t = tracks.get(c)
+        if path.get("sha256") == row["sha256"] and t and t["length_bp"] == n:
             for p in t["parts"]:
-                color=colors.get(p.get("dataset"),"var(--gen-unfilled)");marks.append(f'<span class="repair-part" style="left:{100*p["start"]/n:.8g}%;width:{100*(p["end"]-p["start"])/n:.8g}%;background:{color}"></span>')
-        for k in ("5prime","3prime"):
-            info=row["ends"].get(k); text="TEL" if info and info["state"] in ("already_present","recovered") else "○"; end="5′" if k=="5prime" else "3′"; key=f"terminal-{len(templates)}"; title=esc(c)+" · "+end
-            buttons.append(f'<button class="tel-end" type="button" data-story-open="{key}" aria-label="{title} · {text}" style="{("right:100%" if k=="5prime" else "left:100%")}">{text}</button>')
-            templates.append(f'<template id="{key}" data-title="{title}">{_inspection(info,k,n)}</template>')
-        body.append(f'<div class="repair-rows"><b>{esc(c)} <small>{fmt_bp_short(n)}</small></b><div style="padding-inline:2.1rem"><div style="position:relative;width:{100*n/m:.9g}%;padding:.9em 0"><div class="repair-base" style="background:var(--text-muted)">{"".join(marks)}</div>{"".join(buttons)}</div></div></div>')
-    return section(*head,'<style>.tel-end{position:absolute;top:0;font:inherit;font-size:.78rem;cursor:pointer;color:var(--brand);background:var(--surface-panel);border:1px solid var(--border-strong);border-radius:.3em;padding:0 .22em}</style>'+"".join(body+templates))
+                is_src = p["kind"] == "source"
+                color = colors.get(p.get("dataset"), "var(--ds-0)") if is_src else "var(--gen-unfilled)"
+                cls = "tel-part is-ctg" if is_src else "tel-part is-gap"
+                marks.append(f'<span class="{cls}" style="left:{100*p["start"]/n:.8g}%;width:{100*(p["end"]-p["start"])/n:.8g}%;background:{color}"></span>')
+        for k in ("5prime", "3prime"):
+            info = row["ends"].get(k)
+            has_tel = bool(info and info["state"] in ("already_present", "recovered"))
+            text = "TEL" if has_tel else "○"
+            end = "5′" if k == "5prime" else "3′"
+            side_cls = "is-5p" if k == "5prime" else "is-3p"
+            state_cls = "is-present" if has_tel else "is-missing"
+            key = f"terminal-{len(templates)}"
+            title = esc(c) + " · " + end
+            buttons.append(
+                f'<button class="tel-end {side_cls} {state_cls}" type="button" data-story-open="{key}" '
+                f'title="{title} · {text}" aria-label="{title} · {text}">{text}</button>'
+            )
+            templates.append(f'<template id="{key}" data-title="{title}">{_inspection(info, k, n)}</template>')
+        body.append(
+            f'<div class="tel-row">'
+            f'<div class="tel-chr-col"><b>{esc(c)}</b><small>{esc(fmt_bp_short(n))}</small></div>'
+            f'<div class="tel-gutter"><div class="tel-canvas">'
+            f'<div class="tel-bar-wrap" style="width:{100*n/m:.9g}%">'
+            f'<div class="tel-bar">{"".join(marks)}</div>{"".join(buttons)}'
+            f'</div></div></div></div>'
+        )
+    return section(*head, "".join(body + templates), right=right_txt)

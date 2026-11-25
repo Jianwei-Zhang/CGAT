@@ -108,10 +108,20 @@ def render_overview(vm):
             + (DIALOG if vm["refinement_summary"]["tools"] or any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene", "terminal_scene")) else "")
         )
 
+    brand_mark = (
+        '<span class="cgat-brand">'
+        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">'
+        '<rect x="1" y="2" width="14" height="3.2" rx="1" fill="currentColor" opacity=".9"/>'
+        '<rect x="1" y="6.9" width="9.5" height="2.8" rx="1" fill="currentColor" opacity=".55"/>'
+        '<rect x="11.5" y="6.9" width="3.5" height="2.8" rx="1" fill="var(--gen-patch)"/>'
+        '<rect x="1" y="11.4" width="14" height="2.8" rx="1" fill="var(--ds-1)"/>'
+        '</svg>CGAT Server</span>'
+    )
     html=workbench_page(
-        f"{ws_name} · 组装结果",
-        f"{ws_name} · Assembly Report",
-        '<style>@media (max-width:1024px){.wb-shell{grid-template-columns:minmax(0,1fr)}.wb-sidebar{min-width:0}}</style>'+body,
+        f"{ws_name} · 组装路径报告",
+        f"{ws_name} · Assembly Path Report",
+        body,
+        brand_html=brand_mark,
         subtitle_html=" · ".join(sub_parts),
         badge_html_str=status_badge(status),
         sidebar_items=sidebar,
