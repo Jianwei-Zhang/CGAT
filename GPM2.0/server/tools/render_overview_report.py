@@ -1,6 +1,8 @@
 """Offline report: source inputs and chromosome groups precede the assembly and delivery views."""
 from __future__ import annotations
 
+import re
+
 try:
     from render_final_story import final_card
     from render_gap_story import gap_card
@@ -11,7 +13,6 @@ try:
         bi,
         callout,
         esc,
-        status_badge,
         workbench_page,
     )
 except ModuleNotFoundError:
@@ -24,9 +25,26 @@ except ModuleNotFoundError:
         bi,
         callout,
         esc,
-        status_badge,
         workbench_page,
     )
+
+
+def _format_header_time(raw: str) -> str:
+    if not raw:
+        return ""
+    text = raw.strip()
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$", text)
+    if m:
+        date_part, hm_part, tz_part = m.groups()
+        if tz_part in ("Z", "+00:00", "-00:00", "+0000"):
+            disp = f"{date_part} {hm_part} UTC"
+        elif tz_part:
+            disp = f"{date_part} {hm_part} {tz_part}"
+        else:
+            disp = f"{date_part} {hm_part}"
+    else:
+        disp = text
+    return f'<time class="cgat-time" datetime="{esc(text)}" title="{esc(text)}">{esc(disp)}</time>'
 
 
 def _run_notices(vm):
@@ -70,15 +88,7 @@ def _run_notices(vm):
 def render_overview(vm):
     meta = vm["meta"]
     ws_name = meta.get("workspace_name") or "CGAT Workspace"
-    batch_id = meta.get("batch_id")
-    status = meta.get("batch_status") or "unknown"
     gen_at = meta.get("generated_at") or ""
-
-    sub_parts = []
-    if batch_id:
-        sub_parts.append(f'<span>Batch <code>{esc(batch_id[:12])}</code></span>')
-    if gen_at:
-        sub_parts.append(f'<span>{esc(gen_at)}</span>')
 
     sidebar = [
         ("inputs", "01", "输入数据", "Inputs"),
@@ -108,24 +118,33 @@ def render_overview(vm):
             + (DIALOG if vm["refinement_summary"]["tools"] or any(vm["lgz_summary"].get(k) for k in ("step1_scene", "step2_scene", "terminal_scene")) else "")
         )
 
-    brand_mark = (
-        '<span class="cgat-brand">'
-        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">'
-        '<rect x="1" y="2" width="14" height="3.2" rx="1" fill="currentColor" opacity=".9"/>'
-        '<rect x="1" y="6.9" width="9.5" height="2.8" rx="1" fill="currentColor" opacity=".55"/>'
-        '<rect x="11.5" y="6.9" width="3.5" height="2.8" rx="1" fill="var(--gen-patch)"/>'
-        '<rect x="1" y="11.4" width="14" height="2.8" rx="1" fill="var(--ds-1)"/>'
-        '</svg>CGAT Server</span>'
+    brand_icon = (
+        '<span class="cgat-brand-icon" aria-hidden="true">'
+        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none">'
+        '<rect x="1" y="2" width="14" height="3.2" rx="1" fill="currentColor" opacity=".92"/>'
+        '<rect x="1" y="6.8" width="9.5" height="2.8" rx="1" fill="currentColor" opacity=".55"/>'
+        '<rect x="11.5" y="6.8" width="3.5" height="2.8" rx="1" fill="var(--gen-patch)"/>'
+        '<rect x="1" y="11.3" width="14" height="2.8" rx="1" fill="var(--ds-1)"/>'
+        '</svg></span>'
     )
-    html=workbench_page(
-        f"{ws_name} · 组装路径报告",
-        f"{ws_name} · Assembly Path Report",
+    title_html = (
+        '<span class="cgat-heading-prefix">'
+        '<span class="t-zh">CGAT Server 报告：</span>'
+        '<span class="t-en">CGAT Server Report: </span>'
+        '</span>'
+        f'<span class="cgat-heading-project" title="{esc(ws_name)}">{esc(ws_name)}</span>'
+    )
+    html = workbench_page(
+        f"CGAT Server 报告：{ws_name}",
+        f"CGAT Server Report: {ws_name}",
         body,
-        brand_html=brand_mark,
-        subtitle_html=" · ".join(sub_parts),
-        badge_html_str=status_badge(status),
+        title_html=title_html,
+        brand_html=brand_icon,
+        brand_sep=False,
+        header_time_html=_format_header_time(gen_at),
+        header_time_raw=True,
         sidebar_items=sidebar,
-        page_title_plain=f"{ws_name} · CGAT",
+        page_title_plain=f"CGAT Server 报告：{ws_name}",
     )
     batches=vm['manual_summary']['batches']
     if batches:

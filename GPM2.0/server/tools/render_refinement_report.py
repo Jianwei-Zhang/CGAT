@@ -39,6 +39,7 @@ CSS = """
   --radius-sm:4px;
   --surface-app:#f7f8fa;
   --surface-panel:#ffffff;
+  --surface-header:rgba(255,255,255,.92);
   --surface-subtle:#f9fafb;
   --surface-muted:#f1f3f5;
   --surface-hover:#eef1f4;
@@ -65,6 +66,7 @@ html[data-theme="dark"]{
   color-scheme:dark;
   --surface-app:#0f1419;
   --surface-panel:#151c24;
+  --surface-header:rgba(21,28,36,.92);
   --surface-subtle:#1b242e;
   --surface-muted:#222d3a;
   --surface-hover:#273444;
@@ -92,6 +94,7 @@ html[data-theme="dark"]{
     color-scheme:dark;
     --surface-app:#0f1419;
     --surface-panel:#151c24;
+    --surface-header:rgba(21,28,36,.92);
     --surface-subtle:#1b242e;
     --surface-muted:#222d3a;
     --surface-hover:#273444;
@@ -135,36 +138,50 @@ small,.muted{color:var(--text-muted);font-size:.84rem}
 .num{font-variant-numeric:tabular-nums}
 .is-hidden{display:none!important}
 
-/* Formal Editorial Masthead Header */
-.cgat-header{background:var(--surface-panel);border-top:3px solid var(--brand);border-bottom:1px solid var(--border-subtle)}
-.cgat-header-inner{max-width:1280px;margin:0 auto;padding:.9rem 1.5rem}
+/* Sticky Single-Row Topbar Header */
+.cgat-header{position:sticky;top:0;z-index:40;background:var(--surface-panel);background:var(--surface-header);backdrop-filter:saturate(180%) blur(10px);-webkit-backdrop-filter:saturate(180%) blur(10px);border-top:2.5px solid var(--brand);border-bottom:1px solid var(--border-subtle);box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.cgat-header-inner{max-width:1280px;margin:0 auto;min-height:48px;padding:.46rem 1.5rem;display:flex;flex-direction:column;justify-content:center}
 .cgat-header.is-centered .cgat-header-inner{max-width:1140px}
-.cgat-title-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-.cgat-title-left{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;min-width:0}
+.cgat-title-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem 1.25rem;min-width:0}
+.cgat-title-left{display:flex;align-items:center;gap:.55rem;min-width:0;flex:1 1 auto}
+.cgat-brand-icon{display:inline-flex;align-items:center;justify-content:center;color:var(--brand);flex-shrink:0}
 .cgat-brand{display:inline-flex;align-items:center;gap:.42rem;font-size:.86rem;font-weight:700;letter-spacing:.02em;color:var(--brand);white-space:nowrap}
 .cgat-brand svg{flex-shrink:0}
-.cgat-sep{display:inline-block;width:1px;height:18px;background:var(--border-default);flex-shrink:0}
-.cgat-title-group{display:inline-flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;min-width:0}
-.cgat-title-group h1{font-size:1.26rem;font-weight:700;letter-spacing:-.015em;line-height:1.25}
-.cgat-doc-role{font-size:.88rem;font-weight:500;color:var(--text-muted);white-space:nowrap}
-.cgat-subtitle{margin-top:.32rem;color:var(--text-muted);font-size:.83rem;display:flex;flex-wrap:wrap;gap:.35rem .7rem;align-items:center}
-.wb-controls{display:inline-flex;align-items:center;gap:.65rem;flex-shrink:0;flex-wrap:wrap}
-.cgat-time{font-size:.81rem;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-.hdr-sep{display:inline-block;width:1px;height:14px;background:var(--border-subtle);flex-shrink:0}
-.seg-ctrl{display:inline-flex;align-items:center;padding:2px;border-radius:var(--radius-sm);background:var(--surface-muted);border:1px solid var(--border-subtle)}
-.seg-ctrl .ctrl-btn{border:0;background:transparent;padding:.18rem .52rem;border-radius:3px}
-.seg-ctrl .ctrl-btn.is-active{background:var(--surface-panel);color:var(--text-primary);box-shadow:0 1px 2px rgba(15,23,42,.06)}
-.ctrl-btn{display:inline-flex;align-items:center;gap:.28rem;padding:.24rem .58rem;border-radius:var(--radius-sm);border:1px solid var(--border-subtle);background:var(--surface-panel);color:var(--text-muted);font:500 12px/1.3 inherit;cursor:pointer;white-space:nowrap}
+.cgat-sep{display:inline-block;width:1px;height:16px;background:var(--border-default);flex-shrink:0}
+.cgat-title-group{display:inline-flex;align-items:baseline;gap:.5rem;min-width:0;max-width:100%}
+.cgat-title-group h1{display:inline-flex;align-items:baseline;min-width:0;font-size:1.02rem;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+.cgat-heading-prefix{font-weight:600;color:var(--text-secondary);white-space:nowrap;flex-shrink:0}
+.cgat-heading-project{font-weight:700;font-size:1.05rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.cgat-doc-role{font-size:.86rem;font-weight:500;color:var(--text-muted);white-space:nowrap}
+.cgat-subtitle{margin-top:.28rem;color:var(--text-muted);font-size:.82rem;display:flex;flex-wrap:wrap;gap:.35rem .7rem;align-items:center}
+.wb-controls{display:inline-flex;align-items:center;gap:.55rem;flex-shrink:0}
+.cgat-time{font-size:.8rem;color:var(--text-muted);font-variant-numeric:tabular-nums;letter-spacing:.01em;white-space:nowrap}
+.hdr-sep{display:inline-block;width:1px;height:14px;background:var(--border-default);opacity:.7;flex-shrink:0}
+.seg-ctrl{display:inline-flex;align-items:center;height:28px;padding:2px;gap:1px;border-radius:6px;background:var(--surface-muted);border:1px solid var(--border-subtle)}
+.seg-ctrl .ctrl-btn{height:22px;border:0;background:transparent;padding:0 .54rem;border-radius:4px;font-size:12px;font-weight:500;color:var(--text-secondary)}
+.seg-ctrl .ctrl-btn:hover:not(.is-active){background:var(--surface-hover);color:var(--text-primary)}
+.seg-ctrl .ctrl-btn.is-active{background:var(--surface-panel);color:var(--brand);font-weight:650;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.ctrl-btn{display:inline-flex;align-items:center;justify-content:center;gap:.28rem;padding:.24rem .58rem;border-radius:var(--radius-sm);border:1px solid var(--border-subtle);background:var(--surface-panel);color:var(--text-muted);font:500 12px/1.3 inherit;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s,color .12s}
 .ctrl-btn:hover{background:var(--surface-subtle);border-color:var(--border-default);color:var(--text-primary)}
 .ctrl-btn.is-active{background:var(--surface-muted);border-color:var(--border-default);color:var(--text-primary);font-weight:600}
-.cgat-nav{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem;padding-top:.65rem;border-top:1px solid var(--border-subtle);align-items:center}
-.cgat-nav a{font-size:.85rem;color:var(--text-secondary);padding:.2rem .5rem;border-radius:var(--radius-sm)}
+.theme-btn{width:28px;height:28px;padding:0;border-radius:6px;color:var(--text-secondary)}
+.theme-btn:hover{background:var(--surface-hover);border-color:var(--border-default);color:var(--text-primary)}
+.theme-btn .ico-sun{display:none}
+.theme-btn .ico-moon{display:block}
+html[data-theme="dark"] .theme-btn .ico-moon{display:none}
+html[data-theme="dark"] .theme-btn .ico-sun{display:block}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme="light"]) .theme-btn .ico-moon{display:none}
+  html:not([data-theme="light"]) .theme-btn .ico-sun{display:block}
+}
+.cgat-nav{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.45rem;padding-top:.45rem;border-top:1px solid var(--border-subtle);align-items:center}
+.cgat-nav a{font-size:.84rem;color:var(--text-secondary);padding:.18rem .48rem;border-radius:var(--radius-sm)}
 .cgat-nav a:hover{background:var(--surface-subtle);color:var(--text-primary);text-decoration:none}
 
 /* Clean Frameless-Sidebar / Centered Single-Column Layout */
-.wb-shell{max-width:1280px;margin:0 auto;padding:1.35rem 1.5rem 2.5rem;display:grid;grid-template-columns:184px minmax(0,1fr);gap:1.65rem;align-items:start}
+.wb-shell{max-width:1280px;margin:0 auto;padding:1.25rem 1.5rem 2.5rem;display:grid;grid-template-columns:184px minmax(0,1fr);gap:1.65rem;align-items:start}
 .wb-shell.no-sidebar{display:block;max-width:1140px}
-.wb-sidebar{position:sticky;top:18px;padding-top:.15rem}
+.wb-sidebar{position:sticky;top:66px;padding-top:.15rem}
 .wb-toc{list-style:none;margin:0;padding:0;border-left:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:.12rem}
 .wb-toc a{display:flex;align-items:baseline;gap:.42rem;padding:.34rem .72rem;margin-left:-1px;border-left:2px solid transparent;color:var(--text-muted);font-size:.83rem;font-weight:500;line-height:1.35;transition:color .12s,border-color .12s,background .12s;border-radius:0 var(--radius-sm) var(--radius-sm) 0}
 .wb-toc a:hover{color:var(--text-primary);background:var(--surface-hover);text-decoration:none}
@@ -174,7 +191,7 @@ small,.muted{color:var(--text-muted);font-size:.84rem}
 .cgat-main{min-width:0;display:flex;flex-direction:column;gap:1.1rem}
 
 /* Crisp Paper Panels & Shared Story Kit */
-.panel{background:var(--surface-panel);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:1.1rem 1.35rem;min-width:0;scroll-margin-top:18px;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.panel{background:var(--surface-panel);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:1.1rem 1.35rem;min-width:0;scroll-margin-top:66px;box-shadow:0 1px 2px rgba(15,23,42,.03)}
 .panel.is-alert{border-color:var(--tone-err-line)}
 .panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.8rem;padding-bottom:.55rem;border-bottom:1px solid var(--border-subtle)}
 .panel-head-right{font-size:.82rem;color:var(--text-muted);font-weight:500;display:inline-flex;align-items:center;gap:.5rem;flex-wrap:wrap}
@@ -386,14 +403,21 @@ details.tree-node[open]>summary .tree-caret{transform:rotate(90deg)}
   .split-grid{grid-template-columns:1fr}
 }
 @media (max-width:760px){
-  .cgat-header-inner{padding:.85rem 1rem}
+  .cgat-header-inner{padding:.45rem 1rem}
   .panel{padding:.9rem 1rem}
   .story-scale-row{grid-template-columns:104px minmax(0,1fr);gap:.5rem}
   .ideo-row>summary{grid-template-columns:84px minmax(120px,1fr) 64px 66px}
   .ideo-detail{padding-left:.75rem}
 }
+@media (max-width:640px){
+  .cgat-title-row{flex-wrap:wrap;gap:.35rem .65rem}
+  .cgat-title-left{flex:1 1 100%}
+  .wb-controls{margin-left:auto;gap:.45rem}
+  .cgat-time{font-size:.75rem}
+}
 @media print{
   body{background:#fff;color:#000}
+  .cgat-header{position:static;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
   .wb-controls,.wb-sidebar,.cgat-nav,.pager,.filter-bar,.copy-btn,.tree-controls{display:none!important}
   .wb-shell{display:block;padding:0;max-width:none}
   .panel,.gap-card,.job-card{break-inside:avoid}
@@ -404,27 +428,34 @@ WORKBENCH_JS = r"""
 (()=>{
   const root=document.documentElement;
   const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(_){return null;}};
+  const isDark=()=>root.dataset.theme==='dark'||(!root.dataset.theme&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const syncThemeBtn=()=>{
+    const dark=isDark(),en=root.dataset.lang==='en';
+    const lbl=dark?(en?'Switch to light theme':'切换为浅色主题'):(en?'Switch to dark theme':'切换为深色主题');
+    document.querySelectorAll('[data-theme-toggle]').forEach(b=>{b.title=lbl;b.setAttribute('aria-label',lbl);b.setAttribute('aria-pressed',String(dark));});
+  };
   const setLang=(lang)=>{
     lang=(lang==='en')?'en':'zh';
     root.dataset.lang=lang;
     root.lang=(lang==='en')?'en':'zh-CN';
     document.querySelectorAll('[data-lang-btn]').forEach(b=>b.classList.toggle('is-active',b.dataset.langBtn===lang));
+    syncThemeBtn();
     store('cgat_report_lang',lang);
   };
   const setTheme=(theme)=>{
-    if(theme==='dark'||theme==='light'){root.dataset.theme=theme;store('cgat_report_theme',theme);}
+    if(theme==='dark'||theme==='light'){root.dataset.theme=theme;syncThemeBtn();store('cgat_report_theme',theme);}
   };
   const savedLang=store('cgat_report_lang');
   if(savedLang==='zh'||savedLang==='en')setLang(savedLang);
   const savedTheme=store('cgat_report_theme');
   if(savedTheme==='dark'||savedTheme==='light')setTheme(savedTheme);
+  syncThemeBtn();
   document.addEventListener('click',(ev)=>{
     const lb=ev.target.closest('[data-lang-btn]');
     if(lb){setLang(lb.dataset.langBtn);return;}
     const tb=ev.target.closest('[data-theme-toggle]');
     if(tb){
-      const dark=root.dataset.theme==='dark'||(!root.dataset.theme&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
-      setTheme(dark?'light':'dark');return;
+      setTheme(isDark()?'light':'dark');return;
     }
     const cb=ev.target.closest('[data-copy]');
     if(cb){
@@ -917,8 +948,12 @@ def svg_timing_bars(items):
     return "".join(parts)
 
 
-def _header_controls_html(header_time_html=""):
-    time_part = f'<time class="cgat-time">{header_time_html}</time><span class="hdr-sep" aria-hidden="true"></span>' if header_time_html else ""
+def _header_controls_html(header_time_html="", *, time_raw=False):
+    if header_time_html:
+        t_node = header_time_html if time_raw else f'<time class="cgat-time">{header_time_html}</time>'
+        time_part = t_node + '<span class="hdr-sep" aria-hidden="true"></span>'
+    else:
+        time_part = ""
     return (
         '<div class="wb-controls">'
         + time_part
@@ -926,8 +961,10 @@ def _header_controls_html(header_time_html=""):
         '<button type="button" class="ctrl-btn is-active" data-lang-btn="zh" aria-label="切换中文">中文</button>'
         '<button type="button" class="ctrl-btn" data-lang-btn="en" aria-label="Switch to English">EN</button>'
         '</div>'
-        '<button type="button" class="ctrl-btn" data-theme-toggle="1" aria-label="切换深浅主题">'
-        '<span class="t-zh">深浅主题</span><span class="t-en">Theme</span></button>'
+        '<button type="button" class="ctrl-btn theme-btn" data-theme-toggle="1" title="切换为深色主题" aria-label="切换为深色主题">'
+        '<svg class="ico-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>'
+        '<svg class="ico-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-14.93 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
+        '</button>'
         '</div>'
     )
 
@@ -939,10 +976,13 @@ def workbench_page(
     *,
     scope_zh=None,
     scope_en=None,
+    title_html=None,
     brand_html="",
+    brand_sep=True,
     role_zh=None,
     role_en=None,
     header_time_html="",
+    header_time_raw=False,
     subtitle_html="",
     badge_html_str="",
     nav_html="",
@@ -954,17 +994,18 @@ def workbench_page(
     """Render the formal, restrained offline CGAT report shell with EXACTLY ONE </main>."""
     sub_part = f'<div class="cgat-subtitle">{subtitle_html}</div>' if subtitle_html else ""
     nav_part = f'<nav class="cgat-nav" aria-label="Report navigation">{nav_html}</nav>' if nav_html else ""
-    brand_part = f'{brand_html}<span class="cgat-sep" aria-hidden="true"></span>' if brand_html else ""
+    brand_part = (brand_html + ('<span class="cgat-sep" aria-hidden="true"></span>' if brand_sep else "")) if brand_html else ""
     role_part = f'<span class="cgat-doc-role">{bi(role_zh, role_en or role_zh)}</span>' if role_zh else ""
+    h1_inner = title_html if title_html is not None else bi(title_zh, title_en)
     hdr_cls = "cgat-header" if sidebar_items else "cgat-header is-centered"
     header = (
         f'<header class="{hdr_cls}"><div class="cgat-header-inner">'
         '<div class="cgat-title-row">'
         '<div class="cgat-title-left">'
         + brand_part
-        + '<div class="cgat-title-group"><h1>' + bi(title_zh, title_en) + '</h1>' + role_part + (badge_html_str or "") + '</div>'
+        + '<div class="cgat-title-group"><h1>' + h1_inner + '</h1>' + role_part + (badge_html_str or "") + '</div>'
         + '</div>'
-        + _header_controls_html(header_time_html)
+        + _header_controls_html(header_time_html, time_raw=header_time_raw)
         + '</div>'
         + sub_part + nav_part
         + '</div></header>'
