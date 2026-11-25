@@ -72,7 +72,7 @@ def local_path(root: Path, relative: str) -> Path:
     return path
 
 
-def fasta_stats(path: Path) -> dict | None:
+def fasta_stats(path: Path, *, gap_positions=False) -> dict | None:
     """Stream FASTA; N runs span physical lines. Never retain whole sequences."""
     if not path.is_file():
         return None
@@ -80,20 +80,24 @@ def fasta_stats(path: Path) -> dict | None:
     current = None
     n_run = 0
 
-    def finish_gap():
+    def finish_gap(end):
         nonlocal n_run
         if current is not None and n_run >= 100:
             current["gap_count"] += 1
             current["gap_bp"] += n_run
+            if gap_positions:
+                current["gap_intervals"].append([end - n_run, end])
         n_run = 0
 
     with path.open(encoding="ascii") as handle:
         for raw in handle:
             if raw.startswith(">"):
-                finish_gap()
+                finish_gap(current["length_bp"] if current else 0)
                 name = raw[1:].split()[0]
                 current = {"sequence": name, "length_bp": 0, "n_bp": 0,
                            "gap_count": 0, "gap_bp": 0}
+                if gap_positions:
+                    current["gap_intervals"] = []
                 records.append(current)
                 continue
             sequence = "".join(raw.split()).upper()
@@ -101,14 +105,15 @@ def fasta_stats(path: Path) -> dict | None:
                 continue
             if current is None:
                 raise ValueError(f"FASTA sequence has no header: {path}")
+            offset = current["length_bp"]
             current["length_bp"] += len(sequence)
             current["n_bp"] += sequence.count("N")
             for match in re.finditer(r"N+|[^N]+", sequence):
                 if match[0][0] == "N":
                     n_run += len(match[0])
                 else:
-                    finish_gap()
-    finish_gap()
+                    finish_gap(offset + match.start())
+    finish_gap(current["length_bp"] if current else 0)
     lengths = sorted((row["length_bp"] for row in records), reverse=True)
     total = sum(lengths)
     cumulative = 0

@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 import json
 import re
 
+from report_q0_tracks import bound_tracks, references, snapshot_tracks
 from report_inventory import file_href, obj, physical
 from server_report_io import SCHEMA, timing_summary
 from render_server_report import REPORT_PREVIEW_ROWS
@@ -100,16 +101,23 @@ def stats(value):
     return counts(value, STATS) if isinstance(value, dict) else {}
 
 
-def assignment_groups(table, reference_order):
+def assignment_groups(table, reference_order, complete=None):
     """Preserve the complete run-bound membership; a ctg name is scoped to its assembly."""
-    if (not isinstance(table, dict) or table.get("available") is not True
-            or not isinstance(table.get("rows"), list) or table.get("preview_only")
-            or table.get("row_count", len(table["rows"])) != len(table["rows"])):
+    if not isinstance(table, dict) or table.get("available") is not True or not isinstance(table.get("rows"), list):
         return None
+    preview = table["rows"]
+    count = table.get("row_count", len(preview))
+    if table.get("preview_only") or count != len(preview):
+        if not isinstance(complete, dict):
+            return None
+        members = ((ds, ctg, chrom) for chrom, datasets in complete.items() for ds, names in datasets.items() for ctg in names)
+    else:
+        members = ((r["dataset_name"], r["seq_name"], r["assigned_chr_name"]) for r in preview)
     groups = {chrom: {} for chrom in reference_order}
     owners = defaultdict(set)
-    for row in table["rows"]:
-        dataset, ctg, chrom = (row[key] for key in ("dataset_name", "seq_name", "assigned_chr_name"))
+    seen = 0
+    for dataset, ctg, chrom in members:
+        seen += 1
         if not all(safe_name(name) for name in (dataset, ctg, chrom)):
             raise ValueError("invalid assignment identifier")
         targets = owners[dataset, ctg]
@@ -117,6 +125,8 @@ def assignment_groups(table, reference_order):
             raise ValueError("duplicate chromosome assignment")
         targets.add(chrom)
         groups.setdefault(chrom, {}).setdefault(dataset, []).append(ctg)
+    if seen != count or any(r["assigned_chr_name"] not in owners.get((r["dataset_name"], r["seq_name"]), ()) for r in preview):
+        raise ValueError("assignment membership does not match the snapshot")
     return [{"chr": chrom, "member_count": sum(map(len, sources.values())),
              "sources": [{"dataset": ds, "members": [{"name": ctg, "multi": len(owners[ds, ctg]) > 1}
                                                        for ctg in names]} for ds, names in sources.items()]}
@@ -196,6 +206,7 @@ def collect(layout):
     root = layout.root
     errors = []
     reference_order = []
+    ref_tracks = {}
     out = dict(
         status=None,
         run_id=None,
@@ -206,6 +217,7 @@ def collect(layout):
         assignment={"min_coverage_percent": None, "groups": None},
         funnel={},
         q0={},
+        q0_scene=None,
         sequence_versions={},
         version_tracks={},
         stage_events={},
@@ -246,6 +258,10 @@ def collect(layout):
                 dict(name=d["name"], role=d["role"], stats=stats(d.get("stats")))
             )
             if d["role"] == "reference":
+                try:
+                    ref_tracks.update(references(d.get("stats") or {}))
+                except failures:
+                    errors.append("reference: invalid_track_statistics")
                 reference_order.extend(row["sequence"] for row in (d.get("stats") or {}).get("sequences", [])
                                        if isinstance(row, dict) and safe_name(row.get("sequence")))
         out["assignment"]["min_coverage_percent"] = recorded_coverage(f.get("package"))
@@ -276,11 +292,16 @@ def collect(layout):
     aligned = {}
     q0 = {}
     donor_summary = {}
+    q0_stats = {}
+    q0_table = None
 
     def versions(facts):
+        nonlocal q0_stats
         for k, v in facts.get("sequence_versions", {}).items():
             if re.fullmatch(r"q[0-4]", k) and v:
                 out["sequence_versions"][k] = stats(v)
+                if k == "q0":
+                    q0_stats = v
 
     try:
         units = m["steps"]
@@ -329,7 +350,10 @@ def collect(layout):
                 aligned[unit[4:]] = summ["aligned_query_count"]
             if unit == "assign" and facts.get("tables", {}).get("assignments", {}).get("available") is not False:
                 out["funnel"].update(counts(summ, ("assigned_unique_contigs", "unassigned_contigs")))
-                out["assignment"]["groups"] = assignment_groups(facts.get("tables", {}).get("assignments"), reference_order)
+                out["assignment"]["groups"] = assignment_groups(
+                    facts.get("tables", {}).get("assignments"), reference_order, facts.get("assignment_members"))
+            if q0_table is None and unit in ("grt_prepare", "lgz_prepare"):
+                q0_table = facts.get("tables", {}).get("q_segments")
             q0 = facts.get("q0_construction") or q0
             for key in ("donor_sets", "donor_members"):
                 tab = facts.get("tables", {}).get(key, {})
@@ -385,4 +409,10 @@ def collect(layout):
         )
     except failures:
         errors.append("q0: invalid_summary")
+    try:
+        out["q0_scene"] = bound_tracks(layout, q0, ref_tracks, q0_stats)
+        if out["q0_scene"] is None:
+            out["q0_scene"] = snapshot_tracks(q0_table, ref_tracks, q0_stats)
+    except failures:
+        errors.append("q0 selection: missing_or_invalid_tracks")
     return out

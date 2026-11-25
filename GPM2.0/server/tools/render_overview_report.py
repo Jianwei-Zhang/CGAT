@@ -4,9 +4,8 @@ from __future__ import annotations
 from collections import defaultdict
 
 try:
-    from render_path_story import input_card, assignment_card
+    from render_path_story import input_card, assignment_card, q0_card
     from render_refinement_report import (
-        DATASET_COLORS,
         badge_bi,
         bi,
         callout,
@@ -24,9 +23,8 @@ try:
         workbench_page,
     )
 except ModuleNotFoundError:
-    from .render_path_story import input_card, assignment_card
+    from .render_path_story import input_card, assignment_card, q0_card
     from .render_refinement_report import (
-        DATASET_COLORS,
         badge_bi,
         bi,
         callout,
@@ -953,46 +951,6 @@ def _render_result_files_and_diagnostics(vm):
     )
     tree_fold = disclosure(bi("工作区目录结构与维护", "Workspace Directory & Maintenance"), tree_inner)
 
-    # Fold 2: Inputs & q0 construction
-    q0 = lgz["q0"]
-    src_bp = q0.get("source_bp") or {}
-    sorted_src = sorted(src_bp.items(), key=lambda kv: (-kv[1], kv[0]))
-    if len(sorted_src) > 1:
-        segs = [(bp, DATASET_COLORS[i % len(DATASET_COLORS)], f"{n}: {fmt_bp(bp)}") for i, (n, bp) in enumerate(sorted_src)]
-        src_block = (
-            svg_stacked_bar(segs, width=400, height=14, aria_label="q0 source composition")
-            + '<div class="legend-row">'
-            + "".join(
-                f'<span class="legend-item"><i class="swatch" style="background:{DATASET_COLORS[i % len(DATASET_COLORS)]}"></i>{esc(n)} <b>{esc(fmt_bp_short(bp))}</b></span>'
-                for i, (n, bp) in enumerate(sorted_src)
-            )
-            + '</div>'
-        )
-    elif len(sorted_src) == 1:
-        n, bp = sorted_src[0]
-        src_block = f'<p>{bi("单一来源：", "Single source: ")}<b>{esc(n)}</b> · {esc(fmt_bp_short(bp))}</p>'
-    else:
-        src_block = '<p class="muted">—</p>'
-    sel_c = fmt_int(q0.get("selected_chromosomes"))
-    inp_j = fmt_int(q0.get("input_gap_joins"))
-    unk_j = fmt_int(q0.get("unknown_joins"))
-    trunc_warn = (
-        callout(bi("旧快照来源组成经过预览截断，仅反映部分贡献。", "Legacy source composition preview is truncated."), tone="warn")
-        if q0.get("source_rows_truncated") else ""
-    )
-    inputs_fold = (
-        '<div>'
-        + disclosure(
-            bi("q0 构图明细", "q0 construction details"),
-            '<div id="alignment-q0" class="split-grid" style="margin-top:.75rem">'
-            + f'<div><h3>{bi("q0 来源构成", "q0 Sources")}</h3>{src_block}'
-            + f'<p class="muted">{bi(f"构建 {sel_c} 条 chr · 原有 N 连接 {inp_j} · 新增未知连接 {unk_j}", f"{sel_c} chrs · {inp_j} input gaps · {unk_j} unknown joins")}</p>'
-            + '</div></div>'
-            + trunc_warn,
-        )
-        + '</div>'
-    )
-
     # Fold 3: Per-chromosome & per-gap filterable comparison matrix
     tools = ref.get("tools") or []
     tool_names = [t["tool"] for t in tools]
@@ -1134,7 +1092,6 @@ def _render_result_files_and_diagnostics(vm):
         + '</section>'
         + '<section id="diagnostics-fold" class="panel">'
         + tree_fold
-        + inputs_fold
         + matrix_fold
         + diag_fold
         + '</section>'
@@ -1157,6 +1114,7 @@ def render_overview(vm):
     sidebar = [
         ("inputs", "01", "输入数据", "Inputs"),
         ("chr-groups", "02", "染色体分组", "Chromosome groups"),
+        ("alignment-q0", "03", "初始路径 q0", "Initial path q0"),
         ("pseudomolecule-evolution", "", "假分子演化", "Evolution"),
         ("result-files", "", "结果取件", "Result Pickup"),
         ("diagnostics-fold", "", "诊断与明细", "Diagnostics"),
@@ -1166,6 +1124,7 @@ def render_overview(vm):
         _run_notices(vm)
         + input_card(vm["lgz_summary"]["inputs"])
         + assignment_card(vm["lgz_summary"].get("assignment", {}))
+        + q0_card(vm["lgz_summary"])
         + _render_pseudomolecule_evolution(vm)
         + _render_result_files_and_diagnostics(vm)
     )

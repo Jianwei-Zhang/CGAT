@@ -83,7 +83,7 @@ def _statistics_match(value, sha256: str) -> bool:
     return value["n50_bp"] == n50
 
 
-def sequence_stats(root: Path, path: Path) -> dict | None:
+def sequence_stats(root: Path, path: Path, *, gap_positions=False) -> dict | None:
     if not path.is_file():
         return None
     before = file_signature(path)
@@ -91,7 +91,8 @@ def sequence_stats(root: Path, path: Path) -> dict | None:
     # This always establishes actual content in the current process, even when
     # persistent metadata agrees. It can reuse an earlier checkpoint hash read.
     current_sha = digest(path)
-    key = hashlib.sha256(relative.encode()).hexdigest()
+    algorithm = STATISTICS_ALGORITHM + ("+gap-intervals-v1" if gap_positions else "")
+    key = hashlib.sha256((("reference-gap-intervals:" if gap_positions else "") + relative).encode()).hexdigest()
     cache = workspace_join(root, ".run_all/report-statistics", f"{key}.json")
     if cache.parent.is_symlink() or not cache.parent.resolve().is_relative_to(root.resolve()):
         raise ValueError("report statistics cache escapes its workspace")
@@ -99,12 +100,12 @@ def sequence_stats(root: Path, path: Path) -> dict | None:
     source = {"path": relative, "sha256": current_sha}
     value = None
     if (isinstance(saved, dict) and saved.get("schema") == 1
-            and saved.get("algorithm") == STATISTICS_ALGORITHM
+            and saved.get("algorithm") == algorithm
             and saved.get("source") == source
             and _statistics_match(saved.get("stats"), current_sha)
             and saved.get("stats_sha256") == fingerprint(saved["stats"])):
         value = saved["stats"]
-    if value is None and saved is None and STATISTICS_ALGORITHM == _LEGACY_STATISTICS_ALGORITHM:
+    if value is None and saved is None and algorithm == _LEGACY_STATISTICS_ALGORITHM:
         # Adopt only the previous known statistics contract and verify its
         # content binding. Archived reports stay immutable. This avoids one
         # last full re-scan when first installing the persistent-cache fix.
@@ -120,10 +121,10 @@ def sequence_stats(root: Path, path: Path) -> dict | None:
                 value = old
                 break
     if value is None:
-        value = fasta_stats(path)
+        value = fasta_stats(path, gap_positions=True) if gap_positions else fasta_stats(path)
     if file_signature(path) != before or not _statistics_match(value, current_sha):
         raise ValueError(f"FASTA changed during report statistics: {path}")
-    record = {"schema": 1, "algorithm": STATISTICS_ALGORITHM, "source": source,
+    record = {"schema": 1, "algorithm": algorithm, "source": source,
               "stats_sha256": fingerprint(value), "stats": value}
     if saved != record:
         write_json(cache, record)
@@ -159,7 +160,7 @@ def inputs(root: Path) -> dict:
         role = "reference" if is_reference else ("assembly_candidate" if modern_q0 else ("primary" if index == len(reference) else "support"))
         path = local_path(root, entry["fasta_relpath"])
         rows.append({"name": entry.get("reference_name", entry.get("dataset_name")),
-                     "role": role, "file": entry["fasta_relpath"], "stats": sequence_stats(root, path)})
+                     "role": role, "file": entry["fasta_relpath"], "stats": sequence_stats(root, path, gap_positions=is_reference)})
     package = table(root, "metadata/package.tsv")
     current = any(row.get("schema_version") == "4" for row in package["rows"])
     return {"datasets": rows, "q0_mode": Q0_MODE if modern_q0 else "legacy_primary",
@@ -211,6 +212,11 @@ def collect_assignment(root: Path, input_data: dict) -> dict:
     assigned = defaultdict(set)
     for row in assignments["rows"]:
         assigned[row["dataset_name"]].add(row["seq_name"])
+    # Full member identities are needed for the story, but not the full audit TSV.
+    membership = {}
+    if len(assignments["rows"]) > REPORT_PREVIEW_ROWS:
+        for row in assignments["rows"]:
+            membership.setdefault(row["assigned_chr_name"], {}).setdefault(row["dataset_name"], []).append(row["seq_name"])
     unassigned = []
     for dataset in input_data.get("datasets", []):
         if dataset["role"] == "reference":
@@ -219,7 +225,8 @@ def collect_assignment(root: Path, input_data: dict) -> dict:
             if sequence["sequence"] not in assigned[dataset["name"]]:
                 unassigned.append({"dataset_name": dataset["name"], **sequence,
                                    "reason": "no_assignment_passing_filters_and_coverage_threshold"})
-    return {"summary": {"assignment_rows": len(assignments["rows"]),
+    return {**({"assignment_members": membership} if membership else {}),
+            "summary": {"assignment_rows": len(assignments["rows"]),
                         "assigned_unique_contigs": sum(map(len, assigned.values())),
                         "unassigned_contigs": len(unassigned)},
             "tables": {"assignments": assignments,
