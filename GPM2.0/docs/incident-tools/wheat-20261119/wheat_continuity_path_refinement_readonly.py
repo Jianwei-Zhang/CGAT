@@ -24,6 +24,7 @@ from wheat_selected_path_risk_audit import footprint, minus
 from wheat_continuous_dominant_admission_readonly import old_routes, risk
 from wheat_local_chain_primitives import clipped
 from wheat_reference_funnel_readonly import digest, write
+from wheat_indexed_anchor_support_readonly import AnchorSupportIndex, indexed_native, joins as indexed_joins
 
 
 def need(ok,why):
@@ -57,13 +58,10 @@ def metrics(path, graph):
 
 @contextmanager
 def common_anchor_joins(graph):
-    native=paths.PathGraph.joins
-    source=textwrap.dedent(inspect.getsource(native))
-    needle='if blocks and (reaches_both := _end_spanning_evidence(blocks, left.interval.length)):'
-    need(source.count(needle)==1,'different frozen join gate')
-    source=source.replace(needle,'if blocks:\n        reaches_both = {evidence_id for _, evidence_id in blocks}')
-    namespace=dict(vars(paths));exec(compile(source,'<isolated-common-anchor-cuts>','exec'),namespace)
-    relaxed=namespace['joins'];strict={};expanded=set()
+    index=graph.__dict__.setdefault('_diagnostic_anchor_support_index',AnchorSupportIndex())
+    native,_=indexed_joins(index)
+    relaxed,source_pin=indexed_joins(index,internal=True)
+    strict={};expanded=set()
     graph._joins.clear()
     def joins(self,left,right):
         need(self is graph,'wrong diagnostic graph')
@@ -77,7 +75,7 @@ def common_anchor_joins(graph):
         self._joins[key]=old+additional;expanded.add(key)
         return self._joins[key]
     with patch.object(paths.PathGraph,'joins',joins):
-        yield strict,sha256(source.encode()).hexdigest()
+        yield strict,source_pin
 
 
 def monotone_better(candidate, incumbent, graph):
@@ -182,7 +180,7 @@ def selected_risk(path,graph,old):
             'conflict_flags':flags,'independent_biological_truth':False}
 
 
-def run(base,owner,admission_owner,evidence_owner,legacy_owner):
+def run_inner(base,owner,admission_owner,evidence_owner,legacy_owner,index,index_code):
     began=monotonic()
     replay=json.loads((admission_owner/'hull-replay.json').read_text());mode=replay['selected_mode']
     need(mode is not None and all(replay['strict_three_arms_reproduced'].values()),'no validated admission candidate')
@@ -204,9 +202,23 @@ def run(base,owner,admission_owner,evidence_owner,legacy_owner):
         data=json.loads(seal.read_text());need(data['binding']['producer_tools_sha256']=='19cebdc7667d912f6d3ace4a59783d3e49fbb02e668ff5f5efbb50c618c27ad2','evidence producer mismatch');available={SourceKey(*v) for v in data['binding']['sources']}
         if sources<=available:cache_name=name;break
     need(cache_name is not None,'sealed evidence cohort does not cover chosen admission; do not substitute incomplete evidence')
-    links=checked_pickle(evidence_owner/(cache_name+'.pickle'),data['sha256'])
-    need(len(links)==data['count'],'cache count mismatch')
-    links=[link for link in links if link.query_source in sources and link.target_source in sources]
+    binding={'candidate_receipt_sha256':digest(admission_owner/'hull-replay.json'),
+             'evidence_seal_sha256':digest(evidence_owner/(cache_name+'.json')),
+             'mode':mode,'sources':sorted([s.dataset,s.contig] for s in sources)}
+    link_seal=owner/'selected-links.json';link_pickle=owner/'selected-links.pickle'
+    if link_seal.exists():
+        saved=json.loads(link_seal.read_text());need(saved['binding']==binding,'filtered evidence binding changed')
+        links=checked_pickle(link_pickle,saved['sha256'])
+        print('SELECTED_LINKS_REUSED',len(links),flush=True)
+    else:
+        print('SEALED_EVIDENCE_READ_START',cache_name,data['count'],flush=True)
+        links=checked_pickle(evidence_owner/(cache_name+'.pickle'),data['sha256'])
+        need(len(links)==data['count'],'cache count mismatch')
+        links=[link for link in links if link.query_source in sources and link.target_source in sources]
+        raw=pickle.dumps(links,protocol=5);link_pickle.write_bytes(raw)
+        write(link_seal,{'binding':binding,'sha256':sha256(raw).hexdigest(),'count':len(links)})
+        del raw
+        print('SELECTED_LINKS_SEALED',len(links),round(monotonic()-began,1),flush=True)
     old_sources={p.source for p in oldgraph.placements.values()}
     old_pairs={k:[link_identity(v) for v in rows] for k,rows in oldgraph.links.items() if rows};new_pairs=defaultdict(list)
     for link in links:
@@ -214,32 +226,79 @@ def run(base,owner,admission_owner,evidence_owner,legacy_owner):
             new_pairs[tuple(sorted((link.query_source,link.target_source)))].append(link_identity(link))
     need(old_pairs==dict(new_pairs),'baseline per-source-pair evidence lost or reordered')
     stats=Counter();constructor,original_pin,sparse_pin=sparse_constructor(stats)
-    with patch.object(paths.PathGraph,'__init__',constructor):
-        graph=paths.PathGraph(admitted,links,(),paths.PathPolicy(),first_request=True,
-                              progress=lambda s:print('CONTINUOUS_GRAPH',s,flush=True))
-    need(graph._score_candidate(baseline.nodes,baseline.joins)==baseline,'baseline fails augmented graph exact gate')
-    raw=pickle.dumps(graph,protocol=5);(owner/'continuous-graph.pickle').write_bytes(raw)
-    write(owner/'continuous-graph.json',{'sha256':sha256(raw).hexdigest(),'mode':mode,'candidate_receipt_sha256':digest(admission_owner/'hull-replay.json'),'evidence_seal_sha256':digest(evidence_owner/(cache_name+'.json'))})
-    print('CONTINUOUS_GRAPH_READY',json.dumps(dict(stats)),flush=True)
+    graph_seal=owner/'continuous-graph.json'
+    if graph_seal.exists():
+        saved=json.loads(graph_seal.read_text());need(saved.get('binding')==binding,'saved graph binding changed')
+        graph=checked_pickle(owner/'continuous-graph.pickle',saved['sha256'])
+        need(saved['indexed_native_frozen_graph_equal'],'missing baseline graph proof')
+        graph_stats=saved['graph_pair_counts']
+        print('CONTINUOUS_GRAPH_REUSED',flush=True)
+    else:
+        with patch.object(paths.PathGraph,'__init__',constructor):
+            proof=paths.PathGraph(list(oldgraph.placements.values()),
+                                  [l for rows in oldgraph.links.values() for l in rows],
+                                  oldgraph.original,oldgraph.policy,first_request=True,
+                                  progress=lambda s:print('INDEXED_BASELINE',s,flush=True))
+            need(proof.required==oldgraph.required and proof.ambiguous_equivalence_ids==oldgraph.ambiguous_equivalence_ids,'indexed required/ambiguity differs')
+            need(proof.coverage.atoms==oldgraph.coverage.atoms and proof.coverage.units==oldgraph.coverage.units and proof.coverage.ambiguous_evidence_ids==oldgraph.coverage.ambiguous_evidence_ids,'indexed coverage model differs')
+            need(proof._score_candidate(baseline.nodes,baseline.joins)==baseline,'indexed native baseline winner differs')
+            print('INDEXED_FROZEN_GRAPH_EXACT_PROOF_PASSED',json.dumps(index.report()),flush=True)
+            del proof;stats.clear()
+            graph=paths.PathGraph(admitted,links,(),paths.PathPolicy(),first_request=True,
+                                  progress=lambda s:print('CONTINUOUS_GRAPH',s,flush=True))
+        graph_stats=dict(stats)
+        raw=pickle.dumps(graph,protocol=5);(owner/'continuous-graph.pickle').write_bytes(raw)
+        write(graph_seal,{'sha256':sha256(raw).hexdigest(),'mode':mode,'binding':binding,
+                          'indexed_native_frozen_graph_equal':True,'graph_pair_counts':graph_stats})
+        del raw
+    graph._diagnostic_anchor_support_index=index
+    # Added placements may change global ambiguity or the evidence IDs merged
+    # into an otherwise identical join. Never register an unsupported old join.
+    mapped=[];baseline_changes=[]
+    for j in baseline.joins:
+        legal=graph.joins(j.left_id,j.right_id)
+        geometry=lambda v:(v.kind,v.left_end,v.right_start,v.n_bp,v.original_adjacency_id)
+        replacement=next((v for v in legal if geometry(v)==geometry(j)),None)
+        mapped.append(replacement)
+        if replacement!=j:
+            baseline_changes.append({'left':j.left_id,'right':j.right_id,
+                                     'same_geometry_available':replacement is not None,
+                                     'old_kind':j.kind,'old_evidence_ids':list(j.evidence_ids),
+                                     'available':[{'kind':v.kind,'left_cut':v.left_end,'right_cut':v.right_start,
+                                                   'evidence_ids':list(v.evidence_ids)} for v in legal]})
+    remapped=graph._score_candidate(baseline.nodes,tuple(mapped)) if all(v is not None for v in mapped) else None
+    if remapped is not None:
+        need(remapped.slices==baseline.slices and remapped.score==baseline.score,'geometry remap changed physical baseline')
+    print('BASELINE_CONTEXT_CHECK',json.dumps({'same_geometry_legal':remapped is not None,'changed_join_count':len(baseline_changes)}),flush=True)
+    print('CONTINUOUS_GRAPH_READY',json.dumps(graph_stats),flush=True)
     old_path=legacy_owner.parent/'q0-continuity-20261126.RAbGvNba'/'old-grt-q-segments.tsv'
     need(digest(old_path)=='cd9069e54e64cce94ba7d4790afd2c575d85ffc227722b04eca56bf6e04ea847','old comparator changed')
     old=old_routes(old_path)
     spine,spine_stats=reference_spine(graph)
-    incumbent=spine if monotone_better(spine,baseline,graph) else baseline
+    proposals=[spine,remapped]
+    proposals.extend(graph._score_candidate((node,),()) for node in graph.placements)
+    lower_ref=sum(v.length for v in refs(baseline,oldgraph))
+    valid=[v for v in proposals if v is not None and v.score>=baseline.score
+           and sum(x.length for x in refs(v,graph))>=lower_ref]
+    need(valid,'no legal current-graph backbone attains frozen score/reference lower bounds; keep old artifact, do not promote')
+    incumbent=min(valid,key=graph.rank)
     results={}
-    def save(name,path):
-        represented,duplicate,_=graph.coverage.assess((s.source,s.interval) for s in path.slices)
+    def save(name,path,validation_graph=None):
+        validation_graph=graph if validation_graph is None else validation_graph
+        represented,duplicate,_=validation_graph.coverage.assess((s.source,s.interval) for s in path.slices)
         need(not duplicate and represented==path.score[0],'final full coverage gate')
         destination=owner/(name+'-path.json.gz')
         with gzip.open(destination,'wt',compresslevel=1) as f:json.dump(encode(path),f)
-        before=refs(baseline,graph);after=refs(path,graph)
-        row={'metrics':metrics(path,graph),'risk':selected_risk(path,graph,old),
+        before=refs(baseline,oldgraph);after=refs(path,validation_graph)
+        row={'metrics':metrics(path,validation_graph),'risk':selected_risk(path,validation_graph,old),
+             'validation_scope':'frozen_baseline_graph' if validation_graph is oldgraph else 'augmented_candidate_graph',
              'reference_gain_bp_vs_frozen':sum(v.length for v in minus(after,before)),
              'reference_loss_bp_vs_frozen':sum(v.length for v in minus(before,after)),
              'path_file':destination.name,'path_sha256':digest(destination),'full_exact_gate_passed':True}
         results[name]=row
         print('CONTINUOUS_PATH_SAVED',name,json.dumps(row['metrics']),flush=True)
-    save('frozen_baseline',baseline)
+    save('frozen_baseline',baseline,oldgraph)
+    if remapped is not None:save('same_frozen_geometry_current_graph',remapped)
     if spine is not None:save('reference_spine_proposal',spine)
     save('validated_initial_backbone',incumbent)
     with common_anchor_joins(graph) as (native_edges,join_pin):
@@ -260,8 +319,8 @@ def run(base,owner,admission_owner,evidence_owner,legacy_owner):
             'spine_diagnostics':spine_stats,'refinement_diagnostics':diagnostics,
             'new_common_anchor_joins':new_edges,'join_variant_sha256':join_pin,
             'sparse_constructor_original_sha256':original_pin,'sparse_constructor_ast_sha256':sparse_pin,
-            'graph_pair_counts':dict(stats),'frozen_pair_evidence_order_preserved':True,
-            'frozen_winner_valid_in_augmented_graph':True,'incumbent_score_lower_bound_preserved':True,
+            'graph_pair_counts':graph_stats,'indexed_anchor_support':index.report(),'indexed_code':index_code,'indexed_frozen_graph_exact_proof_passed':True,'frozen_pair_evidence_order_preserved':True,
+            'frozen_winner_valid_in_augmented_graph':remapped is not None,'baseline_join_compatibility':baseline_changes,'frozen_baseline_graph_sha256':blocked['graph_pickle_sha256'],'incumbent_score_lower_bound_preserved':True,
             'incumbent_reference_length_lower_bound_preserved':True,
             'selected_input_placements_sha256':digest(placement_file),
             'admission_receipt_sha256':digest(admission_owner/'hull-replay.json'),
@@ -270,9 +329,16 @@ def run(base,owner,admission_owner,evidence_owner,legacy_owner):
             'limitations':['Only 1A; no formal whole-wheat acceptance.',
                            'Old Q0 conflicts are a comparator, not independent biological truth.',
                            'Local cut proposals retain outside joins and do not prove a global optimum.',
-                           'A higher total reference length does not imply zero interval loss; gain/loss are both reported.']}
+                           'A higher total reference length does not imply zero interval loss; gain/loss are both reported.',
+                           'Original baseline is validated in its frozen graph. A current-graph legal backbone must meet or exceed its numerical source-score and reference-length lower bounds; old joins are never force-registered across evidence contexts.']}
     write(owner/'continuity-final-selection.json',report)
     print('CONTINUITY_FINAL_SELECTION_DONE',json.dumps(results['common_anchor_refined']['metrics']),flush=True)
+
+
+def run(base,owner,admission_owner,evidence_owner,legacy_owner):
+    index=AnchorSupportIndex(progress=lambda row:print("ANCHOR_SUPPORT_PROGRESS",json.dumps(row),flush=True))
+    with indexed_native(index) as code:
+        return run_inner(base,owner,admission_owner,evidence_owner,legacy_owner,index,code)
 
 
 if __name__=='__main__':

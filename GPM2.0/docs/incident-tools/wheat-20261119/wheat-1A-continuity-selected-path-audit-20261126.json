@@ -1,0 +1,146 @@
+{
+  "actual_paths_reopened": true,
+  "baseline_evidence_context_explicit": true,
+  "formal_workspace_modified": false,
+  "graph_sha256": "51faec603575c1bad9bf0c035b112b401f2cbbf94454530a739d758b437099c5",
+  "incumbent_score_and_reference_length_lower_bounds_verified": true,
+  "mapper_calls": 0,
+  "native_exact_global_gates_passed": true,
+  "new_cuts_have_real_common_anchors": true,
+  "results": {
+    "common_anchor_refined": {
+      "exact_gate": true,
+      "metrics": {
+        "gap_count": 140,
+        "gap_placeholder_bp": 14000,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 236951643,
+        "score": [
+          272176475,
+          -140,
+          -140,
+          -159,
+          -160,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 160,
+        "source_bp": 272176475
+      },
+      "new_common_anchor_joins": 16,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 222272638
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 246799488
+        }
+      },
+      "validation_scope": "augmented_candidate_graph"
+    },
+    "frozen_baseline": {
+      "exact_gate": true,
+      "metrics": {
+        "gap_count": 146,
+        "gap_placeholder_bp": 14600,
+        "max_slice_bp": 35145537,
+        "reference_union_bp": 42204808,
+        "score": [
+          48574190,
+          -146,
+          -146,
+          -153,
+          -154,
+          35145537
+        ],
+        "slice_N50_bp": 35145537,
+        "slices": 154,
+        "source_bp": 48574190
+      },
+      "new_common_anchor_joins": 0,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 2724893
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 3414787
+        }
+      },
+      "validation_scope": "frozen_baseline_graph"
+    },
+    "reference_spine_proposal": {
+      "exact_gate": true,
+      "metrics": {
+        "gap_count": 84,
+        "gap_placeholder_bp": 8400,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 234641906,
+        "score": [
+          268010408,
+          -84,
+          -84,
+          -84,
+          -85,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 85,
+        "source_bp": 268010408
+      },
+      "new_common_anchor_joins": 0,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 222272638
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 246799488
+        }
+      },
+      "validation_scope": "augmented_candidate_graph"
+    },
+    "validated_initial_backbone": {
+      "exact_gate": true,
+      "metrics": {
+        "gap_count": 84,
+        "gap_placeholder_bp": 8400,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 234641906,
+        "score": [
+          268010408,
+          -84,
+          -84,
+          -84,
+          -85,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 85,
+        "source_bp": 268010408
+      },
+      "new_common_anchor_joins": 0,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 222272638
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 246799488
+        }
+      },
+      "validation_scope": "augmented_candidate_graph"
+    }
+  },
+  "schema": "wheat_continuity_actual_path_audit_v1",
+  "selection_report_sha256": "70555364f767928193999be69fa9e620f6b392bc432a4e48e3d8895b0e1f61fb"
+}
