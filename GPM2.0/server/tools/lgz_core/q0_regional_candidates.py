@@ -7,6 +7,7 @@ unknown relationships are mapped. These are not exhaustive all-source searches.
 """
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+import re
 
 from .common import stable_id
 from .q0_catalog import _IntervalUnion, DISCOVERY_REFERENCE_IDENTITY
@@ -130,14 +131,8 @@ class CompletedNativeScopes:
         return remaining
 
 
-    def next_missing_seed(self, query_ids, target_ids):
-        """Batch missing matrix edges without repeating the full global seed.
-
-        Small query members may be included in the target batching key, so the
-        short-target remainder does not fragment into one task per source.
-        Never add a large normal query merely to equalize batching keys.
-        """
-        query_ids=tuple(sorted(set(query_ids)));requested=self.mask(target_ids)
+    def _seed_groups(self, query_ids, requested):
+        """Prepare the ranked matrix keys once for this snapshot of completed evidence."""
         missing_by_query={key:self.remaining_targets(key,requested) for key in query_ids}
         small=self.mask(key for key,missing in missing_by_query.items()
                         if missing and self.catalog.parts[key].interval.length<=1_000_000)
@@ -153,9 +148,12 @@ class CompletedNativeScopes:
             # requested relationships were completed; -D still suppresses self.
             if small & own and missing==(requested & ~own):target_mask |= own
             groups.setdefault(target_mask,[]).append(key)
-        if not groups:return None
-        targets=max(groups,key=lambda mask:(mask.bit_count()*len(groups[mask]),mask.bit_count(),tuple(groups[mask])))
-        queries,target_ids=groups[targets],self.keys(targets)
+        priority=lambda mask:(mask.bit_count()*len(groups[mask]),mask.bit_count(),tuple(groups[mask]))
+        for mask in sorted(groups,key=priority,reverse=True):
+            yield tuple(groups[mask]),mask
+
+    def _seed_request(self, queries, target_mask):
+        queries,target_ids=list(queries),self.keys(target_mask)
         floor=WEAK_GLOBAL_SEED_POLICY['minimum_part_bases']
         reverse=(min(self.catalog.parts[key].interval.length for key in queries)>=floor
                  and max(self.catalog.parts[key].interval.length for key in target_ids)<floor)
@@ -163,6 +161,64 @@ class CompletedNativeScopes:
                 'target_ids':queries if reverse else target_ids,
                 'native_short_targets_as_queries':reverse,
                 'reason':'complete_unroutable_relationships_once_before_regional_candidates'}
+
+    def _cached_seed_shapes(self):
+        """Cheap availability hint after a cold probe, never evidence of coverage.
+
+        Only visit native success receipts, not regional shards or mapper outputs.
+        A matching shape still goes through the ordinary exact directed cache gate.
+        """
+        from .q0_preparation import artifact_path, json_file
+        base='grt/evidence/q0_prepare/tasks'; shapes=set()
+        try:
+            for entry in artifact_path(self.root,base).iterdir():
+                if entry.name in self._scope_seen or not re.fullmatch(r'q0-map-[0-9a-f]{24}',entry.name):continue
+                try:
+                    path=artifact_path(self.root,f'{base}/{entry.name}/success.json')
+                    if not path.is_file():continue
+                    receipt=json_file(path); spec=receipt.get('spec')
+                    if (receipt.get('status')!='success' or not isinstance(spec,dict)
+                            or spec.get('schema')!='lgz_q0_mapping_v1' or spec.get('tool')!=self.tool
+                            or spec.get('preset')!=self.preset):continue
+                    queries,targets=spec.get('query_ids'),spec.get('target_ids')
+                    if not all(isinstance(side,list) and side for side in (queries,targets)):continue
+                    shapes.add((self.mask(queries),self.mask(targets)))
+                except (Q0EvidenceError,TypeError):
+                    continue  # Unusable/foreign receipt; no matrix admitted from this inventory.
+        except FileNotFoundError:
+            pass  # Fresh workspace.
+        except OSError:
+            return None  # No directory listing: fall back to directed cache probes only.
+        return shapes
+
+    def missing_seed_requests(self, query_ids, target_ids):
+        """Probe eligible cached cohorts. A miss does not change coverage or hide a later hit.
+
+        Rebuild the group ordering only after the caller has admitted real new evidence;
+        remember the compact directed cohort keys, not whole expanded target arrays.
+        """
+        queries=tuple(sorted(set(query_ids))); requested=self.mask(target_ids); probed=set()
+        had_miss=False; inventory_read=False; shapes=None
+        while True:
+            generation=len(self.scopes)
+            for key in self._seed_groups(queries,requested):
+                if key in probed: continue
+                if had_miss and not inventory_read:
+                    shapes=self._cached_seed_shapes(); inventory_read=True
+                    if shapes is not None and not shapes:return
+                if shapes is not None:
+                    query_mask,target_mask=self.mask(key[0]),key[1]
+                    if (query_mask,target_mask) not in shapes and (target_mask,query_mask) not in shapes:continue
+                probed.add(key)
+                yield self._seed_request(*key)
+                if len(self.scopes)!=generation:
+                    break  # Recompute the remaining pairs after a verified cache hit.
+                had_miss=True
+            else:
+                return
+
+    def next_missing_seed(self, query_ids, target_ids):
+        return next(self.missing_seed_requests(query_ids,target_ids),None)
 
 
 class CandidatePlan(CompletedNativeScopes):
@@ -211,16 +267,14 @@ class CandidatePlan(CompletedNativeScopes):
                     remaining &= ~(1 << self.ranks[parts[0]])
         return requested, remaining
 
-    def next_unroutable_seed(self):
-        """Orient missing unindexed relations from the small unroutable side.
-
-        Recompute after each complete matrix so the next batch does not repeat
-        newly covered pairs. Do not fragment these small-query batches by
-        isolated observed hits; complete native matrices remain authoritative.
-        """
+    def unroutable_seed_requests(self):
+        """The candidate preflight can reuse exact cached cohorts in either direction."""
         used = self.mask(self.query_chromosomes)
         for mask in self.targets.values(): used |= mask
-        return self.next_missing_seed(self.keys(used & ~self.routable),self.keys(used))
+        return self.missing_seed_requests(self.keys(used & ~self.routable),self.keys(used))
+
+    def next_unroutable_seed(self):
+        return next(self.unroutable_seed_requests(),None)
 
     def windows(self, key):
         length = self.catalog.parts[key].interval.length
@@ -255,8 +309,9 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
         planner = CandidatePlan(root,catalog,index,requests,observed,complete_tasks,tool,preset)
     elif planner.catalog is not catalog or planner.index is not index or planner.root != root or planner.tool != tool or planner.preset != preset:
         raise Q0EvidenceError("candidate planner belongs to another preparation")
-    if planner.next_unroutable_seed() is not None:
-        raise Q0EvidenceError("unroutable native source matrices must complete before regional candidates")
+    # Seed lookup is opportunistic. planning_request() keeps every still-eligible
+    # unroutable target in the explicit native mask; the cache-only dispatcher,
+    # not a global completion prerequisite here, handles that unsearched scope.
     execution = RegionalExecutor(index, threads)
     mapper_threads = execution.budget.mapper_threads; workers = execution.budget.mapper_workers
     print(f"LGZ q0 regional execution: phase=candidate planners={execution.budget.planner_workers} "

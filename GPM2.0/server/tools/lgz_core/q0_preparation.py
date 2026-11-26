@@ -125,7 +125,7 @@ def builder_identity() -> str:
         [name, sha256_file(root / name)] for name in (
             "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
             "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
-            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_frontier_scope.py", "q0_scope_policy.py",
+            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_native_frontier.py", "q0_frontier_scope.py", "q0_scope_policy.py",
             "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
 
 
@@ -629,9 +629,8 @@ def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference
 def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,known_pairs,tool,preset,threads,*,reference_bases,skip_self):
     scopes=CompletedNativeScopes(root,catalog,index,tasks,tool,preset)
     seen={task['task_id'] for task in tasks}
-    while True:
-        request=scopes.next_missing_seed(query_ids,target_ids)
-        if request is None:break
+    cache_misses=0
+    for request in scopes.missing_seed_requests(query_ids,target_ids):
         consumed = False
         def consume_seed(seed,hits):
             nonlocal consumed
@@ -643,14 +642,16 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
         seed=_unroutable_seed(root,catalog,request,tool,preset,threads,reference_bases=reference_bases,
                              skip_self=skip_self,on_cache_hit=consume_seed)
         if seed is None:
-            print("LGZ q0 unroutable seed: not searched; no verified matrix in cache",flush=True)
-            break  # Leave missing relationships eligible for regional planning.
+            cache_misses+=1
+            continue  # Other cohorts may have verified evidence; this one remains unsearched.
         if not consumed:
             hits=read_paf(artifact_path(root, seed['paf']),query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
                           target_lengths={key:catalog.parts[key].interval.length for key in seed['target_ids']},artifact=seed['paf'])
             consume_seed(seed,hits)
         print(f"LGZ q0 weak seed: completed={seed['task_id']} approximate={seed['task_id'] in scopes.approximate_scope_task_ids} "
               f"queries={len(seed['query_ids'])} targets={len(seed['target_ids'])}",flush=True)
+    if cache_misses:
+        print(f"LGZ q0 unroutable seed: direct_cache_misses={cache_misses}; missing relationships remain unsearched",flush=True)
     return scopes
 
 def _readless_package(root):
@@ -1017,19 +1018,21 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             with closing(ReferenceIndex.open(cache.path, root, catalog.parts, lengths, local_paf_directory=cache.paf_directory)) as index:
                 preset = options.get("minimap_preset", "asm10")
                 planner = CandidatePlan(root,catalog,index,pending_candidates,known_pairs,tasks,tool,preset)
-                seed_ids = []
-                while (seed_request := planner.next_unroutable_seed()) is not None:
+                seed_ids = []; seed_misses = 0
+                for seed_request in planner.unroutable_seed_requests():
                     seed = _unroutable_seed(root,catalog,seed_request,tool,preset,threads,
                         reference_bases=sum(lengths.values()),skip_self=options.get("skip_self") == "true")
                     if seed is None:
-                        print("LGZ q0 candidate seed: not searched; no verified matrix in cache",flush=True)
-                        break
+                        seed_misses += 1
+                        continue
                     tasks.append(seed);seed_ids.append(seed["task_id"]);planner.add_complete_tasks([seed])
                 regional_tasks, native_requests, report = prepare_candidates(
                     root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,
                     preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner,
                     regional_frontier=regional_frontier, unsearched=unsearched)
                 report["unroutable_seed_task_ids"] = seed_ids
+                if seed_misses:
+                    print(f"LGZ q0 candidate seed: direct_cache_misses={seed_misses}; missing relationships remain unsearched",flush=True)
             catalog.payload["regional_candidate_discovery"] = report
             if native_requests:
                 whole = native_fallbacks('regional_candidate_discovery',native_requests)

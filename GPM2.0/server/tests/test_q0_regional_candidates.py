@@ -69,6 +69,20 @@ class RegionalCandidatesTests(unittest.TestCase):
         rows,native,reason=plan_request(ParentRequest('candidate','q',windows,('chr',),1,0,1),index)
         self.assertEqual(([q.start for q,_ in rows],native,reason),([0,2000],1,'query_window_without_qualified_reference'))
 
+    def test_cold_optional_seed_does_not_block_routable_candidate_targets(self):
+        from server.tools.lgz_core.q0_native_frontier import RegionalFallbackCache,PHASES
+        a,b,c=(self.ids[k] for k in 'abc');self.catalog.reference_routable_parts=frozenset((a,b))
+        planner=self.plan();self.assertIsNotNone(planner.next_unroutable_seed())
+        def local(root,catalog,q,targets,tool,**kw):
+            self.assertEqual(q.segment_id,a);self.assertEqual({t.segment_id for t in targets},{b});return {'paf':'actual-local'}
+        with mock.patch.object(candidates,'prepare_regional_mapping',side_effect=local):
+            tasks,missing,report=prepare_candidates(self.root,self.catalog,self.index,self.requests,(),[],{},
+                 reference_lengths=self.refs,preset='asm10',threads=1,planner=planner)
+        self.assertEqual(tasks,[{'paf':'actual-local'}]);self.assertEqual(report['completed_regional_tasks'],1)
+        self.assertEqual([(r['query_ids'],r['target_ids']) for r in missing],[([a],[c])])
+        gate=RegionalFallbackCache(bounded=True);self.assertEqual(gate.dispatch(PHASES[1],missing,lambda _:None),[])
+        self.assertEqual(gate.omissions[0]['target_ids'],[c]);self.assertNotEqual(planner.remaining_targets(c,planner.mask([a])),0)
+
     def test_known_sources_are_excluded_before_paf_decode_and_no_local_targets_is_not_failure(self):
         known={(SourceKey('ds','a'),SourceKey('ds','b'))};plan=self.plan(known)
         _,eligible=plan.eligible(self.ids['a']);original=self.index._hit
