@@ -33,12 +33,12 @@ TERMINAL_STYLE = """<style>
 .tel-part.is-ctg{min-width:6px;z-index:1;box-shadow:inset 0 0 0 .7px rgba(255,255,255,.5)}
 .tel-part.is-gap{min-width:5px;z-index:2;background:repeating-linear-gradient(135deg,var(--border-strong) 0 1.5px,var(--surface-panel) 1.5px 3.5px)!important;box-shadow:inset 0 0 0 1px var(--border-strong)}
 .tel-end{position:absolute;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;font:700 .7rem/1 var(--font-mono);cursor:pointer;border-radius:999px;padding:.22rem .4rem;white-space:nowrap;transition:transform .1s,border-color .12s,background .12s}
-.tel-end.is-5p{right:calc(100% + 5px)}
-.tel-end.is-3p{left:calc(100% + 5px)}
-.tel-end.is-present{color:var(--tone-ok-ink);background:var(--tone-ok-bg);border:1px solid var(--tone-ok-line)}
-.tel-end.is-present:hover{background:var(--gen-tel);border-color:var(--gen-tel);color:#fff}
-.tel-end.is-missing{color:var(--text-secondary);background:var(--surface-panel);border:1px solid var(--border-strong);padding:.18rem .38rem;font-size:.73rem}
-.tel-end.is-missing:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.tel-end[data-end-side="5p"]{right:calc(100% + 5px)}
+.tel-end[data-end-side="3p"]{left:calc(100% + 5px)}
+.tel-end[data-end-state="present"]{color:var(--tone-ok-ink);background:var(--tone-ok-bg);border:1px solid var(--tone-ok-line)}
+.tel-end[data-end-state="present"]:hover{background:var(--gen-tel);border-color:var(--gen-tel);color:#fff}
+.tel-end[data-end-state="missing"]{color:var(--text-secondary);background:var(--surface-panel);border:1px solid var(--border-strong);padding:.18rem .38rem;font-size:.73rem}
+.tel-end[data-end-state="missing"]:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
 .tel-cand-fold{margin-top:.5rem;padding-top:.45rem;border-top:1px dashed var(--border-subtle)}
 .tel-cand-fold>summary{cursor:pointer;font-size:.8rem;font-weight:600;color:var(--accent)}
 .tel-dlg-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem .85rem;flex-wrap:wrap;padding:.5rem .72rem;border:1px solid var(--border-subtle);border-left:3px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface-subtle);font-size:.83rem;line-height:1.4}
@@ -55,6 +55,12 @@ TERMINAL_STYLE = """<style>
 .tel-motif-lbl{font-weight:600;color:var(--text-primary)}
 .tel-motif-chip{display:inline-flex;align-items:center;gap:.35rem;flex-wrap:wrap}
 .tel-motif-code{display:inline-block;padding:1px 7px;border:1px solid var(--tone-ok-line);border-radius:4px;background:var(--tone-ok-bg);color:var(--tone-ok-ink);font:700 .79rem/1.35 var(--font-mono);letter-spacing:.03em}
+.tel-hist-card{margin:.55rem 0 0;padding:.55rem .7rem .5rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
+.tel-hist-head{display:flex;align-items:baseline;justify-content:space-between;gap:.4rem .8rem;flex-wrap:wrap;margin-bottom:.25rem;font-size:.78rem;color:var(--text-secondary)}
+.tel-hist-head strong{font-size:.8rem;color:var(--text-primary)}
+.tel-hist-svg{display:block;width:100%;height:auto}
+.tel-hist-foot{display:flex;align-items:center;justify-content:space-between;gap:.4rem .8rem;flex-wrap:wrap;margin-top:.32rem;padding-top:.32rem;border-top:1px solid var(--border-subtle);font-size:.75rem;color:var(--text-muted)}
+.tel-hist-keys{display:inline-flex;align-items:center;gap:.35rem .75rem;flex-wrap:wrap}
 .tel-dlg-note{margin:.45rem 0 0;font-size:.79rem;color:var(--text-muted);line-height:1.45}
 .tel-dlg-reject{margin:.45rem 0 0;padding:.38rem .6rem;border-radius:var(--radius-sm);background:var(--tone-warn-bg);border:1px solid var(--tone-warn-line);color:var(--tone-warn-ink);font-size:.8rem;line-height:1.45}
 .tel-gate-list{margin:.35rem 0 0;padding-left:1.1rem;font-size:.79rem;color:var(--tone-warn-ink);line-height:1.45}
@@ -175,6 +181,117 @@ def _zoom(t, cand, side, outsize):
     return f'<div class="tel-dlg-plot">{"".join(svg)}</div>'
 
 
+def _motif_histogram(t, side):
+    prof = t.get("motif_profile")
+    if not isinstance(prof, dict):
+        return ""
+    fwd = prof.get("forward") or []
+    rev = prof.get("reverse") or []
+    if not fwd or len(fwd) != len(rev):
+        return ""
+    win_a, win_b = prof["window"]
+    bin_bp = prof["bin_bp"]
+    n_bins = len(fwd)
+    span = max(1, win_b - win_a)
+    totals = [f + r for f, r in zip(fwd, rev)]
+    max_val = max(totals) if totals else 0
+    # Clean integer Y ceiling (minimum 10 so empty ends show a clear flat 0 baseline).
+    if max_val <= 10:
+        y_top = 10
+    elif max_val <= 20:
+        y_top = 20
+    elif max_val <= 30:
+        y_top = 30
+    else:
+        y_top = ((max_val + 9) // 10) * 10
+    y_mid = y_top // 2
+
+    vb_w, vb_h = 560, 148
+    pad_l, pad_r, pad_t, pad_b = 44, 16, 16, 30
+    plot_w = vb_w - pad_l - pad_r
+    plot_h = vb_h - pad_t - pad_b
+    base_y = pad_t + plot_h
+
+    def x_of(bp_pos):
+        return pad_l + plot_w * (bp_pos - win_a) / span
+
+    def y_of(val):
+        return base_y - plot_h * val / y_top
+
+    svg = [f'<svg class="tel-hist-svg" viewBox="0 0 {vb_w} {vb_h}" role="img" aria-label="Terminal motif distribution / 末端 Motif 分布">']
+
+    # Shade the 2,000 bp detection window inside the 5,000 bp terminal profile.
+    det_w = t.get("window")
+    if det_w and len(det_w) == 2:
+        da, db = max(win_a, det_w[0]), min(win_b, det_w[1])
+        if da < db:
+            dx0, dx1 = x_of(da), x_of(db)
+            svg.append(f'<rect x="{dx0:.2f}" y="{pad_t}" width="{dx1-dx0:.2f}" height="{plot_h}" fill="var(--brand)" opacity=".06"/>')
+            bound_x = dx1 if side == "5prime" else dx0
+            if pad_l + 4 < bound_x < pad_l + plot_w - 4:
+                svg.append(f'<line x1="{bound_x:.2f}" y1="{pad_t}" x2="{bound_x:.2f}" y2="{base_y}" stroke="var(--brand)" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>')
+
+    # Horizontal gridlines & Y ticks
+    for tick in (0, y_mid, y_top):
+        ty = y_of(tick)
+        stroke = "var(--border-default)" if tick == 0 else "var(--border-subtle)"
+        dash = '' if tick == 0 else ' stroke-dasharray="2 3"'
+        svg.append(f'<line x1="{pad_l}" y1="{ty:.2f}" x2="{pad_l + plot_w}" y2="{ty:.2f}" stroke="{stroke}" stroke-width="1"{dash}/>')
+        svg.append(f'<text x="{pad_l - 6}" y="{ty + 3.5:.2f}" text-anchor="end" font-size="9.5" fill="var(--text-muted)">{tick}</text>')
+    svg.append(f'<text x="{pad_l - 6}" y="10" text-anchor="end" font-size="9" fill="var(--text-muted)">cnt</text>')
+
+    # Bars (stacked forward + reverse per fixed bin)
+    fwd_lbl = prof.get("forward_label") or "+"
+    rev_lbl = prof.get("reverse_label") or "-"
+    slot_w = plot_w / n_bins
+    gap = min(2.0, slot_w * 0.18)
+    bar_w = max(2.0, slot_w - gap)
+    for i, (fc, rc) in enumerate(zip(fwd, rev)):
+        bx = pad_l + i * slot_w + gap / 2
+        b_start = win_a + i * bin_bp
+        b_end = min(win_b, b_start + bin_bp)
+        tip = f'{b_start+1:,}–{b_end:,} bp · {fwd_lbl}(+): {fc} · {rev_lbl}(-): {rc}'
+        if fc > 0:
+            fh = plot_h * fc / y_top
+            fy = base_y - fh
+            svg.append(f'<rect x="{bx:.2f}" y="{fy:.2f}" width="{bar_w:.2f}" height="{max(1.5, fh):.2f}" rx="1.5" fill="var(--gen-tel)"><title>{esc(tip)}</title></rect>')
+        if rc > 0:
+            rh = plot_h * rc / y_top
+            ry = base_y - (plot_h * (fc + rc) / y_top)
+            svg.append(f'<rect x="{bx:.2f}" y="{ry:.2f}" width="{bar_w:.2f}" height="{max(1.5, rh):.2f}" rx="1.5" fill="var(--ds-1)"><title>{esc(tip)}</title></rect>')
+        if fc == 0 and rc == 0:
+            svg.append(f'<rect x="{bx:.2f}" y="{pad_t}" width="{bar_w:.2f}" height="{plot_h}" fill="transparent"><title>{esc(tip)}</title></rect>')
+
+    # X axis ticks (5 evenly spaced coordinates across the profile window)
+    for i in range(5):
+        pos_bp = round(win_a + span * i / 4)
+        tx = x_of(pos_bp)
+        anchor = "start" if i == 0 else ("end" if i == 4 else "middle")
+        svg.append(f'<line x1="{tx:.2f}" y1="{base_y}" x2="{tx:.2f}" y2="{base_y + 4}" stroke="var(--border-strong)" stroke-width="1"/>')
+        lbl = f"{pos_bp+1:,}" if i == 0 else f"{pos_bp:,}"
+        svg.append(f'<text x="{tx:.2f}" y="{base_y + 15}" text-anchor="{anchor}" font-size="9.5" fill="var(--text-muted)">{lbl}</text>')
+    svg.append(f'<text x="{pad_l + plot_w / 2:.1f}" y="{vb_h - 3}" text-anchor="middle" font-size="9.5" fill="var(--text-muted)">bp</text>')
+    svg.append("</svg>")
+
+    total_f, total_r = sum(fwd), sum(rev)
+    total_all = total_f + total_r
+    head_left = bi("末端 Motif 分布", "Terminal motif distribution")
+    head_right = bi(f"末端 {span:,} bp · 每 {bin_bp} bp 统计 · 合计 {total_all:,} 次", f"{span:,} bp end · {bin_bp} bp bins · {total_all:,} hits")
+    keys = []
+    if total_f > 0 or total_all == 0:
+        keys.append(f'<span class="legend-item"><i class="swatch" style="background:var(--gen-tel)"></i>{esc(fwd_lbl)} (+) · {total_f:,}</span>')
+    if total_r > 0 or total_all == 0:
+        keys.append(f'<span class="legend-item"><i class="swatch" style="background:var(--ds-1)"></i>{esc(rev_lbl)} (−) · {total_r:,}</span>')
+    keys.append('<span class="legend-item"><i class="swatch" style="background:var(--brand);opacity:.2;border:1px dashed var(--brand)"></i>' + bi("2 kb 检测区", "2 kb scan zone") + '</span>')
+    return (
+        '<div class="tel-hist-card">'
+        f'<div class="tel-hist-head"><strong>{head_left}</strong><span>{head_right}</span></div>'
+        + "".join(svg)
+        + f'<div class="tel-hist-foot"><div class="tel-hist-keys">{"".join(keys)}</div></div>'
+        '</div>'
+    )
+
+
 def _motif_summary_bar(t):
     motifs = t.get("matched_motifs") or []
     sigs = t.get("q3_signals") if t.get("selected") and t.get("q3_signals") else t.get("q2_signals")
@@ -215,9 +332,10 @@ def _inspection(t, side, size):
         '</div>'
     ]
     cs = t["candidates"] or []
+    hist_html = _motif_histogram(t, side)
 
     def one(c):
-        has_plot_data = bool(c or sel or t["q2_signals"] or t["q3_signals"])
+        has_plot_data = bool(c or sel or (not hist_html and (t["q2_signals"] or t["q3_signals"])))
         rows = [_zoom(t, c, side, size)] if has_plot_data else []
         meta_bits = []
         if c:
@@ -266,12 +384,14 @@ def _inspection(t, side, size):
 
     primary = next((c for c in cs if sel and c["status"] == "accepted" and c["event"] == sel["event"]), None) or next(iter(cs), None)
     msg.append(one(primary))
+    if hist_html:
+        msg.append(hist_html)
     motif_bar = _motif_summary_bar(t)
     if motif_bar:
         msg.append(motif_bar)
     if t["q2_signals"] or t["q3_signals"] or (primary and primary["signals"]):
         msg.append('<p class="tel-dlg-note"><i class="swatch" style="background:var(--gen-tel);margin-right:.35rem"></i>' + bi("绿色区间：窗口内检出的端粒串联重复分布（悬停查看坐标与重复数）", "Green: detected tandem telomere repeat distribution (hover for coordinates)") + "</p>")
-    elif state != "unresolved":
+    elif state != "unresolved" and not hist_html:
         msg.append('<p class="tel-dlg-note">' + bi("本历史快照仅保存了规则命中结果，未记录逐段基序坐标；新版本运行将直接绘制末端基序分布图。", "This earlier snapshot recorded rule hits only; new runs plot per-hit motif positions here.") + '</p>')
     if state == "unresolved" and not cs:
         msg.append('<p class="tel-dlg-note">' + (
@@ -346,12 +466,12 @@ def terminal_card(lgz):
                 chr_tel += 1
             text = "TEL" if has_tel else "○"
             end = "5′" if k == "5prime" else "3′"
-            side_cls = "is-5p" if k == "5prime" else "is-3p"
-            state_cls = "is-present" if has_tel else "is-missing"
+            side_val = "5p" if k == "5prime" else "3p"
+            state_val = "present" if has_tel else "missing"
             key = f"terminal-{len(templates)}"
             title = esc(c) + " · " + end
             buttons.append(
-                f'<button class="tel-end {side_cls} {state_cls}" type="button" data-story-open="{key}" '
+                f'<button class="tel-end" data-end-side="{side_val}" data-end-state="{state_val}" type="button" data-story-open="{key}" '
                 f'title="{title} · {text}" aria-label="{title} · {text}">{text}</button>'
             )
             is_compact = not info or (not info.get("candidates") and not info.get("selected"))

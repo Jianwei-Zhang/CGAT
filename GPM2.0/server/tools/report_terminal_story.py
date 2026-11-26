@@ -118,6 +118,31 @@ def _revcomp(seq):
     return str(seq).translate(_RC_TRANS)[::-1]
 
 
+def _motif_profile(raw, length):
+    if not isinstance(raw, dict):
+        return None
+    win = raw.get("window")
+    bin_bp = raw.get("bin_bp")
+    fwd = raw.get("forward")
+    rev = raw.get("reverse")
+    if (not isinstance(win, list) or len(win) != 2 or not all(type(v) is int for v in win)
+            or not 0 <= win[0] < win[1] <= length
+            or type(bin_bp) is not int or bin_bp <= 0
+            or not isinstance(fwd, list) or not isinstance(rev, list)
+            or not fwd or len(fwd) != len(rev) or len(fwd) > 200
+            or not all(type(v) is int and v >= 0 for v in fwd)
+            or not all(type(v) is int and v >= 0 for v in rev)):
+        return None
+    return {
+        "window": [win[0], win[1]],
+        "bin_bp": bin_bp,
+        "forward": list(fwd),
+        "reverse": list(rev),
+        "forward_label": str(raw.get("forward_label") or "")[:40],
+        "reverse_label": str(raw.get("reverse_label") or "")[:40],
+    }
+
+
 def _resolve_matched_motifs(raw_ids, rule_lookup):
     ids = raw_ids
     if isinstance(ids, str):
@@ -187,5 +212,6 @@ def terminal_scene(facts, tel_rules=None):
         rows[c]["ends"][k]={"state":state,"reason":label(t["reason"]),"q2_length":lengths[c],"window":[a,b],"selected":chosen,
                     "count":count,"candidates":sorted(cs,key=lambda x:x["rank"]) if complete else None,
                     "matched_motifs":matched_motifs,
+                    "motif_profile":_motif_profile(signal.get("q3_profile") or signal.get("q2_profile"), outputs[c]),
                     "q2_signals":spans(signal.get("q2"),lengths[c]),"q3_signals":spans(signal.get("q3"),outputs[c])}
     return list(rows.values())

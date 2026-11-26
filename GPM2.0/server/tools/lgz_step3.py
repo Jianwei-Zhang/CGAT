@@ -47,6 +47,8 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_step3.
 
 ENGINE_VERSION = 1
 END_SEARCH_WINDOW = 2_000
+PROFILE_WINDOW = 5_000
+PROFILE_BIN_BP = 200
 ALIGNMENT_QUERY_WINDOW = 5_000_000
 MAX_EXTRACT_LENGTH = 5_000_000
 MUMMER_MIN_CLUSTER = 1_000
@@ -188,6 +190,37 @@ def tandem_matches(
             int(row["start0"]),
         ),
     )
+
+
+def terminal_motif_profile(
+    sequence: str,
+    terminal: str,
+    rules: list[dict[str, object]],
+    window_bp: int = PROFILE_WINDOW,
+    bin_bp: int = PROFILE_BIN_BP,
+) -> dict[str, object]:
+    """Bin exact motif counts across the terminal window for report histograms."""
+    w = min(window_bp, len(sequence))
+    offset = 0 if terminal == "5prime" else len(sequence) - w
+    chunk = sequence[offset : offset + w].upper()
+    fwd_motifs = list(dict.fromkeys(str(r["motif"]).upper() for r in rules if not str(r.get("rule_id", "")).endswith("-rc") and r.get("motif")))
+    rev_motifs = list(dict.fromkeys(str(r["motif"]).upper() for r in rules if str(r.get("rule_id", "")).endswith("-rc") and r.get("motif")))
+    fwd_pat = re.compile("|".join(re.escape(m) for m in sorted(fwd_motifs, key=len, reverse=True))) if fwd_motifs else None
+    rev_pat = re.compile("|".join(re.escape(m) for m in sorted(rev_motifs, key=len, reverse=True))) if rev_motifs else None
+    fwd_counts: list[int] = []
+    rev_counts: list[int] = []
+    for pos in range(0, w, bin_bp):
+        sub = chunk[pos : pos + bin_bp]
+        fwd_counts.append(len(fwd_pat.findall(sub)) if fwd_pat else 0)
+        rev_counts.append(len(rev_pat.findall(sub)) if rev_pat else 0)
+    return {
+        "window": [offset, offset + w],
+        "bin_bp": bin_bp,
+        "forward": fwd_counts,
+        "reverse": rev_counts,
+        "forward_label": "/".join(fwd_motifs[:3]),
+        "reverse_label": "/".join(rev_motifs[:3]),
+    }
 
 
 def terminal_signal(
@@ -1770,7 +1803,8 @@ def run_step3(
                 before = terminal_signal(input_records[chromosome], terminal, rules)
                 after = terminal_signal(output_records[chromosome], terminal, rules)
                 report_signals.append({"chr": chromosome, "terminal": terminal,
-                                       "q2": before["report_signal_intervals"], "q3": after["report_signal_intervals"]})
+                                       "q2": before["report_signal_intervals"], "q3": after["report_signal_intervals"],
+                                       "q3_profile": terminal_motif_profile(output_records[chromosome], terminal, rules)})
                 accepted = accepted_by_terminal.get((chromosome, terminal))
                 if accepted is not None and (before["present"] or not after["present"]):
                     fail(f"accepted telomere candidate did not restore {chromosome}:{terminal}")
