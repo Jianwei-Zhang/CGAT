@@ -1,0 +1,322 @@
+{
+  "baseline_metrics": {
+    "gap_count": 146,
+    "gap_placeholder_bp": 14600,
+    "reference_union_bp": 42204808,
+    "score": [
+      48574190,
+      -146,
+      -146,
+      -153,
+      -154,
+      35145537
+    ],
+    "slices": 154,
+    "source_bp": 48574190
+  },
+  "formal_workspace_modified": false,
+  "graph_sha256": "b620ed9b1b52cdfd472aa64b3da11a62e0c5c8d8ba6247d972ad879226a75c8a",
+  "join_function_sha256": "eca71cb721632cfdac176aedd1a4668362bc56c110e997f0cdcf535ecf5f9876",
+  "limitations": [
+    "Scientific counterfactual only; no production gate removed or formal workflow started.",
+    "Only formerly empty edge choices may gain internally anchored sequence-overlap joins; original nonempty choices remain unchanged.",
+    "All joins use actual qualified pair evidence and the original contiguous-anchor cut calculation; no reference-only overlap cut is fabricated.",
+    "Original exact duplicate/coverage gates pass, but this is not independent biological or subgenome truth validation.",
+    "Search budget remains 20000; cache reuse means timings are not an unbiased speed benchmark.",
+    "Reference-first mode additionally changes proposal order and is reported separately."
+  ],
+  "mapper_calls": 0,
+  "results": {
+    "baseline_search": {
+      "full_coverage_gate_passed": true,
+      "logs": [
+        "ranking complete: evaluations=20000 local_rounds=1 search_s=22.68"
+      ],
+      "metrics": {
+        "gap_count": 31,
+        "gap_placeholder_bp": 3100,
+        "net_reference_bp_vs_frozen": -2248381,
+        "net_source_bp_vs_frozen": -3020809,
+        "reference_union_bp": 39956427,
+        "score": [
+          45553381,
+          -31,
+          -31,
+          -39,
+          -40,
+          35145537
+        ],
+        "slices": 40,
+        "source_bp": 45553381
+      },
+      "new_internal_anchor_joins": [
+        {
+          "evidence_ids": [
+            "q0-paf-c02f7f625412343cc64af844"
+          ],
+          "left": "q0-placement-bee362b2947106ca0fdfeef5",
+          "left_local_cut": 40137,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_15616"
+          ],
+          "right": "q0-placement-166f68d31b8cb0b13773afad",
+          "right_local_cut": 40135,
+          "right_orientation": "-",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_4619"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-dc399fd2e7f64c1b8857b5b1"
+          ],
+          "left": "q0-placement-f2a961ebae34322c791351f2",
+          "left_local_cut": 1231480,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4654"
+          ],
+          "right": "q0-placement-b7b4576ee96e0d8e2909ddb5",
+          "right_local_cut": 368564,
+          "right_orientation": "-",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_11200"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-9933fff76b3f236c191a52ae"
+          ],
+          "left": "q0-placement-c7826428c3307b52bcdde975",
+          "left_local_cut": 284828,
+          "left_orientation": "-",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_11191"
+          ],
+          "right": "q0-placement-9fb9adabae0989d4b96159b5",
+          "right_local_cut": 295050,
+          "right_orientation": "+",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-9305b7a1019945759feb55b7",
+            "q0-paf-ec860232b3681eedc130c459"
+          ],
+          "left": "q0-placement-f2e69ae5abd551f9a6b6d56e",
+          "left_local_cut": 5084,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_1294"
+          ],
+          "right": "q0-placement-586c8ee6d68d1855ec4ed10f",
+          "right_local_cut": 5082,
+          "right_orientation": "+",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_5804"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-45194e76fa140be6d436901c"
+          ],
+          "left": "q0-placement-1fb04e0433c1641aeb049c50",
+          "left_local_cut": 42058,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_14276"
+          ],
+          "right": "q0-placement-050a393957bf6725620a4e71",
+          "right_local_cut": 42055,
+          "right_orientation": "-",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_4410"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-bdcf30e8bcb9d629fce8f515"
+          ],
+          "left": "q0-placement-a100bbf4433f00105040b8b6",
+          "left_local_cut": 7574,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_3643"
+          ],
+          "right": "q0-placement-3277b94da53951d64e498ada",
+          "right_local_cut": 7573,
+          "right_orientation": "+",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_13098"
+          ]
+        }
+      ],
+      "original_winner_still_legal": true,
+      "path_file": "internal-anchor-baseline_search-path.json.gz",
+      "path_sha256": "3cea13d673e71863557e675f0187da3a280235752228ad37e74752703a6b46d7",
+      "search_function_sha256": "e14d33bb3b24a5c3beae3ff010f4d31933c204d19a74196cd59f9d53e66badf8",
+      "seconds": 22.789390695048496
+    },
+    "reference_first_search": {
+      "full_coverage_gate_passed": true,
+      "logs": [
+        "ranking complete: evaluations=20000 local_rounds=1 search_s=16.05"
+      ],
+      "metrics": {
+        "gap_count": 35,
+        "gap_placeholder_bp": 3500,
+        "net_reference_bp_vs_frozen": -2134936,
+        "net_source_bp_vs_frozen": -2826666,
+        "reference_union_bp": 40069872,
+        "score": [
+          45747524,
+          -35,
+          -35,
+          -43,
+          -44,
+          35145537
+        ],
+        "slices": 44,
+        "source_bp": 45747524
+      },
+      "new_internal_anchor_joins": [
+        {
+          "evidence_ids": [
+            "q0-paf-c02f7f625412343cc64af844"
+          ],
+          "left": "q0-placement-bee362b2947106ca0fdfeef5",
+          "left_local_cut": 40137,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_15616"
+          ],
+          "right": "q0-placement-166f68d31b8cb0b13773afad",
+          "right_local_cut": 40135,
+          "right_orientation": "-",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_4619"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-dc399fd2e7f64c1b8857b5b1"
+          ],
+          "left": "q0-placement-f2a961ebae34322c791351f2",
+          "left_local_cut": 1231480,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4654"
+          ],
+          "right": "q0-placement-b7b4576ee96e0d8e2909ddb5",
+          "right_local_cut": 368564,
+          "right_orientation": "-",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_11200"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-9933fff76b3f236c191a52ae"
+          ],
+          "left": "q0-placement-c7826428c3307b52bcdde975",
+          "left_local_cut": 284828,
+          "left_orientation": "-",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_11191"
+          ],
+          "right": "q0-placement-9fb9adabae0989d4b96159b5",
+          "right_local_cut": 295050,
+          "right_orientation": "+",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-9305b7a1019945759feb55b7",
+            "q0-paf-ec860232b3681eedc130c459"
+          ],
+          "left": "q0-placement-f2e69ae5abd551f9a6b6d56e",
+          "left_local_cut": 5084,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_1294"
+          ],
+          "right": "q0-placement-586c8ee6d68d1855ec4ed10f",
+          "right_local_cut": 5082,
+          "right_orientation": "+",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_5804"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-45194e76fa140be6d436901c"
+          ],
+          "left": "q0-placement-1fb04e0433c1641aeb049c50",
+          "left_local_cut": 42058,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_14276"
+          ],
+          "right": "q0-placement-050a393957bf6725620a4e71",
+          "right_local_cut": 42055,
+          "right_orientation": "-",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_4410"
+          ]
+        },
+        {
+          "evidence_ids": [
+            "q0-paf-bdcf30e8bcb9d629fce8f515"
+          ],
+          "left": "q0-placement-a100bbf4433f00105040b8b6",
+          "left_local_cut": 7574,
+          "left_orientation": "+",
+          "left_source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_3643"
+          ],
+          "right": "q0-placement-3277b94da53951d64e498ada",
+          "right_local_cut": 7573,
+          "right_orientation": "+",
+          "right_source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_13098"
+          ]
+        }
+      ],
+      "original_winner_still_legal": true,
+      "path_file": "internal-anchor-reference_first_search-path.json.gz",
+      "path_sha256": "1c00e86408269250946f6d0c42fe85f2d3dd610cc20578d4f8ddf4984a2b93aa",
+      "search_function_sha256": "e563917e358b8bc853f7fddd9146d958b3cdb8e7d14aa402f4fbaf19f5abc8d1",
+      "seconds": 16.161499242996797
+    }
+  },
+  "schema": "wheat_1A_internal_anchor_join_counterfactual_v1"
+}

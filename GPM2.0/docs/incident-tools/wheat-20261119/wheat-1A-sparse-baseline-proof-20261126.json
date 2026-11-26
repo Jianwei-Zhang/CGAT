@@ -1,0 +1,16 @@
+{
+  "baseline_ambiguity_equal": true,
+  "baseline_coverage_atoms_and_units_equal": true,
+  "baseline_full_winner_equal": true,
+  "baseline_pair_counts": {
+    "actual_geometry_candidate_pairs": 1537,
+    "cartesian_placement_pairs": 3024,
+    "source_pairs": 3024
+  },
+  "baseline_required_equal": true,
+  "frozen_graph_sha256": "b620ed9b1b52cdfd472aa64b3da11a62e0c5c8d8ba6247d972ad879226a75c8a",
+  "original_constructor_sha256": "758c869470412b595813f25b7305614fbf6e48989ededbc2a07f59f900e37a29",
+  "schema": "wheat_exact_sparse_pair_graph_proof_v1",
+  "scientific_gate_changes": false,
+  "sparse_constructor_ast_sha256": "fc4b1ca3ff4f462bdbc9ca6c52b4fc4ed6d4c1290d5cb67b931a7186a4fa0a26"
+}

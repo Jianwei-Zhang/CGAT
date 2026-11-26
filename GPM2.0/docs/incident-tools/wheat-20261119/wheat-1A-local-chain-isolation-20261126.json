@@ -33,7 +33,9 @@
     },
     "43099350": {
       "purpose": "dominant90 downstream selection, normalized metrics",
-      "state": "RUNNING at 2026-11-26T21:31:41+08:00"
+      "state": "FAILED after intentional dkill, not scientific failure",
+      "end": "2026-11-26T21:37:31+08:00",
+      "reason": "dense Cartesian placement-pair enumeration remained in graph construction; retained sealed 224218-link input cache and resumed exact sparse iteration"
     },
     "43099351": {
       "purpose": "internal-anchor counterfactual, normalized metrics",
@@ -43,7 +45,13 @@
     },
     "43099391": {
       "purpose": "full regional admission to selection with exact sparse pair iteration",
-      "state": "RUNNING at 2026-11-26T21:31:41+08:00"
+      "state": "RUNNING observed 2026-11-26T21:59:01+08:00; reading existing regional evidence"
+    },
+    "43099403": {
+      "purpose": "dominant90 selection resumed from sealed evidence with exact sparse graph",
+      "state": "SUCCEEDED",
+      "start": "2026-11-26T21:38:35+08:00",
+      "end": "2026-11-26T21:47:44+08:00"
     }
   },
   "current_script_sha256": {
@@ -54,7 +62,8 @@
     "wheat_local_chain_selection_readonly.py": "ad762277eba9b935c44253949e7133d945814dcacf11e9ba2ec7443f39e930df",
     "wheat_pair_edge_forensics.py": "e3ebfca336a314da184343607c196fd7cf77b257c932367d7bdaf1091ba9564b",
     "wheat_internal_anchor_join_readonly.py": "bfcda46d825a9fd4e3622cf15759d7fb09044d6780ad6e51c1256f9344afca7f",
-    "wheat_sparse_pair_graph_readonly.py": "1bddb6c2220e89b090dc09a20edbaa57cd4f9e844b0ab2ce4941cd21f98d11b1"
+    "wheat_sparse_pair_graph_readonly.py": "1bddb6c2220e89b090dc09a20edbaa57cd4f9e844b0ab2ce4941cd21f98d11b1",
+    "wheat_selected_path_risk_audit.py": "72f72be796c13fc084159ba6222f26a68f059c0016f1e7351db44d5fc191e4a6"
   },
   "repair": {
     "backup": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-chain-20261126.nyLKgP1a/repairs/metric-json-normalization",
@@ -73,5 +82,12 @@
   "formal_Q0_LGZ": "HOLD",
   "mapper_calls": 0,
   "formal_workspace_modified": false,
-  "master_modified": false
+  "master_modified": false,
+  "monitor": {
+    "script": "/tmp/wheat-local-chain-20261126/watch-regional.py",
+    "pid": 523966,
+    "interval_seconds": 60,
+    "max_duration_seconds": 10800,
+    "behavior": "read scheduler/log only; on success verify/download report and actual path artifacts, run frozen local selected-slice risk audit; never submit/cancel jobs, mutate formal workspace or run git"
+  }
 }

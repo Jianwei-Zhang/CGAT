@@ -1,0 +1,74 @@
+{
+  "schema": "wheat_1A_selected_path_risk_audit_v1",
+  "mode": "dominant90",
+  "selection_report_sha256": "c2d33bc5f888bcaee82513557a2f9987a0738df0daae5bd99dbf068766e148c1",
+  "old_metadata_sha256": "cd9069e54e64cce94ba7d4790afd2c575d85ffc227722b04eca56bf6e04ea847",
+  "results": {
+    "original_search": {
+      "metrics_verified": {
+        "source_bp": 76417563,
+        "reference_union_bp": 67037675,
+        "slices": 140,
+        "gap_count": 137,
+        "gap_placeholder_bp": 13700,
+        "score": [
+          76417563,
+          -137,
+          -137,
+          -90,
+          -140,
+          35145537
+        ]
+      },
+      "reference_overlap_with_old_q0_bp": {
+        "same_1A_same_orientation": 12444439
+      },
+      "source_overlap_conflict_bp": {},
+      "reference_bp_by_name_label": {
+        "A": 53662177,
+        "unlabelled": 12444439,
+        "B": 450268,
+        "D": 480791
+      },
+      "B_D_only_reference_bp_without_A_or_unlabelled": 931059,
+      "largest_old_route_conflict_examples": []
+    },
+    "reference_spine": {
+      "metrics_verified": {
+        "source_bp": 213676927,
+        "reference_union_bp": 202915039,
+        "slices": 1093,
+        "gap_count": 1092,
+        "gap_placeholder_bp": 109200,
+        "score": [
+          213676927,
+          -1092,
+          -1092,
+          -444,
+          -1093,
+          3414787
+        ]
+      },
+      "reference_overlap_with_old_q0_bp": {
+        "same_1A_same_orientation": 46002812
+      },
+      "source_overlap_conflict_bp": {},
+      "reference_bp_by_name_label": {
+        "A": 155221205,
+        "unlabelled": 46009056,
+        "D": 839266,
+        "B": 845512
+      },
+      "B_D_only_reference_bp_without_A_or_unlabelled": 1684778,
+      "largest_old_route_conflict_examples": []
+    }
+  },
+  "mapper_calls": 0,
+  "formal_workspace_modified": false,
+  "limitations": [
+    "Old Q0 and source-name labels are not independent biological truth.",
+    "Conflict means a source interval was placed on a different chromosome/orientation by the old route; it is a review flag, not proof which route is wrong.",
+    "Reference category unions may overlap and must not be added as disjoint losses.",
+    "Only actual selected slice intersections are audited, not all admitted candidate hulls."
+  ]
+}

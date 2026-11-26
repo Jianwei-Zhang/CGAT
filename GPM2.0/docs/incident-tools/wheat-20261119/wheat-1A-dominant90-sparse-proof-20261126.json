@@ -1,0 +1,13 @@
+{
+  "baseline_proof_sha256": "19aca8b7c912fa624ec7ad901bd95ea5fd89c111d9b5479035aa195567257f15",
+  "constructor_ast_sha256": "fc4b1ca3ff4f462bdbc9ca6c52b4fc4ed6d4c1290d5cb67b931a7186a4fa0a26",
+  "dominant_pair_counts": {
+    "actual_geometry_candidate_pairs": 19024,
+    "cartesian_placement_pairs": 2875250,
+    "source_pairs": 5951
+  },
+  "evidence_cache_reused": true,
+  "resumed_dense_job": "43099350",
+  "scientific_gate_changes": false,
+  "selection_report_sha256": "c2d33bc5f888bcaee82513557a2f9987a0738df0daae5bd99dbf068766e148c1"
+}
