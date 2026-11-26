@@ -28,11 +28,13 @@ WRAPPER_CSP = ("default-src 'none'; style-src 'unsafe-inline'; frame-src 'self' 
 DETAIL_REQUEST = "cgat.native-report.open-detail"
 DETAIL_CLICK = f"""(()=>{{
   for (const kind of ["click", "auxclick"]) document.addEventListener(kind, event => {{
-    const link = event.target?.closest?.("a.table-link");
+    const link = event.target?.closest?.("a[href]");
     if (!link) return;
+    const href = link.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
     event.preventDefault();
     if (kind === "click" && window.parent !== window) {{
-      window.parent.postMessage({{type: "{DETAIL_REQUEST}", name: link.getAttribute("href")}}, "*");
+      window.parent.postMessage({{type: "{DETAIL_REQUEST}", name: href}}, "*");
     }}
   }}, true);
 }})();"""
@@ -367,6 +369,23 @@ def reported_direction(row):
     return direction or (row.get("fill_direction") if row.get("filled") and row.get("fill_direction") else "left")
 
 
+_OVERVIEW_GAP_KEYS = (
+    "chromosome", "gap_id", "gap_start", "gap_end", "gap_len",
+    "filled", "fill_length", "fill_type", "fill_direction",
+    "report_direction", "rounds", "status",
+)
+_OVERVIEW_JUNCTION_KEYS = ("mode", "gap_length", "flank_length_delta", "overlap_trim")
+
+
+def _slim_overview_gap(gap):
+    item = {k: gap[k] for k in _OVERVIEW_GAP_KEYS if k in gap}
+    if isinstance(gap.get("junction"), dict):
+        slim_j = {k: gap["junction"][k] for k in _OVERVIEW_JUNCTION_KEYS if k in gap["junction"]}
+        if slim_j:
+            item["junction"] = slim_j
+    return item
+
+
 def global_details(raw, source_gaps):
     """Close links against the HTML's own embedded data, not a guessed tree."""
     text = raw.decode("utf-8", errors="strict")
@@ -383,8 +402,10 @@ def global_details(raw, source_gaps):
                 embedded.append(gap)
         def identities(rows):
             return sorted(json.dumps(row, sort_keys=True) for row in rows)
-        if source_gaps and identities(embedded) != identities(source_gaps):
-            raise UnsupportedView("native overview data differs from current native gap diagnostics")
+        if source_gaps:
+            actual = identities(embedded)
+            if actual != identities(source_gaps) and actual != identities([_slim_overview_gap(g) for g in source_gaps]):
+                raise UnsupportedView("native overview data differs from current native gap diagnostics")
         return {detail_name(row["chromosome"], row["gap_id"], reported_direction(row)) for row in embedded}
     except (KeyError, TypeError, AttributeError, ValueError) as error:
         raise UnsupportedView("unusable native overview gap data: " + str(error)) from error

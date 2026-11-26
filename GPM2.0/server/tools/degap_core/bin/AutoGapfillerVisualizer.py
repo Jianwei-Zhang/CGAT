@@ -242,7 +242,24 @@ class GapFillingVisualizer:
 
         # 准备数据
         from JunctionReport import render_project_junctions
-        junction_html = render_project_junctions({'events': self.gap_filling_results.get('gaps', [])})
+        def _gap_report_href(gap):
+            chrom = gap.get('chromosome')
+            gap_id = gap.get('gap_id')
+            if not chrom or gap_id is None:
+                return None
+            fill_dir = gap.get('fill_direction', 'none')
+            if gap.get('report_direction') == 'bidirectional' or fill_dir == 'bidirectional':
+                flag = 'bidirectional'
+            elif gap.get('filled') and fill_dir in ('left', 'right'):
+                flag = fill_dir
+            else:
+                flag = 'left'
+            return f"{chrom}.{gap_id}.{flag}.html"
+        junction_html = render_project_junctions(
+            {'events': self.gap_filling_results.get('gaps', [])},
+            include_event_details=False,
+            event_href_fn=_gap_report_href,
+        )
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         total_gaps = summary.get('total_gaps', 0)
         filled_gaps = summary.get('filled_gaps', 0)
@@ -254,19 +271,46 @@ class GapFillingVisualizer:
             stats = self.integration_config.get('stats', {})
             total_bp_added = getattr(self, 'total_bp_added', stats.get('total_bp_added', 0))
             bp_metric_html = f"""
-            <div class="metric-card">
-                <div class="metric-label">
-                    <span class="lang-en">Net Length Change</span>
-                    <span class="lang-zh" style="display:none;">净长度变化</span>
-                </div>
-                <div class="metric-value accent">{esc(self._format_bp(total_bp_added))}</div>
-            </div>"""
+            <span class="summary-strip-item">
+                <span class="summary-strip-label"><span class="lang-en">Net Length</span><span class="lang-zh">净长度变化</span></span>
+                <span class="summary-strip-val accent">{esc(self._format_bp(total_bp_added))}</span>
+            </span>"""
 
-        # 准备 JavaScript 数据
-        js_summary = json.dumps(summary, indent=2)
-        js_gaps_by_chrom = json.dumps(self.gaps_by_chrom, indent=2, default=str)
-        js_preprocessing_config = json.dumps(self.preprocessing_config if self.preprocessing_config else {}, indent=2)
-        js_integration_config = json.dumps(self.integration_config if self.integration_config else {}, indent=2)
+        # 准备 JavaScript 数据（仅保留前端渲染与坐标投影所需字段，避免把冗长碱基修订明细塞入总览脚本）
+        slim_gaps_by_chrom = {}
+        for chrom, cdata in self.gaps_by_chrom.items():
+            slim_gaps = []
+            for gap in cdata.get('gaps', []):
+                item = {
+                    k: gap[k]
+                    for k in (
+                        'chromosome', 'gap_id', 'gap_start', 'gap_end', 'gap_len',
+                        'filled', 'fill_length', 'fill_type', 'fill_direction',
+                        'report_direction', 'rounds', 'status',
+                    )
+                    if k in gap
+                }
+                if isinstance(gap.get('junction'), dict):
+                    j = gap['junction']
+                    slim_j = {
+                        k: j[k]
+                        for k in ('mode', 'gap_length', 'flank_length_delta', 'overlap_trim')
+                        if k in j
+                    }
+                    if slim_j:
+                        item['junction'] = slim_j
+                slim_gaps.append(item)
+            slim_gaps_by_chrom[chrom] = {
+                'gaps': slim_gaps,
+                'total': cdata.get('total', len(slim_gaps)),
+                'filled': cdata.get('filled', 0),
+                'unfilled': cdata.get('unfilled', 0),
+                'length': cdata.get('length', 0),
+            }
+        js_summary = json.dumps(summary, separators=(',', ':'))
+        js_gaps_by_chrom = json.dumps(slim_gaps_by_chrom, separators=(',', ':'), default=str)
+        js_preprocessing_config = json.dumps(self.preprocessing_config if self.preprocessing_config else {}, separators=(',', ':'))
+        js_integration_config = json.dumps(self.integration_config if self.integration_config else {}, separators=(',', ':'))
 
         extra_css = """
         .table-toggle-container {
@@ -646,12 +690,26 @@ class GapFillingVisualizer:
             font-weight: 600;
             white-space: nowrap;
         }
+
+        .fold-body > .jr-root { border: 0; margin: 0; }
+        .fold-body > .jr-root > .section-header { display: none; }
+        .fold-body > .jr-root > .section-body { padding: 4px 0 0; }
+        .reads-bar { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--ink-muted); }
+        .reads-bar b { color: var(--ink); font-weight: 600; }
+        table.hide-uniform-dir [data-col="dir"] { display: none; }
         """
 
         css = report_css(extra_css)
+        junction_drawer_html = ""
+        if junction_html:
+            junction_drawer_html = f"""
+            <details class="fold">
+                <summary><span class="fold-title"><span class="lang-en">Junction &amp; Connection Diagnostics</span><span class="lang-zh">连接边界与诊断</span></span></summary>
+                <div class="fold-body">{junction_html}</div>
+            </details>"""
 
         html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -662,125 +720,99 @@ class GapFillingVisualizer:
 </head>
 <body>
     <main class="container">
-        <!-- Header -->
+        <!-- Header & Summary Strip -->
         <header class="header">
             <div class="header-top">
                 <div class="header-info">
                     <div class="report-eyebrow">DEGAP · AutoGapfiller</div>
-                    <h1>AutoGapfiller</h1>
-                    <p class="lang-en">Gap Filling Visualization Report</p>
-                    <p class="lang-zh" style="display:none;">Gap 填充可视化报告</p>
+                    <h1><span class="lang-en">Gap Filling Report</span><span class="lang-zh">Gap 填补报告</span></h1>
                 </div>
-                <div class="language-switcher" role="group" aria-label="Language Switcher">
-                    <button type="button" class="language-btn active" data-lang="en" aria-pressed="true" onclick="switchLanguage('en')">EN</button>
-                    <button type="button" class="language-btn" data-lang="zh" aria-pressed="false" onclick="switchLanguage('zh')">中文</button>
-                </div>
-            </div>
-            <div class="header-meta">
-                <span>
-                    <span class="lang-en">Generated:</span>
-                    <span class="lang-zh" style="display:none;">生成时间：</span>
-                    <strong class="num">{esc(current_time)}</strong>
-                </span>
-            </div>
-        </header>
-
-        <!-- Summary Metrics -->
-        <section class="metrics-grid" aria-label="Summary overview">
-            <div class="metric-card">
-                <div class="metric-label">
-                    <span class="lang-en">Total Gaps</span>
-                    <span class="lang-zh" style="display:none;">Gap 总数</span>
-                </div>
-                <div class="metric-value">{esc(total_gaps)}</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">
-                    <span class="lang-en">Filled Gaps</span>
-                    <span class="lang-zh" style="display:none;">已填充 Gap</span>
-                </div>
-                <div class="metric-value ok">{esc(filled_gaps)}</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">
-                    <span class="lang-en">Fill Rate</span>
-                    <span class="lang-zh" style="display:none;">填充率</span>
-                </div>
-                <div class="metric-value accent">{esc(fill_rate)}</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">
-                    <span class="lang-en">Chromosomes</span>
-                    <span class="lang-zh" style="display:none;">涉及染色体</span>
-                </div>
-                <div class="metric-value">{chrom_count}</div>
-            </div>{bp_metric_html}
-        </section>
-
-        <!-- Reads Information Card -->
-        <section class="card">
-            <div class="card-header">
-                <span class="lang-en">Reads Information</span>
-                <span class="lang-zh" style="display:none;">Reads 信息</span>
-            </div>
-            <div class="card-content">
-                <div class="table-scroll">
-                    <table class="kv" id="readsInfoTable">
-                        <!-- Will be populated by JavaScript -->
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- Initial Genome Overview Card -->
-        <section class="card">
-            <div class="card-header">
-                <span class="lang-en">Initial Genome Overview</span>
-                <span class="lang-zh" style="display:none;">初始基因组概览</span>
-            </div>
-            <div class="card-content">
-                <div id="initial-table-container" class="table-container-limited">
-                    <table id="initialGenomeTable">
-                        <thead>
-                            <tr>
-                                <th class="lang-en">
-                                    Chromosome
-                                    <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="Filter chromosome" onclick="toggleFilterMenu('initial', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('initial', event);}}">
-                                        ▼
-                                        <div id="initial-chrom-filter" class="chrom-filter-menu"></div>
-                                    </span>
-                                </th>
-                                <th class="lang-zh" style="display:none;">
-                                    染色体
-                                    <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="筛选染色体" onclick="toggleFilterMenu('initial', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('initial', event);}}">
-                                        ▼
-                                        <div id="initial-chrom-filter-zh" class="chrom-filter-menu"></div>
-                                    </span>
-                                </th>
-                                <th class="lang-en">Gap ID</th>
-                                <th class="lang-zh" style="display:none;">Gap ID</th>
-                                <th class="lang-en">Region</th>
-                                <th class="lang-zh" style="display:none;">区域</th>
-                            </tr>
-                        </thead>
-                        <tbody id="initialGenomeTableBody">
-                            <!-- Will be populated by JavaScript -->
-                        </tbody>
-                    </table>
-                    <div class="table-toggle-container">
-                        <button type="button" id="initial-toggle-btn" class="table-toggle-btn" onclick="toggleTableExpand('initial')"><span class="lang-en">Expand</span><span class="lang-zh" style="display:none;">展开</span></button>
+                <div class="header-actions">
+                    <div class="language-switcher" role="group" aria-label="Language Switcher">
+                        <button type="button" class="language-btn active" data-lang="en" aria-pressed="true" onclick="switchLanguage('en')">EN</button>
+                        <button type="button" class="language-btn" data-lang="zh" aria-pressed="false" onclick="switchLanguage('zh')">中文</button>
                     </div>
                 </div>
+            </div>
+            <div class="summary-strip" role="group" aria-label="Summary overview">
+                <span class="summary-strip-item">
+                    <span class="summary-strip-label"><span class="lang-en">Total Gaps</span><span class="lang-zh">Gap 总数</span></span>
+                    <span class="summary-strip-val">{esc(total_gaps)}</span>
+                </span>
+                <span class="summary-strip-item">
+                    <span class="summary-strip-label"><span class="lang-en">Filled</span><span class="lang-zh">已填补</span></span>
+                    <span class="summary-strip-val ok">{esc(filled_gaps)}</span>
+                </span>
+                <span class="summary-strip-item">
+                    <span class="summary-strip-label"><span class="lang-en">Fill Rate</span><span class="lang-zh">填补率</span></span>
+                    <span class="summary-strip-val accent">{esc(fill_rate)}</span>
+                </span>
+                <span class="summary-strip-item">
+                    <span class="summary-strip-label"><span class="lang-en">Chromosomes</span><span class="lang-zh">染色体</span></span>
+                    <span class="summary-strip-val">{chrom_count}</span>
+                </span>{bp_metric_html}
+            </div>
+            <div id="readsInfoBar" class="reads-bar" style="display:none;"></div>
+        </header>
+
+        <!-- Chromosome Visualization Card (visual-first) -->
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="lang-en">Chromosome Overview</span><span class="lang-zh">染色体分布总览</span></h2>
+                <select id="chromSelect" class="chrom-selector" aria-label="Select chromosome" onchange="filterChromosome()">
+                    <option value="all" class="lang-en">All Chromosomes</option>
+                    <option value="all" class="lang-zh">所有染色体</option>
+                </select>
+            </div>
+
+            <!-- Track Length Control (only visible for single chromosome) -->
+            <div id="trackLengthControl" class="track-control-bar">
+                <div class="track-control-row">
+                    <label for="trackLengthSlider" class="track-control-label">
+                        <span class="lang-en">Track Length:</span>
+                        <span class="lang-zh">轨道长度：</span>
+                    </label>
+                    <input type="range" id="trackLengthSlider" min="1000000" max="300000000" step="1000000"
+                           oninput="updateTrackLength()">
+                    <span id="trackLengthValue" class="track-control-value">50.00 Mb</span>
+                </div>
+            </div>
+
+            <div class="section-body">
+                <div id="chromVisualization">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #e2e8f0;"></span>
+                        <span class="lang-en">Normal sequence</span>
+                        <span class="lang-zh">正常序列</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #15803d;"></span>
+                        <span class="lang-en">Filled gap</span>
+                        <span class="lang-zh">已填补 gap</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #b91c1c;"></span>
+                        <span class="lang-en">Unfilled gap</span>
+                        <span class="lang-zh">未填补 gap</span>
+                    </div>
+                </div>
+                <p class="section-note" id="chromCoordinateNote" style="margin:8px 0 0;">
+                    <span class="lang-en">Tracks use the original assembly coordinate frame; hover a gap for fill length and flank delta.</span>
+                    <span class="lang-zh">轨道采用原始组装坐标系；悬停查看填补长度与末端变化。</span>
+                </p>
             </div>
         </section>
 
         <!-- Gap Filling Tasks Card -->
-        <section class="card">
-            <div class="card-header">
-                <span class="lang-en">Gap Filling Tasks</span>
-                <span class="lang-zh" style="display:none;">Gap 填充任务</span>
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="lang-en">Gap Filling Tasks</span><span class="lang-zh">Gap 填补任务</span></h2>
             </div>
-            <div class="card-content">
+            <div class="section-body">
                 <div id="tasks-table-container" class="table-container-limited">
                     <table id="gapFillingTasksTable">
                         <thead>
@@ -792,7 +824,7 @@ class GapFillingVisualizer:
                                         <div id="tasks-chrom-filter" class="chrom-filter-menu"></div>
                                     </span>
                                 </th>
-                                <th class="lang-zh" style="display:none;">
+                                <th class="lang-zh">
                                     染色体
                                     <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="筛选染色体" onclick="toggleFilterMenu('tasks', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('tasks', event);}}">
                                         ▼
@@ -800,19 +832,19 @@ class GapFillingVisualizer:
                                     </span>
                                 </th>
                                 <th class="lang-en">Gap ID</th>
-                                <th class="lang-zh" style="display:none;">Gap ID</th>
+                                <th class="lang-zh">Gap ID</th>
+                                <th class="lang-en">Region</th>
+                                <th class="lang-zh">原始区域</th>
                                 <th class="lang-en">Filled</th>
-                                <th class="lang-zh" style="display:none;">是否填补</th>
-                                <th class="lang-en">Connection Type</th>
-                                <th class="lang-zh" style="display:none;">连接类型</th>
-                                <th class="lang-en">Direction</th>
-                                <th class="lang-zh" style="display:none;">方向/模式</th>
+                                <th class="lang-zh">状态</th>
+                                <th data-col="dir" class="lang-en">Direction</th>
+                                <th data-col="dir" class="lang-zh">方向/模式</th>
                                 <th class="lang-en">Rounds</th>
-                                <th class="lang-zh" style="display:none;">轮次数量</th>
+                                <th class="lang-zh">轮次</th>
                                 <th class="lang-en">Fill Length</th>
-                                <th class="lang-zh" style="display:none;">填补长度</th>
+                                <th class="lang-zh">填补长度</th>
                                 <th class="lang-en">Details</th>
-                                <th class="lang-zh" style="display:none;">详情</th>
+                                <th class="lang-zh">详情</th>
                             </tr>
                         </thead>
                         <tbody id="gapFillingTasksTableBody">
@@ -820,107 +852,93 @@ class GapFillingVisualizer:
                         </tbody>
                     </table>
                     <div class="table-toggle-container">
-                        <button type="button" id="tasks-toggle-btn" class="table-toggle-btn" onclick="toggleTableExpand('tasks')"><span class="lang-en">Expand</span><span class="lang-zh" style="display:none;">展开</span></button>
+                        <button type="button" id="tasks-toggle-btn" class="table-toggle-btn" onclick="toggleTableExpand('tasks')"><span class="lang-en">Expand</span><span class="lang-zh">展开</span></button>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Final Integrated Genome Card -->
-        <section class="card">
-            <div class="card-header">
-                <span class="lang-en">Final Integrated Genome</span>
-                <span class="lang-zh" style="display:none;">最终整合基因组</span>
-            </div>
-            <div class="card-content">
-                <div id="final-table-container" class="table-container-limited">
-                    <table id="finalGenomeTable">
-                        <thead>
-                            <tr>
-                                <th class="lang-en">
-                                    Chromosome
-                                    <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="Filter chromosome" onclick="toggleFilterMenu('final', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('final', event);}}">
-                                        ▼
-                                        <div id="final-chrom-filter" class="chrom-filter-menu"></div>
-                                    </span>
-                                </th>
-                                <th class="lang-zh" style="display:none;">
-                                    染色体
-                                    <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="筛选染色体" onclick="toggleFilterMenu('final', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('final', event);}}">
-                                        ▼
-                                        <div id="final-chrom-filter-zh" class="chrom-filter-menu"></div>
-                                    </span>
-                                </th>
-                                <th class="lang-en">Gap ID</th>
-                                <th class="lang-zh" style="display:none;">Gap ID</th>
-                                <th class="lang-en">Region</th>
-                                <th class="lang-zh" style="display:none;">区域</th>
-                            </tr>
-                        </thead>
-                        <tbody id="finalGenomeTableBody">
-                            <!-- Will be populated by JavaScript -->
-                        </tbody>
-                    </table>
-                    <div class="table-toggle-container">
-                        <button type="button" id="final-toggle-btn" class="table-toggle-btn" onclick="toggleTableExpand('final')"><span class="lang-en">Expand</span><span class="lang-zh" style="display:none;">展开</span></button>
+        <!-- Secondary Coordinate & Diagnostics Drawers -->
+        <div class="fold-panel">
+            <details class="fold">
+                <summary><span class="fold-title"><span class="lang-en">Remaining Gaps (Final Coordinates)</span><span class="lang-zh">剩余未填补 Gap（终版坐标）</span> <span id="remainingCount" class="muted num"></span></span></summary>
+                <div class="fold-body">
+                    <div id="final-table-container" class="table-container-limited">
+                        <table id="finalGenomeTable">
+                            <thead>
+                                <tr>
+                                    <th class="lang-en">
+                                        Chromosome
+                                        <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="Filter chromosome" onclick="toggleFilterMenu('final', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('final', event);}}">
+                                            ▼
+                                            <div id="final-chrom-filter" class="chrom-filter-menu"></div>
+                                        </span>
+                                    </th>
+                                    <th class="lang-zh">
+                                        染色体
+                                        <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="筛选染色体" onclick="toggleFilterMenu('final', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('final', event);}}">
+                                            ▼
+                                            <div id="final-chrom-filter-zh" class="chrom-filter-menu"></div>
+                                        </span>
+                                    </th>
+                                    <th class="lang-en">Gap ID</th>
+                                    <th class="lang-zh">Gap ID</th>
+                                    <th class="lang-en">Region</th>
+                                    <th class="lang-zh">终版区域</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finalGenomeTableBody">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                        <div class="table-toggle-container">
+                            <button type="button" id="final-toggle-btn" class="table-toggle-btn" onclick="toggleTableExpand('final')"><span class="lang-en">Expand</span><span class="lang-zh">展开</span></button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </details>
 
-        <!-- Chromosome Visualization Card -->
-        <section class="card">
-            <div class="card-header">
-                <span class="lang-en">Chromosome Visualization</span>
-                <span class="lang-zh" style="display:none;">染色体可视化</span>
-                <select id="chromSelect" class="chrom-selector" aria-label="Select chromosome" onchange="filterChromosome()">
-                    <option value="all" class="lang-en">All Chromosomes</option>
-                    <option value="all" class="lang-zh" style="display:none;">所有染色体</option>
-                </select>
-            </div>
-
-            <!-- Track Length Control (only visible for single chromosome) -->
-            <div id="trackLengthControl" class="track-control-bar">
-                <div class="track-control-row">
-                    <label for="trackLengthSlider" class="track-control-label">
-                        <span class="lang-en">Track Length:</span>
-                        <span class="lang-zh" style="display:none;">轨道长度：</span>
-                    </label>
-                    <input type="range" id="trackLengthSlider" min="1000000" max="300000000" step="1000000"
-                           oninput="updateTrackLength()">
-                    <span id="trackLengthValue" class="track-control-value">50.00 Mb</span>
-                </div>
-            </div>
-
-            <div class="card-content">
-                <p class="section-note" id="chromCoordinateNote">
-                    <span class="lang-en">Track coordinates and marker widths use the original assembly coordinate frame (1-based inclusive gaps placed at 0-based start). Filled sequence lengths, original-overlap trimming, and flank length deltas are reported in tooltips and tables.</span>
-                    <span class="lang-zh" style="display:none;">染色体轨道与标记宽度均采用原始组装坐标系（1-based 闭区间 gap 按 0-based 起点定位）；填补序列长度、原始重叠去重裁剪与末端修订净变化见悬停提示与表格。</span>
-                </p>
-                <div id="chromVisualization">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-
-                <div class="legend">
-                    <div class="legend-item">
-                        <span class="legend-color" style="background: #e2e8f0;"></span>
-                        <span class="lang-en">Normal sequence</span>
-                        <span class="lang-zh" style="display:none;">正常序列</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background: #15803d;"></span>
-                        <span class="lang-en">Filled gap</span>
-                        <span class="lang-zh" style="display:none;">已填充 gap</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color" style="background: #b91c1c;"></span>
-                        <span class="lang-en">Unfilled gap</span>
-                        <span class="lang-zh" style="display:none;">未填充 gap</span>
+            <details class="fold" hidden>
+                <summary><span class="fold-title"><span class="lang-en">Initial Gap Coordinates</span><span class="lang-zh">初始 Gap 坐标清单</span></span></summary>
+                <div class="fold-body">
+                    <div id="initial-table-container" class="table-container-limited">
+                        <table id="initialGenomeTable">
+                            <thead>
+                                <tr>
+                                    <th class="lang-en">
+                                        Chromosome
+                                        <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="Filter chromosome" onclick="toggleFilterMenu('initial', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('initial', event);}}">
+                                            ▼
+                                            <div id="initial-chrom-filter" class="chrom-filter-menu"></div>
+                                        </span>
+                                    </th>
+                                    <th class="lang-zh">
+                                        染色体
+                                        <span class="chrom-filter-icon" tabindex="0" role="button" aria-label="筛选染色体" onclick="toggleFilterMenu('initial', event)" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();toggleFilterMenu('initial', event);}}">
+                                            ▼
+                                            <div id="initial-chrom-filter-zh" class="chrom-filter-menu"></div>
+                                        </span>
+                                    </th>
+                                    <th class="lang-en">Gap ID</th>
+                                    <th class="lang-zh">Gap ID</th>
+                                    <th class="lang-en">Region</th>
+                                    <th class="lang-zh">区域</th>
+                                </tr>
+                            </thead>
+                            <tbody id="initialGenomeTableBody">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                        <div class="table-toggle-container">
+                            <button type="button" id="initial-toggle-btn" class="table-toggle-btn" onclick="toggleTableExpand('initial')"><span class="lang-en">Expand</span><span class="lang-zh">展开</span></button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
-    {junction_html}
+            </details>{junction_drawer_html}
+        </div>
+        <footer class="report-footer">
+            <p>DEGAP · AutoGapfiller · <span class="num">{esc(current_time)}</span></p>
+        </footer>
     </main>
 
     <!-- Tooltip -->
@@ -949,6 +967,7 @@ class GapFillingVisualizer:
         function switchLanguage(lang) {{
             currentLang = lang;
             document.documentElement.setAttribute('lang', lang === 'zh' ? 'zh-CN' : 'en');
+            document.documentElement.setAttribute('data-lang', lang === 'zh' ? 'zh' : 'en');
 
             // Update button states
             document.querySelectorAll('.language-btn').forEach(btn => {{
@@ -996,12 +1015,9 @@ class GapFillingVisualizer:
             const btn = document.getElementById(which + '-toggle-btn');
             const expanded = container.classList.toggle('expanded');
 
-            // Update button text based on current language
-            if (currentLang === 'en') {{
-                btn.innerHTML = expanded ? '<span class="lang-en">Collapse</span><span class="lang-zh" style="display:none;">收起</span>' : '<span class="lang-en">Expand</span><span class="lang-zh" style="display:none;">展开</span>';
-            }} else {{
-                btn.innerHTML = expanded ? '<span class="lang-en" style="display:none;">Collapse</span><span class="lang-zh">收起</span>' : '<span class="lang-en" style="display:none;">Expand</span><span class="lang-zh">展开</span>';
-            }}
+            btn.innerHTML = expanded
+                ? '<span class="lang-en">Collapse</span><span class="lang-zh">收起</span>'
+                : '<span class="lang-en">Expand</span><span class="lang-zh">展开</span>';
         }}
 
         // Numeric & coordinate projection helpers (pure functions)
@@ -1019,9 +1035,7 @@ class GapFillingVisualizer:
         }}
 
         function bilingualSpan(enHtml, zhHtml) {{
-            const enStyle = currentLang === 'zh' ? ' style="display:none;"' : '';
-            const zhStyle = currentLang === 'zh' ? '' : ' style="display:none;"';
-            return `<span class="lang-en"${{enStyle}}>${{enHtml}}</span><span class="lang-zh"${{zhStyle}}>${{zhHtml}}</span>`;
+            return `<span class="lang-en">${{enHtml}}</span><span class="lang-zh">${{zhHtml}}</span>`;
         }}
 
         // Format number with commas
@@ -1277,70 +1291,37 @@ class GapFillingVisualizer:
             return content;
         }}
 
-        // Populate Reads Information
+        // Populate Reads Information (compact inline bar, hidden when absent)
         function populateReadsInfo() {{
-            const table = document.getElementById('readsInfoTable');
+            const bar = document.getElementById('readsInfoBar');
+            if (!bar) return;
 
             if (!preprocessingConfig || Object.keys(preprocessingConfig).length === 0) {{
-                table.innerHTML = '<tr><td colspan="2" class="empty-state"><span class="lang-en">No reads information available</span><span class="lang-zh" style="display:none;">暂无 Reads 信息</span></td></tr>';
+                bar.style.display = 'none';
                 return;
             }}
 
             const dataType = String(preprocessingConfig.data_type || 'unknown');
             const hifiStats = preprocessingConfig.hifi_stats || {{}};
             const ontStats = preprocessingConfig.ont_stats || {{}};
+            const items = [];
 
-            let html = '';
-
-            // Data Type
             const displayType = dataType.charAt(0).toUpperCase() + dataType.slice(1);
-            html += `
-                <tr>
-                    <td><span class="lang-en">Data Type</span><span class="lang-zh" style="display:none;">数据类型</span></td>
-                    <td>${{escapeHtml(displayType)}}</td>
-                </tr>
-            `;
+            items.push(`<span>${{bilingualSpan('Reads', '数据类型')}}: <b>${{escapeHtml(displayType)}}</b></span>`);
 
-            // HiFi Stats
             if (hifiStats && Object.keys(hifiStats).length > 0) {{
-                html += `
-                    <tr>
-                        <td>HiFi Reads</td>
-                        <td class="num">${{escapeHtml(formatNumber(hifiStats.Number || hifiStats.NumSeqs || 0))}} reads</td>
-                    </tr>
-                    <tr>
-                        <td>HiFi Max Length</td>
-                        <td class="num">${{escapeHtml(formatNumber(hifiStats.MaxLength || 0))}} bp</td>
-                    </tr>
-                `;
+                items.push(`<span class="num">HiFi <b>${{escapeHtml(formatNumber(hifiStats.Number || hifiStats.NumSeqs || 0))}}</b> (max ${{escapeHtml(formatBP(hifiStats.MaxLength || 0))}})</span>`);
             }}
-
-            // ONT Stats
             if (ontStats && Object.keys(ontStats).length > 0) {{
-                html += `
-                    <tr>
-                        <td>ONT Reads</td>
-                        <td class="num">${{escapeHtml(formatNumber(ontStats.Number || ontStats.NumSeqs || 0))}} reads</td>
-                    </tr>
-                    <tr>
-                        <td>ONT Max Length</td>
-                        <td class="num">${{escapeHtml(formatNumber(ontStats.MaxLength || 0))}} bp</td>
-                    </tr>
-                `;
+                items.push(`<span class="num">ONT <b>${{escapeHtml(formatNumber(ontStats.Number || ontStats.NumSeqs || 0))}}</b> (max ${{escapeHtml(formatBP(ontStats.MaxLength || 0))}})</span>`);
             }}
-
-            // Seed Length - use unified seed_length (max of HiFi and ONT)
             const seedLength = preprocessingConfig.seed_length || 0;
             if (seedLength > 0) {{
-                html += `
-                    <tr>
-                        <td><span class="lang-en">Seed Length</span><span class="lang-zh" style="display:none;">Seed 长度</span></td>
-                        <td class="num">${{escapeHtml(formatNumber(seedLength))}} bp</td>
-                    </tr>
-                `;
+                items.push(`<span class="num">${{bilingualSpan('Seed', 'Seed 长度')}}: <b>${{escapeHtml(formatBP(seedLength))}}</b></span>`);
             }}
 
-            table.innerHTML = html;
+            bar.innerHTML = items.join('');
+            bar.style.display = items.length ? 'flex' : 'none';
         }}
 
         // Populate Initial Genome Table
@@ -1374,16 +1355,17 @@ class GapFillingVisualizer:
             }});
 
             if (rowCount === 0) {{
-                html = '<tr><td colspan="3" class="empty-state"><span class="lang-en">No initial gaps recorded</span><span class="lang-zh" style="display:none;">暂无初始 Gap 记录</span></td></tr>';
+                html = '<tr><td colspan="3" class="empty-state"><span class="lang-en">No initial gaps recorded</span><span class="lang-zh">暂无初始 Gap 记录</span></td></tr>';
             }}
 
             tbody.innerHTML = html;
 
-            // Show/hide toggle button based on row count (show if >= 6 rows)
+            const container = document.getElementById('initial-table-container');
             const toggleContainer = document.querySelector('#initial-table-container .table-toggle-container');
-            if (rowCount >= 6) {{
+            if (rowCount > 20) {{
                 toggleContainer.style.display = 'flex';
             }} else {{
+                container.classList.add('expanded');
                 toggleContainer.style.display = 'none';
             }}
         }}
@@ -1391,9 +1373,11 @@ class GapFillingVisualizer:
         // Populate Gap Filling Tasks Table
         function populateGapFillingTasksTable() {{
             const tbody = document.getElementById('gapFillingTasksTableBody');
+            const table = document.getElementById('gapFillingTasksTable');
 
             let html = '';
             let rowCount = 0;
+            const seenDirs = new Set();
 
             // Sort chromosomes
             const chromNames = Object.keys(gapsByChrom).sort();
@@ -1405,23 +1389,25 @@ class GapFillingVisualizer:
                 const sortedGaps = [...chromData.gaps].sort(compareGapsGenomic);
 
                 sortedGaps.forEach(gap => {{
-                    // Extended - use badge style
-                    const extended = gap.filled ?
-                        '<span class="badge badge-yes" data-i18n-en="Yes" data-i18n-zh="是">Yes</span>' :
-                        '<span class="badge badge-no" data-i18n-en="No" data-i18n-zh="否">No</span>';
+                    const region = `${{formatNumber(gap.gap_start)}} - ${{formatNumber(gap.gap_end)}}`;
 
-                    // Connection Type - use badge style
-                    let connectionType = '<span class="badge badge-na">-</span>';
+                    // Merged status + connection type badge
+                    let statusBadge;
                     if (gap.filled) {{
-                        if (gap.fill_type === 'extension') {{
-                            connectionType = '<span class="badge badge-extension" data-i18n-en="Extension" data-i18n-zh="延伸">Extension</span>';
-                        }} else if (gap.fill_type === 'direct_connection') {{
-                            connectionType = '<span class="badge badge-direct" data-i18n-en="Direct" data-i18n-zh="直连">Direct</span>';
+                        if (gap.fill_type === 'direct_connection') {{
+                            statusBadge = '<span class="badge badge-yes" data-i18n-en="Filled · Direct" data-i18n-zh="已填补 · 直连">Filled · Direct</span>';
+                        }} else if (gap.fill_type === 'extension') {{
+                            statusBadge = '<span class="badge badge-yes" data-i18n-en="Filled · Ext" data-i18n-zh="已填补 · 延伸">Filled · Ext</span>';
+                        }} else {{
+                            statusBadge = '<span class="badge badge-yes" data-i18n-en="Filled" data-i18n-zh="已填补">Filled</span>';
                         }}
+                    }} else {{
+                        statusBadge = '<span class="badge badge-no" data-i18n-en="Unfilled" data-i18n-zh="未填补">Unfilled</span>';
                     }}
 
-                    // Flag column - show fill_direction (left/right/none)
-                    const displayFlag = gap.fill_direction || 'none';
+                    // Direction column (auto-hidden when uniform across all gaps)
+                    const displayFlag = gap.report_direction || gap.fill_direction || 'none';
+                    seenDirs.add(displayFlag);
 
                     const rounds = gap.filled && gap.rounds !== undefined && gap.rounds !== null ? gap.rounds : '-';
 
@@ -1429,7 +1415,6 @@ class GapFillingVisualizer:
                     const fillCell = formatFillLengthCell(gap);
 
                     // Details - View link to sub-task report
-                    // For filled gaps: use fill_direction, for unfilled: use 'left'
                     const linkFlag = gap.report_direction || (gap.filled && gap.fill_direction ? gap.fill_direction : 'left');
                     const reportFile = `${{chrom}}.${{gap.gap_id}}.${{linkFlag}}.html`;
                     const details = `<a class="table-link" href="${{escapeHtml(reportFile)}}" target="_blank" rel="noopener" title="View details for ${{escapeHtml(chrom)}} Gap ${{escapeHtml(gap.gap_id)}}" data-i18n-en="View" data-i18n-zh="查看">View</a>`;
@@ -1438,9 +1423,9 @@ class GapFillingVisualizer:
                         <tr>
                             <td class="mono">${{escapeHtml(chrom)}}</td>
                             <td class="num">${{escapeHtml(gap.gap_id)}}</td>
-                            <td>${{extended}}</td>
-                            <td>${{connectionType}}</td>
-                            <td class="mono">${{escapeHtml(displayFlag)}}</td>
+                            <td class="num muted">${{escapeHtml(region)}}</td>
+                            <td>${{statusBadge}}</td>
+                            <td data-col="dir" class="mono">${{escapeHtml(displayFlag)}}</td>
                             <td class="num">${{escapeHtml(rounds)}}</td>
                             <td class="${{fillCell.className}}">${{fillCell.html}}</td>
                             <td>${{details}}</td>
@@ -1450,17 +1435,22 @@ class GapFillingVisualizer:
                 }});
             }});
 
+            if (table) {{
+                table.classList.toggle('hide-uniform-dir', rowCount > 0 && seenDirs.size <= 1);
+            }}
+
             if (rowCount === 0) {{
-                html = '<tr><td colspan="8" class="empty-state"><span class="lang-en">No gap filling tasks recorded</span><span class="lang-zh" style="display:none;">暂无 Gap 填充任务记录</span></td></tr>';
+                html = '<tr><td colspan="8" class="empty-state"><span class="lang-en">No gap filling tasks recorded</span><span class="lang-zh">暂无 Gap 填充任务记录</span></td></tr>';
             }}
 
             tbody.innerHTML = html;
 
-            // Show/hide toggle button based on row count (show if >= 6 rows)
+            const container = document.getElementById('tasks-table-container');
             const toggleContainer = document.querySelector('#tasks-table-container .table-toggle-container');
-            if (rowCount >= 6) {{
+            if (rowCount > 20) {{
                 toggleContainer.style.display = 'flex';
             }} else {{
+                container.classList.add('expanded');
                 toggleContainer.style.display = 'none';
             }}
         }}
@@ -1499,12 +1489,17 @@ class GapFillingVisualizer:
             }}
 
             tbody.innerHTML = html;
+            const remBadge = document.getElementById('remainingCount');
+            if (remBadge) {{
+                remBadge.textContent = `(${{rowCount}})`;
+            }}
 
-            // Show/hide toggle button based on row count (show if >= 6 rows)
+            const container = document.getElementById('final-table-container');
             const toggleContainer = document.querySelector('#final-table-container .table-toggle-container');
-            if (rowCount >= 6) {{
+            if (rowCount > 20) {{
                 toggleContainer.style.display = 'flex';
             }} else {{
+                container.classList.add('expanded');
                 toggleContainer.style.display = 'none';
             }}
         }}
@@ -1537,7 +1532,7 @@ class GapFillingVisualizer:
                 : [selectedChrom];
 
             if (chromNames.length === 0) {{
-                container.innerHTML = '<div class="empty-state"><span class="lang-en">No chromosomes to display</span><span class="lang-zh" style="display:none;">暂无可显示的染色体</span></div>';
+                container.innerHTML = '<div class="empty-state"><span class="lang-en">No chromosomes to display</span><span class="lang-zh">暂无可显示的染色体</span></div>';
                 return;
             }}
 

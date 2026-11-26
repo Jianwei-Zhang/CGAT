@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 
 NO_FILL = "Job execution completed but did not produce expected results"
 LOGS = ("process.log", "run.stdout.log", "run.stderr.log")
-ENGINE_REVISION = "ff4d753511fc8556d77b9a578e064e69fe47ade9"
+ENGINE_REVISION = "c06fa1e0b0e28df31847eb1a30d72027fcd4234c"
 FAMILY = "family-result.json"
 FAMILY_NO_FILL = frozenset({"terminal", "round_limit", "length_limit", "exhausted"})
 FAMILY_FILES = {"connection-diagnostics.json", "family-components.fa", "family-report.html", "process.agp",

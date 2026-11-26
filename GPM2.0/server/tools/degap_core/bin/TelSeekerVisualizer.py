@@ -507,6 +507,17 @@ class Part2HTMLReportGenerator:
             if max_len_val is None else esc(max_len_val)
         )
 
+        viz_html = self._connection_visualization_html()
+        viz_section = (
+            f"""
+  <div class="section">
+    <div class="section-title" data-i18n-en="Connection Visualization" data-i18n-zh="连接情况可视化">Connection Visualization</div>
+    {viz_html}
+  </div>"""
+            if "<svg" in viz_html
+            else ""
+        )
+
         html = f"""<!DOCTYPE html>
 <html lang=\"en\">
 <head>
@@ -521,29 +532,27 @@ class Part2HTMLReportGenerator:
 <div class=\"container\">
   <div class=\"header\">
     <div class=\"header-top\">
-      <h1 data-i18n-en=\"TelSeeker Part2 Report\" data-i18n-zh=\"TelSeeker Part2 报告\">TelSeeker Part2 Report</h1>
-      <div class=\"language-switcher\" role=\"group\" aria-label=\"Language Switcher\">
-        <button class=\"language-btn\" data-lang=\"zh\" type=\"button\" aria-label=\"切换为中文\">中文</button>
-        <button class=\"language-btn active\" data-lang=\"en\" type=\"button\" aria-label=\"Switch to English\">EN</button>
+      <div class=\"header-info\">
+        <div class=\"report-eyebrow\">DEGAP · TelSeeker</div>
+        <h1 data-i18n-en=\"TelSeeker Part2 Report\" data-i18n-zh=\"TelSeeker Part2 报告\">TelSeeker Part2 Report</h1>
+        <div class=\"sub\" data-i18n-en=\"Task: <code>{chr_end_i18n}</code> · Generated: {now_esc}\" data-i18n-zh=\"任务：<code>{chr_end_i18n}</code> · 生成时间：{now_esc}\">Task: <code>{chr_end_esc}</code> · Generated: {now_esc}</div>
+      </div>
+      <div class=\"header-actions\">
+        {status_badge}
+        <div class=\"language-switcher\" role=\"group\" aria-label=\"Language Switcher\">
+          <button class=\"language-btn\" data-lang=\"zh\" type=\"button\" aria-label=\"切换为中文\">中文</button>
+          <button class=\"language-btn active\" data-lang=\"en\" type=\"button\" aria-label=\"Switch to English\">EN</button>
+        </div>
       </div>
     </div>
-    <div class=\"sub\" data-i18n-en=\"Task: <code>{chr_end_i18n}</code> · Generated: {now_esc}\" data-i18n-zh=\"任务：<code>{chr_end_i18n}</code> · 生成时间：{now_esc}\">Task: <code>{chr_end_esc}</code> · Generated: {now_esc}</div>
-    <div class=\"badges\">{status_badge}<span class=\"badge info\" data-i18n-en=\"Rounds: {esc(total_rounds)}\" data-i18n-zh=\"轮次：{esc(total_rounds)}\">Rounds: {esc(total_rounds)}</span></div>
-    <p class="muted"><span data-i18n-en="Stop reason" data-i18n-zh="停止原因">Stop reason</span>: <code>{esc(fin.get('stop_reason') or '—')}</code></p>
+    <div class=\"summary-strip\">
+      <span class=\"summary-strip-item\"><span class=\"summary-strip-label\" data-i18n-en=\"Rounds\" data-i18n-zh=\"轮次\">Rounds</span><span class=\"summary-strip-val\">{esc(total_rounds)}</span></span>
+      <span class=\"summary-strip-item\"><span class=\"summary-strip-label\" data-i18n-en=\"Seed\" data-i18n-zh=\"Seed\">Seed</span><span class=\"summary-strip-val\">{info.get('seed_length',0):,} bp</span></span>
+      <span class=\"summary-strip-item\"><span class=\"summary-strip-label\" data-i18n-en=\"Telo Reads\" data-i18n-zh=\"端粒 Reads\">Telo Reads</span><span class=\"summary-strip-val\">{info.get('telo_reads_count',0):,}</span></span>
+      <span class=\"summary-strip-item\"><span class=\"summary-strip-label\" data-i18n-en=\"Stop reason\" data-i18n-zh=\"停止原因\">Stop reason</span><code>{esc(fin.get('stop_reason') or '—')}</code></span>
+    </div>
   </div>
-
-  <div class=\"section\">
-    <div class=\"section-title\" data-i18n-en=\"Initial Information\" data-i18n-zh=\"初始信息\">Initial Information</div>
-    <table class=\"kv\">
-      <tr><td data-i18n-en=\"Chromosome End\" data-i18n-zh=\"染色体端\">Chromosome End</td><td>{esc(info.get('chr_name','N/A'))}.{esc(info.get('end_type','?'))}</td></tr>
-      <tr><td data-i18n-en=\"Seed Length\" data-i18n-zh=\"Seed长度\">Seed Length</td><td>{info.get('seed_length',0):,} bp</td></tr>
-      <tr><td data-i18n-en=\"Telomere Reads\" data-i18n-zh=\"端粒reads数量\">Telomere Reads</td><td>{info.get('telo_reads_count',0):,}</td></tr>
-      <tr><td data-i18n-en=\"Edge Tolerance\" data-i18n-zh=\"边缘阈值\">Edge Tolerance</td><td>{esc(conf.get('edge','N/A'))} bp</td></tr>
-      <tr><td data-i18n-en=\"K-mer Parameters\" data-i18n-zh=\"K-mer参数\">K-mer Parameters</td><td>num={esc(conf.get('kmer_num','N/A'))}, size={esc(conf.get('kmer_size','N/A'))}</td></tr>
-      <tr><td data-i18n-en=\"Max Rounds\" data-i18n-zh=\"最大轮次\">Max Rounds</td><td>{max_rounds_html}</td></tr>
-      <tr><td data-i18n-en=\"Max Extension Length\" data-i18n-zh=\"最大延伸长度\">Max Extension Length</td><td>{max_len_html}</td></tr>
-    </table>
-  </div>
+{viz_section}
 
   <div class=\"section\">
     <div class=\"section-title\" data-i18n-en=\"Connection Overview\" data-i18n-zh=\"连接结果总览\">Connection Overview</div>
@@ -554,9 +563,21 @@ class Part2HTMLReportGenerator:
 
   {render_target_search_section(self.data, self.output_dir)}
 
-  <div class=\"section\">
-    <div class=\"section-title\" data-i18n-en=\"Connection Visualization\" data-i18n-zh=\"连接情况可视化\">Connection Visualization</div>
-    {self._connection_visualization_html()}
+  <div class=\"fold-panel\">
+    <details class=\"fold\">
+      <summary><span class=\"fold-title\" data-i18n-en=\"Parameters &amp; Initial Information\" data-i18n-zh=\"参数与初始信息\">Parameters &amp; Initial Information</span></summary>
+      <div class=\"fold-body\">
+        <table class=\"kv\">
+          <tr><td data-i18n-en=\"Chromosome End\" data-i18n-zh=\"染色体端\">Chromosome End</td><td>{esc(info.get('chr_name','N/A'))}.{esc(info.get('end_type','?'))}</td></tr>
+          <tr><td data-i18n-en=\"Seed Length\" data-i18n-zh=\"Seed长度\">Seed Length</td><td>{info.get('seed_length',0):,} bp</td></tr>
+          <tr><td data-i18n-en=\"Telomere Reads\" data-i18n-zh=\"端粒reads数量\">Telomere Reads</td><td>{info.get('telo_reads_count',0):,}</td></tr>
+          <tr><td data-i18n-en=\"Edge Tolerance\" data-i18n-zh=\"边缘阈值\">Edge Tolerance</td><td>{esc(conf.get('edge','N/A'))} bp</td></tr>
+          <tr><td data-i18n-en=\"K-mer Parameters\" data-i18n-zh=\"K-mer参数\">K-mer Parameters</td><td>num={esc(conf.get('kmer_num','N/A'))}, size={esc(conf.get('kmer_size','N/A'))}</td></tr>
+          <tr><td data-i18n-en=\"Max Rounds\" data-i18n-zh=\"最大轮次\">Max Rounds</td><td>{max_rounds_html}</td></tr>
+          <tr><td data-i18n-en=\"Max Extension Length\" data-i18n-zh=\"最大延伸长度\">Max Extension Length</td><td>{max_len_html}</td></tr>
+        </table>
+      </div>
+    </details>
   </div>
 
   <div class=\"footer\" data-i18n-en=\"Report generated by TelSeekerVisualizer.py.\" data-i18n-zh=\"本报告由 TelSeekerVisualizer.py 自动生成。\">Report generated by TelSeekerVisualizer.py.</div>
@@ -1572,7 +1593,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
         final_motif_html = """
         <div class="card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span data-i18n-en="7. Final Genome Motif Distribution" data-i18n-zh="7. 最终基因组 Motif 分布">7. Final Genome Motif Distribution</span>
+                <span data-i18n-en="Final Genome Motif Distribution" data-i18n-zh="最终基因组 Motif 分布">Final Genome Motif Distribution</span>
                 <select id="motif-chr-selector" class="chr-selector">
                     <option value="all" data-i18n-en="All Chromosomes" data-i18n-zh="所有染色体" selected>All Chromosomes</option>
                 </select>
@@ -1585,12 +1606,7 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
         </div>
         """
     else:
-        final_motif_html = """
-        <div class="card">
-            <div class="card-header" data-i18n-en="7. Final Genome Motif Distribution" data-i18n-zh="7. 最终基因组 Motif 分布">7. Final Genome Motif Distribution</div>
-            <div class="card-content"><p class="empty-state">No final motif plots available</p></div>
-        </div>
-        """
+        final_motif_html = ""
     
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1601,11 +1617,11 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
     <style>
 {report_css()}
 .review-evidence a {{ margin-right: 10px; white-space: nowrap; }}
-.chromosome-task-tracks {{ display: grid; gap: 14px; margin: 20px 0; }}
-.task-track {{ display: grid; grid-template-columns: minmax(100px,180px) minmax(0,1fr); align-items: center; gap: 18px; }}
+.chromosome-task-tracks {{ display: grid; gap: 10px; margin: 12px 0; }}
+.task-track {{ display: grid; grid-template-columns: minmax(100px,180px) minmax(0,1fr); align-items: center; gap: 14px; }}
 .task-track-name {{ font-weight: 600; color: var(--ink-secondary); overflow-wrap: anywhere; }}
-.task-track-bar {{ position: relative; height: 24px; border-radius: 12px; background: var(--surface-subtle); border: 1px solid var(--border-strong); }}
-.end-marker {{ display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-strong); vertical-align: middle; }}
+.task-track-bar {{ position: relative; height: 22px; border-radius: 11px; background: var(--surface-subtle); border: 1px solid var(--border-strong); }}
+.end-marker {{ display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-strong); vertical-align: middle; }}
 .task-track-bar .end-marker {{ position: absolute; top: 50%; transform: translateY(-50%); }}
 .task-track-bar .end-marker.left {{ left: 3px; }}
 .task-track-bar .end-marker.right {{ right: 3px; }}
@@ -1613,15 +1629,15 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
 .end-marker.targeted {{ background: var(--accent); }}
 .end-marker.connected {{ background: var(--ok-ink); }}
 .end-marker.failed {{ background: var(--warn-ink); }}
-.task-legend {{ display: flex; flex-wrap: wrap; gap: 18px; color: var(--ink-secondary); }}
-.task-legend > span {{ display: inline-flex; align-items: center; gap: 7px; }}
-.chr-selector {{ background: var(--surface); border: 1px solid var(--border-strong); color: var(--ink); padding: 6px 10px; border-radius: var(--radius-sm); font: inherit; font-size: 13px; cursor: pointer; min-width: 160px; max-width: 100%; }}
+.task-legend {{ display: flex; flex-wrap: wrap; gap: 14px; color: var(--ink-secondary); font-size: 0.82rem; }}
+.task-legend > span {{ display: inline-flex; align-items: center; gap: 6px; }}
+.chr-selector {{ background: var(--surface); border: 1px solid var(--border-strong); color: var(--ink); padding: 5px 10px; border-radius: var(--radius-sm); font: inherit; font-size: 13px; cursor: pointer; min-width: 150px; max-width: 100%; }}
 .chr-selector:hover {{ border-color: var(--accent); }}
-.motif-plot-container {{ text-align: center; background: var(--surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); }}
+.motif-plot-container {{ text-align: center; background: var(--surface); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); }}
 .motif-plot-container img {{ max-width: 100%; height: auto; }}
-.global-ev-cell {{ font-size: 0.82rem; min-width: 200px; }}
-.global-ev-meta {{ margin-top: 4px; color: var(--ink-secondary); font-variant-numeric: tabular-nums; }}
-.global-ev-link {{ margin-left: 6px; font-size: 0.78rem; white-space: nowrap; }}
+.global-ev-cell {{ font-size: 0.81rem; min-width: 190px; }}
+.global-ev-meta {{ margin-top: 3px; color: var(--ink-secondary); font-variant-numeric: tabular-nums; }}
+.global-ev-link {{ margin-left: 6px; font-size: 0.77rem; white-space: nowrap; }}
 @media (max-width: 768px) {{
   .task-track {{ grid-template-columns: minmax(0,1fr); gap: 6px; }}
   .card-header {{ flex-wrap: wrap; gap: 10px; }}
@@ -1633,90 +1649,44 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
         <div class="header">
             <div class="header-top">
                 <div class="header-info">
+                    <div class="report-eyebrow">DEGAP · TelSeeker</div>
                     <h1 data-i18n-en="TelSeeker Results Visualization" data-i18n-zh="TelSeeker 可视化结果">TelSeeker Results Visualization</h1>
-                    <p data-i18n-en="Telomere Extension Analysis Report" data-i18n-zh="端粒延伸分析报告">Telomere Extension Analysis Report</p>
                 </div>
                 <div class="language-switcher" role="group" aria-label="Language Switcher">
                     <button class="language-btn" data-lang="zh" type="button" aria-label="切换为中文">中文</button>
                     <button class="language-btn active" data-lang="en" type="button" aria-label="Switch to English">EN</button>
                 </div>
             </div>
-        </div>
-
-        <!-- Section 1: Initial manual review -->
-        <div class="card">
-            <div class="card-header" data-i18n-en="1. Initial Chromosome-End Manual Review" data-i18n-zh="1. 初始染色体末端人工检查">1. Initial Chromosome-End Manual Review</div>
-            <div class="card-content">
-                {initial_review_html}
-                <div class="table-container">
-                    <table id="initial-review-table">
-                        <thead>
-                            <tr>
-                                <th>Chromosome</th>
-                                <th>End</th>
-                                <th>Sequence Length</th>
-                                <th data-i18n-en="Selected Target" data-i18n-zh="人工选择目标">Selected Target</th>
-                                <th data-i18n-en="Review Evidence" data-i18n-zh="检查证据">Review Evidence</th>
-                            </tr>
-                        </thead>
-                        <tbody id="initial-review-tbody"></tbody>
-                    </table>
-                </div>
+            <div class="summary-strip" role="group" aria-label="Telomeric reads summary">
+                <span class="summary-strip-item"><span class="summary-strip-label" data-i18n-en="Target Ends" data-i18n-zh="目标端点">Target Ends</span><span class="summary-strip-val accent">{len(need_extension_list):,}</span></span>
+                <span class="summary-strip-item"><span class="summary-strip-label" data-i18n-en="Telo Reads" data-i18n-zh="端粒 Reads">Telo Reads</span><span class="summary-strip-val">{telo_reads_stats['total_reads']:,}</span></span>
+                <span class="summary-strip-item"><span class="summary-strip-label" data-i18n-en="Left / Right" data-i18n-zh="左 / 右">Left / Right</span><span class="summary-strip-val">{telo_reads_stats.get('left_reads', 0):,} / {telo_reads_stats.get('right_reads', 0):,}</span></span>
             </div>
         </div>
 
-        <!-- Section 2: Extension Task List -->
+        <!-- Visual Overview: Chromosome-End Task Status -->
         <div class="card">
-            <div class="card-header" data-i18n-en="2. Extension Task List" data-i18n-zh="2. 延伸任务列表">2. Extension Task List</div>
+            <div class="card-header" data-i18n-en="Chromosome-End Task Status" data-i18n-zh="染色体末端任务状态">Chromosome-End Task Status</div>
             <div class="card-content">
-                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--accent);">
-                    <h4 style="margin: 0 0 10px 0; color: #495057;" data-i18n-en="User-selected chromosome ends:" data-i18n-zh="用户选择的染色体端：">User-selected chromosome ends:</h4>
-                    <p style="margin: 0 0 15px 0; color: #6c757d; font-size: 0.95em;" data-i18n-en="These target ends were supplied explicitly with -e/--target_ends after manual review." data-i18n-zh="这些目标端点由人工检查后通过 -e/--target_ends 明确提供。">
-                        These target ends were supplied explicitly with -e/--target_ends after manual review.
-                    </p>
-                    <div id="need-extension-list" style="font-family: 'Courier New', monospace; font-size: 0.9em;">
-                        <!-- Populated by JavaScript -->
-                    </div>
+                <div id="chromosome-task-tracks" class="chromosome-task-tracks"></div>
+                <div class="task-legend">
+                    <span><i class="end-marker not-targeted"></i> <span data-i18n-en="Not targeted" data-i18n-zh="未选择">Not targeted</span></span>
+                    <span><i class="end-marker targeted"></i> <span data-i18n-en="Targeted" data-i18n-zh="已选择">Targeted</span></span>
+                    <span><i class="end-marker connected"></i> <span data-i18n-en="Connected" data-i18n-zh="已连接">Connected</span></span>
+                    <span><i class="end-marker failed"></i> <span data-i18n-en="Failed" data-i18n-zh="延伸失败">Failed</span></span>
                 </div>
-            </div>
-        </div>
-
-        <!-- Section 3: Telomeric Reads Extraction -->
-        <div class="card">
-            <div class="card-header" data-i18n-en="3. Telomeric Reads Extraction" data-i18n-zh="3. 端粒 Reads 提取">3. Telomeric Reads Extraction</div>
-            <div class="card-content">
-                <div class="stats-overview">
-                    <div class="stat-card">
-                        <div class="stat-value">{telo_reads_stats['total_reads']:,}</div>
-                        <div class="stat-label" data-i18n-en="Total Telo Reads" data-i18n-zh="端粒Reads总数">Total Telo Reads</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">{telo_reads_stats.get('left_reads', 0):,}</div>
-                        <div class="stat-label" data-i18n-en="Left Telo Reads" data-i18n-zh="左端粒Reads">Left Telo Reads</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">{telo_reads_stats.get('right_reads', 0):,}</div>
-                        <div class="stat-label" data-i18n-en="Right Telo Reads" data-i18n-zh="右端粒Reads">Right Telo Reads</div>
-                    </div>
-                </div>
-                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                    <h4 style="margin: 0 0 10px 0; color: #495057;" data-i18n-en="Extracted Files:" data-i18n-zh="提取到的文件：">Extracted Files:</h4>
-                    <ul style="margin: 0; padding-left: 20px; color: #6c757d;" data-i18n-wrapper="file-list">
-                        {"".join(f"<li>{esc(f)}</li>" for f in telo_reads_stats.get('files', [])) if telo_reads_stats.get('files') else "<li data-i18n-en='No files found' data-i18n-zh='未找到文件'>No files found</li>"}
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section 4: Chromosome End Extension -->
-        <div class="card">
-            <div class="card-header" data-i18n-en="4. Chromosome End Extension" data-i18n-zh="4. 染色体端延伸">4. Chromosome End Extension</div>
-            <div class="card-content">
-                <p class="section-note"
-                   data-i18n-en="Linked Sequence Length reports the full final linker FASTA length (linker.fa), not chromosome-side assembly growth alone. Target evidence summarizes per-end bounded-batch large-pool search counts (pool / retrieved / batches / eligible), decision reason, selected tel-read tail vs tested outward junction span, and lower-bound read support (&ge; N, not an exact total). Legacy runs without diagnostics show Unavailable."
-                   data-i18n-zh="拼接后序列长度显示最终 linker FASTA（linker.fa）的全长，而非仅染色体侧组装延伸长度。目标检索证据汇总各端有界批次大池检索计数（池 / 检索 / 批次 / 合格）、判定原因、入选端粒 read 尾长与实测向外接合区跨度，以及 read 佐证下界（&ge; N，并非精确总数）。缺少诊断文件的旧版运行显示为不可用。">
-                    Linked Sequence Length reports the full final linker FASTA length (linker.fa), not chromosome-side assembly growth alone. Target evidence summarizes per-end bounded-batch large-pool search counts (pool / retrieved / batches / eligible), decision reason, selected tel-read tail vs tested outward junction span, and lower-bound read support (&ge; N, not an exact total). Legacy runs without diagnostics show Unavailable.
+                <p class="section-note" style="margin:8px 0 0;"
+                   data-i18n-en="Shows target selection and connection status only. Connected does not mean telomere-complete."
+                   data-i18n-zh="仅展示目标选择与连接状态；Connected 不代表端粒完整。">
+                    Shows target selection and connection status only. Connected does not mean telomere-complete.
                 </p>
+            </div>
+        </div>
+
+        <!-- Extension Results -->
+        <div class="card">
+            <div class="card-header" data-i18n-en="Chromosome End Extension" data-i18n-zh="染色体端延伸">Chromosome End Extension</div>
+            <div class="card-content">
                 <div class="table-container">
                     <table id="extension-table">
                         <thead>
@@ -1736,14 +1706,21 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
                         </tbody>
                     </table>
                 </div>
+                <details class="fold-inline" style="margin:8px 0 0;">
+                    <summary data-i18n-en="Metric &amp; evidence notes" data-i18n-zh="指标与证据口径说明">Metric &amp; evidence notes</summary>
+                    <p data-i18n-en="Linked Sequence Length reports the full final linker FASTA length (linker.fa), not chromosome-side assembly growth alone. Target evidence summarizes per-end bounded-batch large-pool search counts (pool / retrieved / batches / eligible), decision reason, selected tel-read tail vs tested outward junction span, and lower-bound read support (&ge; N, not an exact total). Legacy runs without diagnostics show Unavailable."
+                       data-i18n-zh="拼接后序列长度显示最终 linker FASTA（linker.fa）的全长，而非仅染色体侧组装延伸长度。目标检索证据汇总各端有界批次大池检索计数（池 / 检索 / 批次 / 合格）、判定原因、入选端粒 read 尾长与实测向外接合区跨度，以及 read 佐证下界（&ge; N，并非精确总数）。缺少诊断文件的旧版运行显示为不可用。">
+                        Linked Sequence Length reports the full final linker FASTA length (linker.fa), not chromosome-side assembly growth alone. Target evidence summarizes per-end bounded-batch large-pool search counts (pool / retrieved / batches / eligible), decision reason, selected tel-read tail vs tested outward junction span, and lower-bound read support (&ge; N, not an exact total). Legacy runs without diagnostics show Unavailable.
+                    </p>
+                </details>
             </div>
         </div>
 
-        <!-- Section 5: Final manual review -->
+        <!-- Final manual review -->
         <div class="card">
-            <div class="card-header" data-i18n-en="5. Final Chromosome-End Manual Review" data-i18n-zh="5. 最终染色体末端人工检查">5. Final Chromosome-End Manual Review</div>
+            <div class="card-header" data-i18n-en="Final Chromosome-End Manual Review" data-i18n-zh="最终染色体末端人工检查">Final Chromosome-End Manual Review</div>
             <div class="card-content">
-                <p data-i18n-en="Review the final chromosome-end sequences and motif plots manually. A successful extension means that a linker was produced; it is not an automatic telomere-completeness call."
+                <p class="section-note" data-i18n-en="Review the final chromosome-end sequences and motif plots manually. A successful extension means that a linker was produced; it is not an automatic telomere-completeness call."
                    data-i18n-zh="请人工检查最终染色体末端序列和 motif 图。延伸成功仅表示已生成 linker，不等同于自动判定端粒完整。">
                     Review the final chromosome-end sequences and motif plots manually. A successful extension means that a linker was produced; it is not an automatic telomere-completeness call.
                 </p>
@@ -1766,25 +1743,42 @@ def generate_html_visualization(out_dir: Path, output_path: Path, motif: str = '
             </div>
         </div>
 
-        <!-- Section 6: task and connection status overview -->
-        <div class="card">
-            <div class="card-header" data-i18n-en="6. Chromosome-End Task Status" data-i18n-zh="6. 染色体末端任务状态">6. Chromosome-End Task Status</div>
-            <div class="card-content">
-                <p data-i18n-en="This diagram shows target selection and extension connection status only. Connected does not mean telomere-complete."
-                   data-i18n-zh="该图仅展示目标选择和延伸连接状态；Connected 不代表端粒完整。">
-                    This diagram shows target selection and extension connection status only. Connected does not mean telomere-complete.
-                </p>
-                <div id="chromosome-task-tracks" class="chromosome-task-tracks"></div>
-                <div class="task-legend">
-                    <span><i class="end-marker not-targeted"></i> <span data-i18n-en="Not targeted" data-i18n-zh="未选择">Not targeted</span></span>
-                    <span><i class="end-marker targeted"></i> <span data-i18n-en="Targeted" data-i18n-zh="已选择">Targeted</span></span>
-                    <span><i class="end-marker connected"></i> <span data-i18n-en="Connected" data-i18n-zh="已连接">Connected</span></span>
-                    <span><i class="end-marker failed"></i> <span data-i18n-en="Failed" data-i18n-zh="延伸失败">Failed</span></span>
-                </div>
-            </div>
-        </div>
-
         {final_motif_html}
+
+        <!-- Secondary details folded -->
+        <div class="fold-panel">
+            <details class="fold">
+                <summary><span class="fold-title" data-i18n-en="Initial Chromosome-End Manual Review" data-i18n-zh="初始染色体末端人工检查">Initial Chromosome-End Manual Review</span></summary>
+                <div class="fold-body">
+                    {initial_review_html}
+                    <div class="table-container">
+                        <table id="initial-review-table">
+                            <thead>
+                                <tr>
+                                    <th>Chromosome</th>
+                                    <th>End</th>
+                                    <th>Sequence Length</th>
+                                    <th data-i18n-en="Selected Target" data-i18n-zh="人工选择目标">Selected Target</th>
+                                    <th data-i18n-en="Review Evidence" data-i18n-zh="检查证据">Review Evidence</th>
+                                </tr>
+                            </thead>
+                            <tbody id="initial-review-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
+            <details class="fold">
+                <summary><span class="fold-title" data-i18n-en="Target Ends &amp; Extracted Reads Files" data-i18n-zh="目标端点与提取的 Reads 文件">Target Ends &amp; Extracted Reads Files</span></summary>
+                <div class="fold-body">
+                    <div id="need-extension-list" class="mono" style="font-size:0.84rem;margin-bottom:10px;">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                    <ul style="margin:0;padding-left:18px;color:var(--ink-muted);font-size:0.83rem;" data-i18n-wrapper="file-list">
+                        {"".join(f"<li>{esc(f)}</li>" for f in telo_reads_stats.get('files', [])) if telo_reads_stats.get('files') else "<li data-i18n-en='No files found' data-i18n-zh='未找到文件'>No files found</li>"}
+                    </ul>
+                </div>
+            </details>
+        </div>
     </div>
 
     <script>

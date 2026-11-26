@@ -67,7 +67,8 @@ def prepare_context(base, overlap_contract):
         tools[name] = {"path": path, "sha256": content_hash(path) if path else None}
     code_files = ["FamilyGap.py", "ExtensionFamilies.py", "FamilyOverlap.py", "FamilyRound.py", "FamilyTools.py",
                   "FindExtensionReads.py", "FindExtensionContigs.py", "GapFillerClass.py", "ONTAssemblyReads.py", "JunctionRepair.py",
-                  "PreparedReads.py", "FamilyResult.py", "ReportStyle.py"]
+                  "PreparedReads.py", "FamilyResult.py", "FamilyReport.py", "FamilyReportStyle.py",
+                  "JunctionReport.py", "ReportStyle.py"]
     return {
         "driver": "family-gap-v1", "files": files, "tools": tools, "overlap": overlap_contract,
         "code": {name: content_hash(Path(__file__).parent / name) for name in code_files},

@@ -374,11 +374,10 @@ def _reason_cell_html(reason: Any, *, not_checked: bool = False) -> str:
     code = reason.strip()
     info = REASON_INFO.get(code)
     if info:
-        tone, en_label, zh_label, en_desc, zh_desc = info
+        tone, en_label, zh_label, en_desc, _zh_desc = info
         return (
-            f'<span class="badge badge-{tone}">{_bilingual(en_label, zh_label)}</span>'
+            f'<span class="badge badge-{tone}" title="{esc(en_desc)}">{_bilingual(en_label, zh_label)}</span>'
             f'<div class="tel-reason-code"><code>{esc(code)}</code></div>'
-            f'<div class="tel-reason-desc">{_bilingual(en_desc, zh_desc)}</div>'
         )
     return f'<span class="badge badge-info"><code>{esc(code)}</code></span>'
 
@@ -537,13 +536,30 @@ def _render_policy_and_invariants_html(
     batches_html = _fmt_int_html(primary_diag, "alignment_batches")
 
     return (
-        '<div class="notice">'
-        "<p>"
+        '<details class="tel-details">'
+        '<summary>'
+        + _bilingual("Search Policy, Scope & Invariants", "检索策略、范围与口径说明")
+        + '</summary>'
+        '<div class="tel-details-body">'
+        '<div class="tel-meta-grid">'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Search Strategy", "检索策略")}</div><div class="tel-meta-val">{strategy_html}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Candidate Cap", "候选上限")}</div><div class="tel-meta-val">{_fmt_candidate_cap_html(primary_diag)}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Alignment Batches", "比对批次数")}</div><div class="tel-meta-val">{batches_html}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Global Target Grouping", "全局目标分组")}</div><div class="tel-meta-val">{_fmt_bool_html(primary_diag, "global_grouping")}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Telomeric-Read Extension", "端粒 Read 延伸")}</div><div class="tel-meta-val">{_fmt_bool_html(primary_diag, "target_extension")}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Current Chr-Side Seq Retained (Final Join)", "最终拼接保留当前染色体侧序列")}</div><div class="tel-meta-val">{_fmt_bool_html(primary_diag, "chromosome_sequence_retained")}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Corroboration Policy", "佐证策略阈值")}</div><div class="tel-meta-val">{policy_summary_html}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Chr-Side Assembly Growth (Excl. Tel-Read Tail)", "染色体侧组装延伸（不含端粒 Read 尾）")}</div><div class="tel-meta-val">{chr_growth_html}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Selected Tel-Read Tail", "入选端粒 Read 尾长")}</div><div class="tel-meta-val">{tail_html}</div></div>'
+        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Outward Junction Span Tested", "实测向外接合区跨度")}</div><div class="tel-meta-val">{junction_html}</div></div>'
+        '</div>'
+        '<div class="tel-scope-block">'
+        '<p class="tel-scope-note">'
         + _bilingual(
             "Single-ended large-pool telomere search: one chromosome extension family queries a shared exact sampled-seed index (admissibility filter), validates ALL retrieved records across bounded-batch MUMmer comparisons (256 records / 8 MiB per batch; batching is not a candidate cap), and deterministically selects the best corroborated candidate (not first hit).",
             "单端大池端粒检索：单条染色体延伸家族使用共享精确采样种子索引（准入过滤），将全部检索命中的记录按有界批次（每批 256 条记录 / 8 MiB；分批并非候选上限）送入批量 MUMmer 验证，并按确定性排序选择最优获佐证候选（而非首个命中）。",
         )
-        + "</p>"
+        + '</p>'
         '<p class="tel-scope-note">'
         + _bilingual(
             "Corroboration scope & limits: read corroboration checks at least ",
@@ -563,26 +579,14 @@ def _render_policy_and_invariants_html(
             " bp outward from the junction. Reported support counts are lower bounds (counting stops once minimum support is reached), not exact totals. It is NOT full-read polishing, NOT telomere-repeat-length consensus, and NOT guaranteed full-genome specificity.",
             " bp 处的一致性。报告的支持数仅为下界（达到最小支持即停止计数），不是精确总数；它并非全 read 抛光、并非端粒重复长度共识，也不保证全基因组唯一性。",
         )
-        + "</p>"
+        + '</p>'
         '<p class="tel-scope-note">'
         + _bilingual(
             "Final-join retention & length separation: chromosome_sequence_retained means the current chromosome-side sequence is retained at the FINAL JOIN — it does NOT guarantee that earlier extension/assembly rounds preserved the initial flank unchanged. Chromosome-side assembly growth (total_extension_length) excludes the final telomeric-read tail; selected tel-read tail length (selected_tail_bases) is reported separately from tested outward junction span (junction_bases_tested).",
             "最终拼接保留与长度区分：chromosome_sequence_retained 仅表示在最终拼接（FINAL JOIN）处保留当前染色体侧序列，并不保证此前各轮延伸/组装完整保留了初始侧翼序列。染色体侧组装延伸长度（total_extension_length）不含最终拼接的端粒 read 尾段；入选端粒 read 尾长（selected_tail_bases）与实测向外接合区跨度（junction_bases_tested）分别独立展示。",
         )
-        + "</p>"
-        "</div>"
-        '<div class="tel-meta-grid">'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Search Strategy", "检索策略")}</div><div class="tel-meta-val">{strategy_html}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Candidate Cap", "候选上限")}</div><div class="tel-meta-val">{_fmt_candidate_cap_html(primary_diag)}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Alignment Batches", "比对批次数")}</div><div class="tel-meta-val">{batches_html}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Global Target Grouping", "全局目标分组")}</div><div class="tel-meta-val">{_fmt_bool_html(primary_diag, "global_grouping")}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Telomeric-Read Extension", "端粒 Read 延伸")}</div><div class="tel-meta-val">{_fmt_bool_html(primary_diag, "target_extension")}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Current Chr-Side Seq Retained (Final Join)", "最终拼接保留当前染色体侧序列")}</div><div class="tel-meta-val">{_fmt_bool_html(primary_diag, "chromosome_sequence_retained")}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Corroboration Policy", "佐证策略阈值")}</div><div class="tel-meta-val">{policy_summary_html}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Chr-Side Assembly Growth (Excl. Tel-Read Tail)", "染色体侧组装延伸（不含端粒 Read 尾）")}</div><div class="tel-meta-val">{chr_growth_html}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Selected Tel-Read Tail", "入选端粒 Read 尾长")}</div><div class="tel-meta-val">{tail_html}</div></div>'
-        f'<div class="tel-meta-item"><div class="tel-meta-label">{_bilingual("Outward Junction Span Tested", "实测向外接合区跨度")}</div><div class="tel-meta-val">{junction_html}</div></div>'
-        "</div>"
+        + '</p>'
+        '</div></div></details>'
     )
 
 
@@ -839,9 +843,9 @@ def render_target_search_section(data: Dict[str, Any], output_dir: Path) -> str:
     return (
         '<div class="section tel-evidence-section">'
         f'<div class="section-title">{_bilingual("Telomere Target Search & Corroboration Evidence", "端粒目标检索与佐证证据")}</div>'
-        f"{policy_html}"
         f"{table_html}"
         f"{details_html}"
+        f"{policy_html}"
         "</div>"
     )
 
@@ -849,24 +853,25 @@ def render_target_search_section(data: Dict[str, Any], output_dir: Path) -> str:
 def telomere_report_css() -> str:
     """Return restrained CSS additions using existing ReportStyle custom properties."""
     return """
-.tel-scope-note { margin-top: 6px; font-size: 0.84rem; color: var(--ink-secondary); }
-.tel-meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 0 0 16px 0; }
-.tel-meta-item { background: var(--surface-subtle); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px; min-width: 0; }
-.tel-meta-label { font-size: 0.74rem; font-weight: 600; color: var(--ink-muted); margin-bottom: 3px; }
-.tel-meta-val { font-size: 0.84rem; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
-.tel-reason-code { margin-top: 4px; font-size: 0.76rem; }
-.tel-reason-desc { margin-top: 3px; font-size: 0.78rem; color: var(--ink-muted); max-width: 260px; }
-.tel-subline { margin-top: 3px; font-size: 0.78rem; color: var(--ink-secondary); }
+.tel-scope-block { margin-top: 8px; }
+.tel-scope-note { margin: 4px 0 0; font-size: 0.8rem; color: var(--ink-muted); line-height: 1.5; }
+.tel-meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin: 0 0 8px 0; }
+.tel-meta-item { border-left: 2px solid var(--border); padding: 4px 10px; min-width: 0; }
+.tel-meta-label { font-size: 0.74rem; font-weight: 500; color: var(--ink-muted); margin-bottom: 2px; }
+.tel-meta-val { font-size: 0.83rem; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.tel-reason-code { margin-top: 3px; font-size: 0.74rem; }
+.tel-subline { margin-top: 2px; font-size: 0.77rem; color: var(--ink-secondary); }
 .tel-chip-list { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.tel-chip { display: inline-block; padding: 2px 7px; font-size: 0.75rem; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 4px; color: var(--ink-secondary); }
-.tel-ev-links { display: flex; flex-wrap: wrap; gap: 6px; }
-.tel-ev-link { display: inline-block; padding: 2px 8px; font-size: 0.78rem; background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 4px; color: var(--accent); white-space: nowrap; }
-.tel-ev-link:hover { background: var(--surface-subtle); text-decoration: none; }
-.tel-details { margin-top: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
-.tel-details > summary { cursor: pointer; padding: 10px 14px; font-size: 0.86rem; font-weight: 600; color: var(--ink-secondary); background: var(--surface-subtle); list-style-position: inside; }
-.tel-details-body { padding: 12px 14px; display: grid; gap: 14px; }
-.tel-detail-head { font-size: 0.85rem; margin-bottom: 6px; }
-.tel-detail-meta { font-size: 0.82rem; margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.tel-subtable { font-size: 0.82rem; }
-.tel-truncated { font-size: 0.78rem; margin: 6px 0 0 0; }
+.tel-chip { display: inline-block; padding: 1px 6px; font-size: 0.74rem; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 3px; color: var(--ink-secondary); }
+.tel-ev-links { display: flex; flex-wrap: wrap; gap: 5px; }
+.tel-ev-link { display: inline-block; padding: 2px 7px; font-size: 0.77rem; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: 3px; color: var(--accent); white-space: nowrap; }
+.tel-ev-link:hover { background: var(--accent-soft); border-color: var(--accent-border); text-decoration: none; }
+.tel-details { margin-top: 10px; border-top: 1px solid var(--border); }
+.tel-details > summary { cursor: pointer; padding: 9px 0; font-size: 0.84rem; font-weight: 600; color: var(--ink-secondary); list-style-position: inside; }
+.tel-details > summary:hover { color: var(--ink); }
+.tel-details-body { padding: 4px 0 10px; display: grid; gap: 10px; }
+.tel-detail-head { font-size: 0.84rem; margin-bottom: 5px; }
+.tel-detail-meta { font-size: 0.8rem; margin-bottom: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tel-subtable { font-size: 0.81rem; }
+.tel-truncated { font-size: 0.77rem; margin: 4px 0 0 0; }
 """
