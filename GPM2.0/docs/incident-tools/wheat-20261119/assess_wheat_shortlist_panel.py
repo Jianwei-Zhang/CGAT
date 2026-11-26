@@ -7,12 +7,15 @@ from collections import Counter,defaultdict
 from hashlib import sha256
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import sys
 
 from bound_regional_scope_from_native_receipts import LOOKUP_SHA
 from lgz_core.q0_alignments import parse_paf_line
 from lgz_core.q0_paths import PathGraph,PairLink,search_request_path
-from lgz_core.q0_sources import SourceKey
+from lgz_core.q0_sources import SourceKey,Interval
+from lgz_core.q0_threshold_questions import questions
+from lgz_core.q0_threshold_acceptance import record as encode_request
 from measure_wheat_junction_bound import frozen
 from probe_wheat_native_pair_scope import checked
 from wheat_selection_checkpoint import decode,need
@@ -32,17 +35,30 @@ def read_arm(path,pin,queries,keep,lookup,pairs,reduced):
     need(h.hexdigest()==pin,'PAF content changed'); return counts,common,by_pair
 
 
-def calls(placements,links,left,right):
+def calls(placements,links,left,right,lookup):
     g=PathGraph(placements,links,(),first_request=True); l,r=g.placements[left],g.placements[right]
     def source_cuts(j):
         # At an overlap the oriented left-end/right-start are between-base coordinates.
         cut=lambda p,x:p.interval.start+x if p.orientation=='+' else p.interval.end-x
         return [j.kind,cut(l,j.left_end),cut(r,j.right_start)]
     choices=[source_cuts(j) for j in g.joins(left,right)]
-    path=search_request_path(g).path
+    search=search_request_path(g);path=search.path
     win=None if path is None else dict(slices=[[s.source.dataset,s.source.contig,s.orientation,s.interval.start,s.interval.end] for s in path.slices],
                                      joins=[x.kind for x in path.joins])
-    return choices,win
+    # A matched pair may only have inherited placements from a third (absent) reference seed.
+    # In that case the ordinary question consumer cannot certify a request from this subgraph.
+    c=l.chromosome; request={'assessable':False,'reason':'external_reference_root'}
+    if any(p.localization_kind=='reference' for p in placements):
+        parts={p.segment_id:SimpleNamespace(segment_id=p.segment_id,source=p.source,interval=Interval(0,lookup[p.segment_id]['length'])) for p in placements}
+        assigned=[dict(dataset_name=v.source.dataset,seq_name=v.source.contig,assigned_chr_name=c) for k,v in parts.items() if c in lookup[k]['original_assigned_chromosomes']]
+        data=SimpleNamespace(parts=parts,sources={v.source for v in parts.values()},reference_lengths={c:True},pair_links=links)
+        req,counts=questions(data,SimpleNamespace(admission=SimpleNamespace(placements=placements),paths={c:search}),assigned)
+        request=dict(assessable=True,intervals=encode_request(req),counts=counts)
+    return choices,win,request
+
+
+def both_requests(by):
+    return all(v['next_request']['assessable'] for v in by.values())
 
 
 def assess(folder,result,lookup_path,owner):
@@ -60,8 +76,8 @@ def assess(folder,result,lookup_path,owner):
         c=row['chromosome'];q=row['q'];t=row['t'];j=selected[row['join']];ps=[*parts[c,q],*parts[c,t]];baseline=[row['kind'],row['left_cut'],row['right_cut']];by={}
         for k,(_,_,links) in arms.items():
             rel=[*links[frozenset([q,t])],*links[frozenset([q])],*links[frozenset([t])]]
-            choices,win=calls(ps,rel,j.left_id,j.right_id);by[k]=dict(pair_rows=len(links[frozenset([q,t])]),cuts=choices,selected=win,reproduces_frozen_cut=baseline in choices)
-        rows.append(dict(stratum=row['stratum'],chromosome=c,join=row['join'],old=baseline,full=by['full'],reduced=by['reduced'],same_cuts=sorted(by['full']['cuts'])==sorted(by['reduced']['cuts']),same_local_path=by['full']['selected']==by['reduced']['selected']))
+            choices,win,req=calls(ps,rel,j.left_id,j.right_id,lookup);by[k]=dict(next_request=req,pair_rows=len(links[frozenset([q,t])]),cuts=choices,selected=win,reproduces_frozen_cut=baseline in choices)
+        rows.append(dict(stratum=row['stratum'],chromosome=c,join=row['join'],old=baseline,full=by['full'],reduced=by['reduced'],same_cuts=sorted(by['full']['cuts'])==sorted(by['reduced']['cuts']),same_local_path=by['full']['selected']==by['reduced']['selected'],same_local_request=(by['full']['next_request']['intervals']==by['reduced']['next_request']['intervals'] if both_requests(by) else None)))
     fc,fg,_=arms['full'];sc,sg,_=arms['reduced'];return dict(schema='wheat_shortlist_paired_geometry_v1',mapping=record,panel=record['panel'],full_rows=fc,reduced_rows=sc,retained_geometry_shared=sum((fg&sg).values()),retained_geometry_only_full=sum((fg-sg).values()),retained_geometry_only_reduced=sum((sg-fg).values()),cases=rows,formal_q0=False,limits='Identical frozen placements for the two sources; each arm uses only its own native PAF. Not full-input re-admission, not the next whole-wheat request, not a test of the two retired parents.')
 
 if __name__=='__main__':

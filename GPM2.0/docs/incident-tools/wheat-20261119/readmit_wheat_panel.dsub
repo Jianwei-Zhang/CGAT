@@ -1,0 +1,19 @@
+#!/bin/bash
+#DSUB -n jm19_q0_panel_fresh
+#DSUB -q x86
+#DSUB -nl agent-X86-44
+#DSUB -aa
+#DSUB -D "43065579=SUCCEEDED"
+#DSUB -R "cpu=8,mem=49152MB"
+#DSUB -o fresh_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c kit.sha256
+exec 9>fresh.lock; flock -n 9
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+b=$(dirname "$PWD");stage="$b/q0-panel-common-20261126.VrHi3wTs";mapped="$b/q0-shortlist-panel-20261126.GgIkTAZM"
+printf '%s  %s\n' b5d5a06289ee8f6602724bb5cc97e65358eebc6805ed00305b18bd6c01616f49 "$stage/common.json" | sha256sum --quiet -c -
+code=$(mktemp -d /tmp/wheat-panel-fresh.XXXXXXXX);trap 'rm -rf -- "$code"' EXIT
+tar -xzf tools.tgz -C "$code";export PYTHONPATH="$code/GPM2.0/server/tools:$PWD" PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+python3 -Bu readmit_wheat_panel.py "$stage" "$mapped"
+sha256sum readmission.json

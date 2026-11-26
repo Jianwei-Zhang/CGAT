@@ -10,7 +10,7 @@ from lgz_core.q0_paths import Placement,ReferenceAnchor,PathGraph,PairLink,PathP
 from lgz_core.q0_alignments import parse_paf_line
 from lgz_core.q0_junction_review import possible_window
 from screen_wheat_junction_flanks import screen_all,maybe_old_cut
-from assess_wheat_shortlist_panel import read_arm
+from assess_wheat_shortlist_panel import read_arm,calls
 
 
 def p(k,start,stop,orientation='+'):
@@ -31,6 +31,13 @@ class Targeted(unittest.TestCase):
         self.assertEqual(screen_all(cases,[hit],['chr'])['eligible_upper'],1)
         witness=PairLink(parse_paf_line(paf(alt,right,300,400,0,100),artifact='b',line_number=1),alt.source,right.source)
         self.assertEqual(screen_all(cases,[hit,witness],['chr'])['eligible_upper'],0)
+
+    def test_cut_on_real_paf_and_threshold_request_use_only_this_arm(self):
+        a,b=p('q',0,300),p('t',200,500);z=PairLink(parse_paf_line(paf(a,b,200,300,0,100),artifact='arm',line_number=1),a.source,b.source)
+        lookup={k:dict(length=300,original_assigned_chromosomes=['chr']) for k in ('q','t')}
+        full,_,fullreq=calls([a,b],[z],'q','t',lookup);other,_,req=calls([a,b],[],'q','t',lookup)
+        self.assertIn(['sequence_overlap',250,50],full);self.assertFalse(other)
+        self.assertTrue(fullreq['assessable'] and req['assessable'])
 
     def test_screen_strand_and_wrong_arm_inventory(self):
         a,b=p('q',0,300),p('t',200,500);raw=paf(a,b,200,300,0,100).encode();lookup={k:dict(length=300,contig=k,dataset='ds') for k in ('q','t')}

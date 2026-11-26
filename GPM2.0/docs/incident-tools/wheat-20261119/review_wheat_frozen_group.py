@@ -59,18 +59,21 @@ def genome_subset(root,snap,parts,targets):
 
 def run(base,owner,stage,chrom,workers):
     global PARTSET,RANKS,NAMES,BYID
-    start=monotonic();prior=base/'q0-whole-updated.We9jf3UC';summary,detail,positions,paths=frozen(prior/'selection',prior/'result'); screen=chrom=='all-screen'; cases=[]; placements=[]
+    start=monotonic();prior=base/'q0-whole-updated.We9jf3UC';summary,detail,positions,paths=frozen(prior/'selection',prior/'result'); screen=chrom=='all-screen'; panel_stage=chrom=='panel-stage'; cases=[]; placements=[]
     if screen:
         def candidate(group,pid,alt,sides):cases.append((group,pid,alt,sides))
         bound=measure(prior/'selection',prior/'result',on_candidate=candidate,checkpoints=(summary,detail,positions,paths))
         need(bound['eligible_local_windows_upper']==24,'foreign candidate bound')
         placements=list({p.placement_id:p for _,_,_,sides in cases for l,r,_,_ in sides for p in (l,r)}.values())
+    elif panel_stage:
+        from readmit_wheat_panel import neighborhood
+        hood=neighborhood(owner);needed_parts={k for r in hood['cases'] for k in r['parts']}
     else:
         expected=next(p for p in paths if p.chromosome==chrom)
         with (prior/'selection/admission.jsonl').open('rb') as f:
             for pos in positions[chrom]:f.seek(pos);placements.append(decode(json.loads(f.readline())))
     snap,old.ROOT,old.PARTS,order,lens=old.bind(base/'q0-latest-fork-20261123-1435/control/snapshot.json',base/'q0-source-part-lookup-20261121-1600/source-part-lookup.json')
-    PARTSET={p.segment_id for p in placements};RANKS={old.PARTS[k][0] for k in PARTSET};BYID={k:order[v[0]] for k,v in old.PARTS.items()};NAMES=defaultdict(dict)
+    PARTSET=needed_parts if panel_stage else {p.segment_id for p in placements};RANKS={old.PARTS[k][0] for k in PARTSET};BYID={k:order[v[0]] for k,v in old.PARTS.items()};NAMES=defaultdict(dict)
     for k in PARTSET:
         s=BYID[k];NAMES[s.dataset][s.contig.encode()]=s;NAMES[None][k.encode()]=s
     inv={r['path']:r for r in snap['files']};old.STAGE=stage;m=Path(mapping.__file__).parent;old.PROJECTOR=sha256_file(m/'q0_query_windows.py');old.VALIDATOR=sha256_file(m/'q0_alignments.py');old.MEMBERS={k:v[1:] for k,v in old.PARTS.items()};old.TOOL=old.prep.executable_identity('minimap2');need(old.TOOL['sha256']=='cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3','foreign native executable')
@@ -120,6 +123,9 @@ def run(base,owner,stage,chrom,workers):
             with path.open('rb') as f:
                 for line in f:
                     number,raw=line.split(b'\t',1);hit=_checked_line(raw.decode(),path,rel,int(number),prefix,names[qd],names[td],cache);yield PairLink(hit,NAMES[qd][hit.query_name.encode()],NAMES[td][hit.target_name.encode()])
+    if panel_stage:
+        from readmit_wheat_panel import prepare
+        prepare(owner,snap,old.ROOT,orig,regional,spools,NAMES,hood);log('PANEL_COMMON_READY',len(PARTSET));return
     if screen:
         from screen_wheat_junction_flanks import screen_all
         doc=screen_all(cases,links(),[p.chromosome for p in paths]);doc.update(selection=summary['selection_chain'],questions=summary['questions'],regional_cohort=eligible,referenced_regional=len(regional),elapsed_s=round(monotonic()-start,2),published_q0=False)
