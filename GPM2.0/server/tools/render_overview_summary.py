@@ -6,10 +6,12 @@ import math
 
 try:
     from render_final_story import _select_version
+    from render_path_story import zoom_button
     from render_refinement_report import bi, esc, fmt_bp_short
     from report_gap_story import NAMES, tool_order
 except ModuleNotFoundError:
     from .render_final_story import _select_version
+    from .render_path_story import zoom_button
     from .render_refinement_report import bi, esc, fmt_bp_short
     from .report_gap_story import NAMES, tool_order
 
@@ -972,15 +974,18 @@ def overview_summary_card(vm):
         )
         gcls = "ov-chr-gap is-zero" if cgaps == 0 else "ov-chr-gap"
         return (
-            f'<div class="ov-chr-row" data-ov-chr="{esc(cname)}">'
-            f'<div class="ov-chr-meta">'
+            f'<details class="ov-chr-row" data-ov-chr="{esc(cname)}">'
+            f'<summary>'
+            f'<span class="ov-chr-meta">'
             f'<strong class="ov-chr-name" title="{esc(cname)}">{esc(cname)}</strong>'
             f'<span class="ov-chr-stats">'
             f'<small class="ov-chr-len" data-ov-len>{esc(fmt_bp_short(clen))}</small>'
             f'<small class="{gcls}" data-ov-gap>{cgaps}G</small>'
-            f"</span></div>"
-            f'<div class="ov-rail" data-ov-rail>{rail}</div>'
-            f"</div>"
+            f"</span></span>"
+            f'<span class="ov-rail" data-ov-rail>{rail}</span>'
+            f"</summary>"
+            f'<div class="ov-chr-detail" data-ov-detail></div>'
+            f"</details>"
         )
 
     if active_stage["rows"] and chr_order:
@@ -993,18 +998,25 @@ def overview_summary_card(vm):
                 + "".join(_chr_row_html(c) for c in extra_chrs)
                 + "</details>"
             )
-        p1_tracks = f'<div class="ov-track-frame">{ruler}<div class="ov-track-list">{rows_html}</div></div>'
+        zbtn = zoom_button("总览 · 阶段演化放大视图", "Overview · Stage Evolution Zoom")
+        p1_tracks = f'<div class="ov-track-frame" data-zoom-frame="1">{ruler}<div class="ov-track-list">{rows_html}</div>{zbtn}</div>'
     else:
         p1_tracks = '<p class="muted" style="margin:.4rem 0">' + bi("当前摘要未附带分阶段片段坐标。", "Per-stage segment coordinates were not recorded.") + "</p>"
 
     stage_payload = {
         "domain": domain,
+        "active": default_key,
+        "order": [st["key"] for st in stages if st["rows"]],
         "stages": {
             st["key"]: {
+                "tag": st["tag"],
+                "zh": st["zh"],
+                "en": st["en"],
                 "href": st["href"],
                 "jump_zh": st["jump_zh"],
                 "jump_en": st["jump_en"],
                 "show_tel": st["show_tel"],
+                "is_final": st["is_final"],
                 "rows": {
                     cname: {"l": fmt_bp_short(r["len"]), "g": r["gaps"], "s": r["segs"]}
                     for cname, r in (st["rows"] or {}).items()
@@ -1085,19 +1097,36 @@ STYLE = """<style>
 .ov-step.is-active .ov-step-sub{color:var(--text-secondary)}
 .ov-step-arr{display:inline-flex;align-items:center;color:var(--border-strong);font-size:.88rem;user-select:none;padding:0 1px;opacity:.7}
 .ov-tel-swatch{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand);border:1.5px solid var(--surface-panel);box-shadow:0 0 0 1px var(--brand)}
-.ov-track-frame{border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden}
-.ov-axis,.ov-chr-row{display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;gap:.75rem}
+.ov-track-frame{position:relative;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden;padding-bottom:2.3rem}
+.ov-axis,.ov-chr-row>summary,.ov-stage-row{display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;gap:.75rem}
 .ov-axis{padding:.42rem .85rem .36rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.76rem;font-weight:600}
 .ov-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.73rem}
-.ov-chr-row{padding:.32rem .85rem;border-bottom:1px solid var(--border-subtle);transition:background .1s}
+.ov-chr-row{border-bottom:1px solid var(--border-subtle)}
 .ov-chr-row:last-child{border-bottom:0}
-.ov-chr-row:hover{background:var(--surface-subtle)}
-.ov-chr-meta{display:flex;align-items:baseline;justify-content:space-between;gap:.35rem;min-width:0}
-.ov-chr-name{font:600 .81rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ov-chr-stats{display:inline-flex;align-items:baseline;gap:.32rem;flex-shrink:0;font-variant-numeric:tabular-nums}
+.ov-chr-row>summary{cursor:pointer;list-style:none;padding:.34rem .85rem;min-height:2.05rem;transition:background .1s}
+.ov-chr-row>summary::-webkit-details-marker{display:none}
+.ov-chr-row>summary:hover,.ov-chr-row[open]>summary{background:var(--surface-subtle)}
+.ov-chr-meta{display:flex;align-items:baseline;justify-content:space-between;gap:.32rem;min-width:0}
+.ov-chr-name{display:inline-flex;align-items:center;gap:.32rem;font:600 .81rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-chr-name::before{content:'▸';font-size:10px;color:var(--text-muted);flex-shrink:0}
+.ov-chr-row[open]>summary .ov-chr-name::before{content:'▾'}
+.ov-chr-stats{display:inline-flex;align-items:baseline;gap:.3rem;flex-shrink:0;font-variant-numeric:tabular-nums}
 .ov-chr-len{font-size:.72rem;color:var(--text-muted)}
 .ov-chr-gap{font:600 .69rem/1.2 var(--font-mono);padding:.02rem .28rem;border-radius:3px;background:var(--surface-muted);color:var(--text-secondary)}
 .ov-chr-gap.is-zero{background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
+.ov-chr-detail{padding:.38rem .85rem .5rem;border-top:1px dashed var(--border-subtle);background:var(--surface-subtle)}
+.ov-chr-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.32rem .75rem;margin:0 0 .35rem;padding-left:.85rem;font-size:.75rem;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.ov-chr-summary b{color:var(--text-primary);font-weight:600}
+.ov-chr-summary .is-ok{color:var(--gen-closed);font-weight:600}
+.ov-stage-row{min-height:1.48rem;padding:.08rem 0;border-radius:3px}
+.ov-stage-row.is-current{background:var(--brand-soft)}
+.ov-stage-row.is-current.is-final{background:var(--tone-ok-bg)}
+.ov-stage-lbl{display:flex;align-items:center;justify-content:space-between;gap:.32rem;padding-left:.85rem;padding-right:.15rem;min-width:0;font-size:.74rem;color:var(--text-secondary)}
+.ov-stage-lbl-l{display:inline-flex;align-items:center;gap:.3rem;min-width:0;overflow:hidden}
+.ov-stage-lbl-tag{display:inline-flex;align-items:center;padding:.02rem .28rem;border-radius:3px;background:var(--surface-panel);border:1px solid var(--border-subtle);font:650 .66rem/1.25 var(--font-mono);color:var(--text-secondary);flex-shrink:0}
+.ov-stage-row.is-current .ov-stage-lbl-tag{background:var(--brand);border-color:var(--brand);color:#fff}
+.ov-stage-row.is-current.is-final .ov-stage-lbl-tag{background:var(--gen-closed);border-color:var(--gen-closed);color:#fff}
+.ov-stage-lbl-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ov-rail{position:relative;display:block;height:18px;min-width:0;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);background-size:25% 100%}
 .ov-seg{position:absolute;top:3px;height:12px;border-radius:2px}
 .ov-seg.is-src{min-width:4px;box-shadow:inset 0 0 0 .6px rgba(255,255,255,.35)}
@@ -1111,6 +1140,23 @@ STYLE = """<style>
 .ov-more-chrs>summary{padding:.42rem .85rem;font-size:.78rem;font-weight:500;color:var(--accent);background:var(--surface-subtle);cursor:pointer;border-top:1px dashed var(--border-subtle);list-style:none}
 .ov-more-chrs>summary::-webkit-details-marker{display:none}
 .ov-more-chrs>summary:hover{background:var(--surface-hover)}
+.story-zoom-stage .ov-track-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--chart-scale, 1))}
+.story-zoom-stage .ov-axis,.story-zoom-stage .ov-chr-row>summary,.story-zoom-stage .ov-stage-row{grid-template-columns:196px minmax(0,1fr);gap:0;padding:0;align-items:stretch}
+.story-zoom-stage .ov-axis{position:sticky;top:0;z-index:8;background:var(--surface-subtle)}
+.story-zoom-stage .ov-axis>:first-child{position:sticky;left:0;z-index:9;background:var(--surface-subtle);padding:.52rem .7rem .42rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);display:flex;align-items:center}
+.story-zoom-stage .ov-axis .story-ruler{margin:.52rem 1rem .42rem .8rem;min-width:0}
+.story-zoom-stage .ov-chr-meta{position:sticky;left:0;z-index:5;background:var(--surface-panel);padding:.55rem .7rem .55rem 1rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12);align-items:center}
+.story-zoom-stage .ov-chr-row>summary:hover .ov-chr-meta,.story-zoom-stage .ov-chr-row[open]>summary .ov-chr-meta{background:var(--surface-subtle)}
+.story-zoom-stage .ov-chr-detail{padding:0}
+.story-zoom-stage .ov-chr-summary{position:sticky;left:0;width:fit-content;max-width:100%;margin:0;padding:.38rem 1rem .32rem 1.4rem;background:var(--surface-subtle)}
+.story-zoom-stage .ov-stage-lbl{position:sticky;left:0;z-index:5;background:var(--surface-subtle);padding:.26rem .7rem .26rem 1.4rem;border-right:1px solid var(--border-subtle);box-shadow:4px 0 8px -4px rgba(15,23,42,.12)}
+.story-zoom-stage .ov-stage-row.is-current .ov-stage-lbl{background:var(--brand-soft)}
+.story-zoom-stage .ov-stage-row.is-current.is-final .ov-stage-lbl{background:var(--tone-ok-bg)}
+.story-zoom-stage .ov-rail{margin:.42rem 1rem .42rem .8rem;height:22px;z-index:1}
+.story-zoom-stage .ov-chr-detail .ov-rail{margin:.2rem 1rem .2rem .8rem}
+.story-zoom-stage .ov-seg{top:3px;height:16px}
+.story-zoom-stage .ov-seg.is-src{min-width:6px}
+.story-zoom-stage .ov-seg.is-gap,.story-zoom-stage .ov-seg.is-patch{min-width:6px}
 .ov-charts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
 .ov-chart-card{display:flex;flex-direction:column;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle);padding:.68rem .85rem .58rem;min-width:0}
 .ov-chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin:0 0 .32rem}
@@ -1141,9 +1187,12 @@ STYLE = """<style>
   .ov-step{flex:1 1 110px}
 }
 @media (max-width:760px){
-  .ov-axis,.ov-chr-row{grid-template-columns:116px minmax(0,1fr);gap:.45rem;padding-left:.65rem;padding-right:.65rem}
+  .ov-axis,.ov-chr-row>summary,.ov-stage-row{grid-template-columns:116px minmax(0,1fr);gap:.45rem;padding-left:.65rem;padding-right:.65rem}
+  .ov-chr-detail{padding:.32rem .65rem .42rem}
+  .ov-chr-summary,.ov-stage-lbl{padding-left:.35rem}
   .ov-chr-name{font-size:.76rem}
   .ov-step-arr,.ov-bar-sep{display:none}
+  .story-zoom-stage .ov-axis,.story-zoom-stage .ov-chr-row>summary,.story-zoom-stage .ov-stage-row{grid-template-columns:136px minmax(0,1fr);gap:0;padding:0}
 }
 </style>"""
 
@@ -1152,9 +1201,9 @@ const card=document.getElementById('assembly-overview'),raw=document.getElementB
 if(!card||!raw)return;
 let data;try{data=JSON.parse(raw.textContent||'{}');}catch(_){return;}
 const btns=Array.from(card.querySelectorAll('[data-ov-stage]'));
-const rows=Array.from(card.querySelectorAll('[data-ov-chr]'));
 const jump=card.querySelector('[data-ov-jump]'),jumpLbl=card.querySelector('[data-ov-jump-lbl]');
 const domain=Math.max(1,Number(data.domain)||1);
+let activeKey=data.active||'';
 function mk(cls,left,width,bg,title){
   const el=document.createElement('span');
   el.className=cls;
@@ -1164,9 +1213,95 @@ function mk(cls,left,width,bg,title){
   if(title)el.title=title;
   return el;
 }
+function biEl(zh,en){
+  const f=document.createDocumentFragment();
+  const s1=document.createElement('span');s1.className='t-zh';s1.textContent=zh;
+  const s2=document.createElement('span');s2.className='t-en';s2.textContent=en;
+  f.append(s1,s2);return f;
+}
+function fillRail(rail,cname,info,showTel){
+  const frag=document.createDocumentFragment();
+  const segs=(info&&info.s)||[];
+  for(const seg of segs){
+    const a=seg[0],b=seg[1],c=seg[2],l=100*a/domain,w=100*(b-a)/domain;
+    if(c===9)frag.appendChild(mk('ov-seg is-gap',l,w));
+    else if(c===8)frag.appendChild(mk('ov-seg is-patch',l,w));
+    else frag.appendChild(mk('ov-seg is-src',l,w,'var(--ds-'+c+')'));
+  }
+  if(showTel){
+    const cens=(data.cen||{})[cname]||[];
+    for(const m of cens){frag.appendChild(mk('ov-cen',100*m[0]/domain,Math.max(0.35,100*(m[1]-m[0])/domain),null,'Candidate centromere'));}
+    const tp=(data.tel||{})[cname];
+    if(tp){
+      const endPct=segs.length?100*segs[segs.length-1][1]/domain:0;
+      const defs=[['5′',tp[0],0],['3′',tp[1],endPct]];
+      for(const d of defs){
+        const cls=d[1]===2?'ov-tel is-ext':(d[1]===1?'ov-tel is-ok':'ov-tel is-miss');
+        frag.appendChild(mk(cls,d[2],null,null,d[0]+' telomere'));
+      }
+    }
+  }
+  rail.replaceChildren(frag);
+}
+function renderDetail(detailsEl){
+  const box=detailsEl.querySelector('[data-ov-detail]');
+  if(!box)return;
+  const cname=detailsEl.dataset.ovChr,order=data.order||[],stages=data.stages||{};
+  const frag=document.createDocumentFragment();
+  const firstSt=order.length?stages[order[0]]:null,lastSt=order.length?stages[order[order.length-1]]:null;
+  const firstInfo=firstSt&&firstSt.rows?firstSt.rows[cname]:null;
+  const lastInfo=lastSt&&lastSt.rows?lastSt.rows[cname]:null;
+  const sum=document.createElement('div');sum.className='ov-chr-summary';
+  if(lastInfo){
+    const sLen=document.createElement('span');sLen.append(biEl('终长 ','Length '));
+    const bLen=document.createElement('b');bLen.textContent=lastInfo.l;sLen.append(bLen);sum.append(sLen);
+  }
+  if(firstInfo&&lastInfo){
+    const g0=firstInfo.g,gf=lastInfo.g,diff=gf-g0;
+    const sGap=document.createElement('span');sGap.textContent='Gap ';
+    const bGap=document.createElement('b');
+    bGap.textContent=g0===gf?String(gf):(g0+' → '+gf+(diff<0?' ('+diff+')':''));
+    if(diff<0||gf===0)bGap.className='is-ok';
+    sGap.append(bGap);sum.append(sGap);
+  }
+  const tp=(data.tel||{})[cname];
+  if(tp){
+    const sTel=document.createElement('span');sTel.append(biEl('端粒 ','Tel '));
+    const fmtEnd=(code,side)=>side+(code===2?' +✓':(code===1?' ✓':' ○'));
+    const bTel=document.createElement('b');bTel.textContent=fmtEnd(tp[0],'5′')+' / '+fmtEnd(tp[1],'3′');
+    if(tp[0]>0&&tp[1]>0)bTel.className='is-ok';
+    sTel.append(bTel);sum.append(sTel);
+  }
+  const cens=(data.cen||{})[cname];
+  if(cens&&cens.length){
+    const sCen=document.createElement('span');sCen.append(biEl('着丝粒候选 '+cens.length+' 处','Centromere '+cens.length));sum.append(sCen);
+  }
+  frag.append(sum);
+  for(const k of order){
+    const st=stages[k],info=st&&st.rows?st.rows[cname]:null;
+    if(!info)continue;
+    const row=document.createElement('div');
+    row.className='ov-stage-row'+(k===activeKey?' is-current':'')+(st.is_final?' is-final':'');
+    row.dataset.ovStageRow=k;
+    const lbl=document.createElement('div');lbl.className='ov-stage-lbl';
+    const left=document.createElement('span');left.className='ov-stage-lbl-l';
+    const tag=document.createElement('span');tag.className='ov-stage-lbl-tag';tag.textContent=st.tag||k;
+    const nm=document.createElement('span');nm.className='ov-stage-lbl-name';nm.append(biEl(st.zh||k,st.en||k));
+    left.append(tag,nm);
+    const gap=document.createElement('small');gap.className='ov-chr-gap'+(info.g===0?' is-zero':'');gap.textContent=String(info.g)+'G';
+    lbl.append(left,gap);
+    const rail=document.createElement('div');rail.className='ov-rail';
+    fillRail(rail,cname,info,!!st.show_tel);
+    row.append(lbl,rail);
+    frag.append(row);
+  }
+  box.replaceChildren(frag);
+  detailsEl.dataset.ovRendered='1';
+}
 function applyStage(key){
   const st=(data.stages||{})[key];
   if(!st)return;
+  activeKey=key;
   for(const b of btns){
     const on=b.dataset.ovStage===key;
     b.classList.toggle('is-active',on);
@@ -1178,36 +1313,21 @@ function applyStage(key){
     if(zh)zh.textContent=st.jump_zh||'';
     if(en)en.textContent=st.jump_en||'';
   }
-  for(const row of rows){
+  for(const row of card.querySelectorAll('[data-ov-chr]')){
     const cname=row.dataset.ovChr,info=(st.rows||{})[cname];
     if(!info)continue;
     const lenEl=row.querySelector('[data-ov-len]'),gapEl=row.querySelector('[data-ov-gap]'),rail=row.querySelector('[data-ov-rail]');
     if(lenEl)lenEl.textContent=info.l||'';
     if(gapEl){gapEl.textContent=String(info.g)+'G';gapEl.classList.toggle('is-zero',info.g===0);}
-    if(!rail)continue;
-    const frag=document.createDocumentFragment();
-    const segs=info.s||[];
-    for(const seg of segs){
-      const a=seg[0],b=seg[1],c=seg[2],l=100*a/domain,w=100*(b-a)/domain;
-      if(c===9)frag.appendChild(mk('ov-seg is-gap',l,w));
-      else if(c===8)frag.appendChild(mk('ov-seg is-patch',l,w));
-      else frag.appendChild(mk('ov-seg is-src',l,w,'var(--ds-'+c+')'));
+    if(rail)fillRail(rail,cname,info,!!st.show_tel);
+    for(const sr of row.querySelectorAll('[data-ov-stage-row]')){
+      sr.classList.toggle('is-current',sr.dataset.ovStageRow===key);
     }
-    if(st.show_tel){
-      const cens=(data.cen||{})[cname]||[];
-      for(const m of cens){frag.appendChild(mk('ov-cen',100*m[0]/domain,Math.max(0.35,100*(m[1]-m[0])/domain),null,'Candidate centromere'));}
-      const tp=(data.tel||{})[cname];
-      if(tp){
-        const endPct=segs.length?100*segs[segs.length-1][1]/domain:0;
-        const defs=[['5′',tp[0],0],['3′',tp[1],endPct]];
-        for(const d of defs){
-          const cls=d[1]===2?'ov-tel is-ext':(d[1]===1?'ov-tel is-ok':'ov-tel is-miss');
-          frag.appendChild(mk(cls,d[2],null,null,d[0]+' telomere'));
-        }
-      }
-    }
-    rail.replaceChildren(frag);
   }
 }
 for(const b of btns){b.addEventListener('click',()=>applyStage(b.dataset.ovStage));}
+document.addEventListener('toggle',e=>{
+  const d=e.target;
+  if(d&&d.matches&&d.matches('details.ov-chr-row[data-ov-chr]')&&d.open&&!d.dataset.ovRendered)renderDetail(d);
+},true);
 })();</script>"""

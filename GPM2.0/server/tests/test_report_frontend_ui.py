@@ -122,6 +122,8 @@ class ReportFrontendUITests(unittest.TestCase):
         self.assertIn('id="assembly-overview"', html)
         self.assertLess(html.index('id="assembly-overview"'), html.index('id="inputs"'))
         self.assertIn('id="ov-stage-data"', html)
+        self.assertIn('class="ov-track-frame" data-zoom-frame="1"', html)
+        self.assertIn('<details class="ov-chr-row"', html)
         self.assertIn('aria-label="Gap trajectory"', html)
         self.assertIn('aria-label="Completeness gauges"', html)
         self.assertIn('aria-label="Tool comparison"', html)
