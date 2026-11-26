@@ -1318,15 +1318,23 @@ def overview_summary_card(vm):
         head_bits.append("LGZ-only")
     head_right = f'<span class="ov-head-meta">{" · ".join(head_bits)}</span>'
 
-    # P1: Stepper + single-rail stage view (zoomable & expandable)
+    # P1: Stepper with animated flow connectors + single-rail stage view (zoomable & expandable)
+    active_idx = next((idx for idx, st in enumerate(stages) if st["key"] == default_key), len(stages) - 1)
+    active_is_final = bool(stages[active_idx]["is_final"]) if stages else False
     step_btns = []
     for i, st in enumerate(stages):
-        active = st["key"] == default_key
+        active = i == active_idx
+        done = i < active_idx
         has_rows = bool(st["rows"])
-        cls = "ov-step" + (" is-active" if active else "") + (" is-final" if st["is_final"] else "")
+        cls = (
+            "ov-step"
+            + (" is-active" if active else "")
+            + (" is-done" if done else "")
+            + (" is-final" if st["is_final"] else "")
+        )
         step_btns.append(
             f'<button type="button" class="{cls}" '
-            f'data-ov-stage="{esc(st["key"])}" aria-pressed="{"true" if active else "false"}"'
+            f'data-ov-stage="{esc(st["key"])}" data-ov-idx="{i}" aria-pressed="{"true" if active else "false"}"'
             f'{"" if has_rows else " disabled"}>'
             f'<span class="ov-step-top"><span class="ov-step-tag">{esc(st["tag"])}</span>'
             f'<span class="ov-step-name">{bi(st["zh"], st["en"])}</span></span>'
@@ -1334,7 +1342,16 @@ def overview_summary_card(vm):
             f"</button>"
         )
         if i + 1 < len(stages):
-            step_btns.append('<span class="ov-step-arr" aria-hidden="true">›</span>')
+            passed = i < active_idx
+            c_cls = "ov-step-conn" + (" is-passed" if passed else "") + (" is-final-flow" if (passed and active_is_final) else "")
+            step_btns.append(
+                f'<span class="{c_cls}" data-ov-conn="{i}" aria-hidden="true">'
+                '<svg viewBox="0 0 28 14" width="28" height="14" fill="none">'
+                '<line x1="1" y1="7" x2="21" y2="7" class="ov-conn-base"/>'
+                '<line x1="1" y1="7" x2="21" y2="7" class="ov-conn-flow"/>'
+                '<polyline points="17.5,3.2 22.5,7 17.5,10.8" class="ov-conn-head"/>'
+                "</svg></span>"
+            )
 
     active_stage = next((s for s in stages if s["key"] == default_key), stages[-1])
     jump_html = (
@@ -1474,19 +1491,36 @@ STYLE = """<style>
 .ov-bar-sep{display:inline-block;width:1px;height:12px;background:var(--border-default)}
 .ov-jump{font-size:var(--text-sm);font-weight:500;color:var(--accent);white-space:nowrap}
 .ov-jump:hover{text-decoration:underline}
-.ov-stepper{display:flex;align-items:stretch;gap:3px;padding:4px;margin:0 0 .6rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle)}
-.ov-step{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:.12rem;padding:.38rem .58rem;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);font-family:var(--font-sans);text-align:left;cursor:pointer;transition:background .12s,border-color .12s,box-shadow .12s}
-.ov-step:hover:not(:disabled):not(.is-active){background:var(--surface-hover);color:var(--text-primary)}
-.ov-step.is-active{border-color:var(--border-default);background:var(--surface-panel);color:var(--text-primary);box-shadow:0 1px 2px rgba(15,23,42,.06)}
-.ov-step:disabled{opacity:.58;cursor:default}
-.ov-step-top{display:flex;align-items:center;gap:.34rem;min-width:0}
-.ov-step-tag{display:inline-flex;align-items:center;padding:.03rem .32rem;border-radius:3px;background:var(--surface-muted);font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;line-height:1.25;color:var(--text-secondary);flex-shrink:0}
+.ov-stepper{display:flex;align-items:center;gap:0;padding:.45rem .5rem;margin:0 0 .65rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle)}
+.ov-step{position:relative;flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:.16rem;padding:.44rem .62rem;border:1px solid var(--border-subtle);border-radius:7px;background:var(--surface-panel);color:var(--text-secondary);font-family:var(--font-sans);text-align:left;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease,color .16s ease}
+.ov-step:hover:not(:disabled):not(.is-active){border-color:var(--border-default);background:var(--surface-panel);color:var(--text-primary);transform:translateY(-1px);box-shadow:0 2px 6px rgba(15,23,42,.06)}
+.ov-step.is-done{border-color:var(--tone-info-line);background:var(--surface-panel)}
+.ov-step.is-active{border-color:var(--brand);background:var(--surface-panel);color:var(--text-primary);transform:translateY(-1px);box-shadow:0 3px 10px -2px rgba(29,53,87,.18),0 0 0 2.5px var(--brand-soft)}
+.ov-step.is-active.is-final{border-color:var(--gen-closed);box-shadow:0 3px 10px -2px rgba(43,122,87,.22),0 0 0 2.5px var(--tone-ok-bg)}
+.ov-step.is-active::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2.5px;border-radius:2px 2px 0 0;background:var(--brand)}
+.ov-step.is-active.is-final::after{background:var(--gen-closed)}
+.ov-step:disabled{opacity:.55;cursor:default}
+.ov-step-top{display:flex;align-items:center;gap:.36rem;min-width:0}
+.ov-step-tag{display:inline-flex;align-items:center;padding:.04rem .36rem;border-radius:4px;background:var(--surface-muted);font-family:var(--font-mono);font-size:var(--text-xs);font-weight:650;line-height:1.25;color:var(--text-secondary);flex-shrink:0;transition:background .16s ease,color .16s ease}
+.ov-step.is-done .ov-step-tag{background:var(--brand-soft);color:var(--brand)}
 .ov-step.is-active .ov-step-tag{background:var(--brand);color:#fff}
 .ov-step.is-active.is-final .ov-step-tag{background:var(--gen-closed);color:#fff}
 .ov-step-name{font-size:var(--text-sm);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-step.is-active .ov-step-name{font-weight:700;color:var(--text-primary)}
 .ov-step-sub{font-size:var(--text-xs);color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ov-step.is-active .ov-step-sub{color:var(--text-secondary)}
-.ov-step-arr{display:inline-flex;align-items:center;color:var(--border-strong);font-size:var(--text-sub);user-select:none;padding:0 1px;opacity:.7}
+.ov-step.is-active .ov-step-sub{color:var(--text-secondary);font-weight:500}
+.ov-step-conn{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:28px;color:var(--border-strong);user-select:none}
+.ov-step-conn svg{display:block;overflow:visible}
+.ov-conn-base{stroke:var(--border-default);stroke-width:1.4;stroke-linecap:round;opacity:.55}
+.ov-conn-flow{stroke:var(--border-strong);stroke-width:1.6;stroke-linecap:round;stroke-dasharray:4 5;opacity:.55;animation:ov-flow 1.35s linear infinite}
+.ov-conn-head{stroke:var(--border-strong);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:stroke .16s ease,opacity .16s ease}
+.ov-step-conn.is-passed .ov-conn-base{stroke:var(--brand);opacity:.22}
+.ov-step-conn.is-passed .ov-conn-flow{stroke:var(--brand);stroke-width:1.8;opacity:.92;animation-duration:.9s}
+.ov-step-conn.is-passed .ov-conn-head{stroke:var(--brand);opacity:1}
+.ov-step-conn.is-passed.is-final-flow .ov-conn-base{stroke:var(--gen-closed)}
+.ov-step-conn.is-passed.is-final-flow .ov-conn-flow,.ov-step-conn.is-passed.is-final-flow .ov-conn-head{stroke:var(--gen-closed)}
+@keyframes ov-flow{from{stroke-dashoffset:18}to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.ov-conn-flow{animation:none}}
 .ov-tel-swatch{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand);border:1.5px solid var(--surface-panel);box-shadow:0 0 0 1px var(--brand)}
 .ov-track-frame{position:relative;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden;padding-bottom:2.3rem}
 .ov-axis,.ov-chr-row>summary,.ov-stage-row{display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;gap:.75rem}
@@ -1589,15 +1623,16 @@ STYLE = """<style>
 .ov-rt-table thead th{font-size:var(--text-xs)}
 @media (max-width:860px){
   .ov-charts-grid{grid-template-columns:1fr}
-  .ov-stepper{flex-wrap:wrap}
-  .ov-step{flex:1 1 110px}
+  .ov-stepper{flex-wrap:wrap;gap:.35rem}
+  .ov-step{flex:1 1 118px}
+  .ov-step-conn{display:none}
 }
 @media (max-width:760px){
   .ov-axis,.ov-chr-row>summary,.ov-stage-row{grid-template-columns:116px minmax(0,1fr);gap:.45rem;padding-left:.65rem;padding-right:.65rem}
   .ov-chr-detail{padding:.32rem .65rem .42rem}
   .ov-chr-summary,.ov-stage-lbl{padding-left:.35rem}
   .ov-chr-name{font-size:var(--text-xs)}
-  .ov-step-arr,.ov-bar-sep{display:none}
+  .ov-bar-sep{display:none}
   .story-zoom-stage .ov-axis,.story-zoom-stage .ov-chr-row>summary,.story-zoom-stage .ov-stage-row{grid-template-columns:136px minmax(0,1fr);gap:0;padding:0}
 }
 </style>"""
@@ -1607,6 +1642,7 @@ const card=document.getElementById('assembly-overview'),raw=document.getElementB
 if(!card||!raw)return;
 let data;try{data=JSON.parse(raw.textContent||'{}');}catch(_){return;}
 const btns=Array.from(card.querySelectorAll('[data-ov-stage]'));
+const conns=Array.from(card.querySelectorAll('[data-ov-conn]'));
 const jump=card.querySelector('[data-ov-jump]'),jumpLbl=card.querySelector('[data-ov-jump-lbl]');
 const domain=Math.max(1,Number(data.domain)||1);
 let activeKey=data.active||'';
@@ -1708,10 +1744,24 @@ function applyStage(key){
   const st=(data.stages||{})[key];
   if(!st)return;
   activeKey=key;
+  let activeIdx=-1;
   for(const b of btns){
-    const on=b.dataset.ovStage===key;
+    const idx=Number(b.dataset.ovIdx);
+    if(b.dataset.ovStage===key)activeIdx=idx;
+  }
+  const isFinalFlow=!!st.is_final;
+  for(const b of btns){
+    const idx=Number(b.dataset.ovIdx);
+    const on=idx===activeIdx;
     b.classList.toggle('is-active',on);
+    b.classList.toggle('is-done',activeIdx>=0&&idx<activeIdx);
     b.setAttribute('aria-pressed',on?'true':'false');
+  }
+  for(const c of conns){
+    const idx=Number(c.dataset.ovConn);
+    const passed=activeIdx>=0&&idx<activeIdx;
+    c.classList.toggle('is-passed',passed);
+    c.classList.toggle('is-final-flow',passed&&isFinalFlow);
   }
   if(jump&&st.href)jump.setAttribute('href',st.href);
   if(jumpLbl){
