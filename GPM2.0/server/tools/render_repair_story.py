@@ -62,7 +62,7 @@ html:has(#path-event-dialog[open]){overflow:hidden}
 .story-verdict.is-ok{border-left-color:var(--gen-closed);background:var(--tone-ok-bg)}
 .story-verdict.is-warn{border-left-color:var(--gen-patch);background:var(--tone-warn-bg)}
 .repair-zoom{display:block;width:100%;height:auto}
-.chart-zoom-btn{position:absolute;right:10px;bottom:8px;z-index:4;display:inline-flex;align-items:center;gap:.32rem;height:26px;padding:0 8px;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-secondary);font:500 .75rem/1 inherit;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.07);transition:border-color .12s,background .12s,color .12s}
+.chart-zoom-btn{position:absolute;right:10px;bottom:8px;z-index:4;display:inline-flex;align-items:center;gap:.32rem;height:26px;padding:0 8px;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-secondary);font-family:var(--font-sans);font-size:var(--text-xs);font-weight:500;line-height:1;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.07);transition:border-color .12s,background .12s,color .12s}
 .chart-zoom-btn:hover{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
 .story-zoom-bar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.65rem}
 .story-zoom-ctrl{display:inline-flex;align-items:center;gap:.3rem;font-size:.8rem}

@@ -1,4 +1,4 @@
-"""Opening overview card: single-rail q0->Final stage switcher (P1) and concise metric charts (P2)."""
+"""Opening overview card: single-rail q0->Final stage switcher (P1), 4 genome quality charts (P2), and runtime bar."""
 from __future__ import annotations
 
 import json
@@ -38,6 +38,30 @@ def _calc_n50(lengths):
     return vals[-1]
 
 
+def _contig_continuity(stage_rows):
+    """Compute gap-split Contig N50 and contiguous block count from stage_rows."""
+    if not stage_rows:
+        return None
+    blocks = []
+    for r in stage_rows.values():
+        segs = r.get("segs") or []
+        if not segs:
+            continue
+        cur = 0
+        for a, b, code in segs:
+            if code == 9:
+                if cur > 0:
+                    blocks.append(cur)
+                    cur = 0
+            else:
+                cur += max(0, int(b) - int(a))
+        if cur > 0:
+            blocks.append(cur)
+    if not blocks:
+        return None
+    return _calc_n50(blocks), len(blocks)
+
+
 def _fmt_compact_bp(bp):
     if bp is None:
         return "—"
@@ -50,6 +74,21 @@ def _fmt_compact_bp(bp):
     if v >= 1_000:
         return f"{sign}{v / 1_000:.0f}k" if v >= 100_000 else f"{sign}{v / 1_000:.1f}k"
     return f"{sign}{v}bp"
+
+
+def _fmt_dur(seconds):
+    s = max(0.0, float(seconds or 0.0))
+    if s >= 3600:
+        h = int(s // 3600)
+        m = int(round((s - h * 3600) / 60.0))
+        if m == 60:
+            h += 1
+            m = 0
+        return f"{h}h {m}m" if m else f"{h}h"
+    if s >= 60:
+        m = s / 60.0
+        return f"{m:.0f}m" if m >= 100 else f"{m:.1f}m"
+    return f"{s:.0f}s" if s >= 10 else f"{s:.1f}s"
 
 
 def _suppressed_partials(tool_rec):
@@ -72,7 +111,9 @@ def _final_track_stats(v, tool_rec):
     lens = []
     source_bp = {}
     patch_bp = 0
+    per_chr = {}
     for c in tracks:
+        cname = c.get("chr")
         clen = int(c.get("length") or 0)
         lens.append(clen)
         total_bp += clen
@@ -99,6 +140,8 @@ def _final_track_stats(v, tool_rec):
         total_gaps += cgaps
         if cgaps == 0:
             gap_free += 1
+        if cname:
+            per_chr[cname] = {"len": clen, "gaps": cgaps}
     return {
         "gaps": total_gaps,
         "gap_bp": total_gap_bp,
@@ -108,6 +151,7 @@ def _final_track_stats(v, tool_rec):
         "chr_count": len(tracks),
         "source_bp": source_bp,
         "patch_bp": patch_bp,
+        "per_chr": per_chr,
     }
 
 
@@ -458,94 +502,142 @@ def _render_rail_html(segs, domain, tel_pair=None, show_tel=False, cen_marks=Non
     return "".join(parts)
 
 
-def _svg_gap_trajectory(sv, versions, tools, winning_v, auto):
-    """Chart 1: Clean stage gap count line chart with multi-tool branching at Final."""
-    W, H = 460, 174
-    pad_l, pad_r, pad_t, pad_b = 34, 96 if auto and versions else 24, 18, 26
+def _svg_gap_combo(vm, sv, versions, tools, winning_v, fstats, auto):
+    """Chart 1: Combined Gap count trajectory (line + tool branches) & Gap total bp (background bars)."""
+    W, H = 460, 176
+    has_branches = bool(auto and versions)
+    pad_l, pad_r, pad_t, pad_b = 34, 118 if has_branches else 34, 24, 26
     plot_w = W - pad_l - pad_r
     plot_h = H - pad_t - pad_b
 
-    base_stages = [("q0", "q0"), ("q1", "q1"), ("q2", "q2"), ("q3", "q3")]
-    pts_base = []
-    for k, lbl in base_stages:
-        g = (sv.get(k) or {}).get("gap_count")
+    base_stages = []
+    for k in ("q0", "q1", "q2", "q3"):
+        rec = sv.get(k) or {}
+        g = rec.get("gap_count")
+        gbp = rec.get("gap_bp") if rec.get("gap_bp") is not None else rec.get("n_bp")
         if g is not None:
-            pts_base.append((k, lbl, int(g)))
+            base_stages.append((k, int(g), int(gbp or 0)))
 
     by_tool = {t["tool"]: t for t in tools}
+    loci_total = len((vm.get("refinement_summary") or {}).get("original_loci") or [])
     tool_branches = []
-    if auto and versions:
+    if has_branches:
         win_tool = winning_v["tool"] if winning_v else None
         for v in versions:
             t = v["tool"]
             trec = by_tool.get(t)
             st = _final_track_stats(v, trec) if v.get("tracks") else None
-            fg = st["gaps"] if st is not None else None
-            if fg is None:
+            if st is None:
                 continue
+            decs = (trec or {}).get("gap_decisions") or {}
+            cnts = (trec or {}).get("counts") or {}
+            if decs:
+                closed = sum(1 for d in decs.values() if d.get("state") == "closed")
+                denom = loci_total or len(decs)
+            elif cnts:
+                closed = int(cnts.get("closed") or 0)
+                denom = loci_total or sum(int(cnts.get(x) or 0) for x in ("closed", "partial", "rejected", "unfilled"))
+            else:
+                closed = v.get("edits") or 0
+                denom = loci_total
             tool_branches.append({
                 "tool": t,
                 "name": _SHORT_TOOL.get(t, NAMES.get(t, t)),
                 "full_name": NAMES.get(t, t),
-                "gaps": fg,
+                "gaps": st["gaps"],
+                "gap_bp": st["gap_bp"],
+                "closed": closed,
+                "denom": denom,
                 "winner": t == win_tool,
                 "order": tool_order(t),
             })
         tool_branches.sort(key=lambda r: (0 if r["winner"] else 1, r["gaps"], r["order"]))
 
-    if not pts_base and not tool_branches:
+    if not base_stages and not tool_branches:
         return '<p class="muted" style="margin:.5rem 0">' + bi("暂无阶段 Gap 数据。", "No stage gap data.") + "</p>", ""
 
-    all_y = [g for _, _, g in pts_base] + [b["gaps"] for b in tool_branches]
-    max_y = max(all_y) if all_y else 1
-    if max_y <= 0:
-        max_y = 4
-    step = max(1, int(math.ceil(max_y / 4.0)))
-    if step > 2 and step % 2 == 1 and max_y > 10:
+    all_cnt = [g for _, g, _ in base_stages] + [b["gaps"] for b in tool_branches]
+    max_cnt = max(all_cnt) if all_cnt else 1
+    if max_cnt <= 0:
+        max_cnt = 4
+    step = max(1, int(math.ceil(max_cnt / 4.0)))
+    if step > 2 and step % 2 == 1 and max_cnt > 10:
         step += 1
     y_top = step * 4
 
-    cols = len(pts_base) + (1 if tool_branches else 0)
-    xs = [pad_l + (plot_w * i / max(1, cols - 1)) for i in range(cols)]
+    bar_bps = [bp for _, _, bp in base_stages]
+    if tool_branches:
+        bar_bps.append(tool_branches[0]["gap_bp"])
+    max_bp = max([1, *bar_bps])
 
-    def y_pos(val):
+    cols = len(base_stages) + (1 if tool_branches else 0)
+    xs = [pad_l + (plot_w * i / max(1, cols - 1)) for i in range(cols)]
+    base_y = pad_t + plot_h
+
+    def y_cnt(val):
         return pad_t + plot_h * (1.0 - max(0, val) / max(1, y_top))
 
     svg = [f'<svg class="ov-svg" viewBox="0 0 {W} {H}" role="img" aria-label="Gap trajectory">']
+    # Micro legend top-left
+    svg.append(
+        f'<g transform="translate({pad_l},11)">'
+        '<rect x="0" y="-6.5" width="7" height="7" rx="1.5" fill="var(--surface-muted)" stroke="var(--border-default)"/>'
+        '<text x="10" y="0" class="ov-leg-txt t-zh">Gap 长度</text><text x="10" y="0" class="ov-leg-txt t-en">Gap bp</text>'
+        '<line x1="60" y1="-3" x2="72" y2="-3" stroke="var(--brand)" stroke-width="2"/>'
+        '<circle cx="66" cy="-3" r="2.2" fill="var(--brand)"/>'
+        '<text x="76" y="0" class="ov-leg-txt t-zh">剩余 Gap 数</text><text x="76" y="0" class="ov-leg-txt t-en">Gap count</text>'
+        "</g>"
+    )
+
+    # Horizontal gridlines & left Y ticks (Gap count)
     for i in range(5):
         val = step * i
-        y = y_pos(val)
+        y = y_cnt(val)
         dash = "" if i == 0 else ' stroke-dasharray="2.5 3"'
         svg.append(f'<line x1="{pad_l}" y1="{y:.1f}" x2="{W - pad_r + 4}" y2="{y:.1f}" stroke="var(--border-subtle)"{dash}/>')
         svg.append(f'<text x="{pad_l - 7}" y="{y + 3:.1f}" text-anchor="end" class="ov-ax-txt">{val}</text>')
 
-    if pts_base:
-        poly_coords = [(xs[i], y_pos(g)) for i, (_, _, g) in enumerate(pts_base)]
+    # Background bars: Gap total bp per stage
+    bw = min(26.0, (plot_w / max(1, cols)) * 0.42)
+    for i, bp in enumerate(bar_bps):
+        if bp <= 0:
+            continue
+        bh = max(3.0, (plot_h * 0.72) * (bp / max_bp))
+        y = base_y - bh
+        is_win_bar = bool(tool_branches and i == len(bar_bps) - 1)
+        fill = "var(--tone-ok-bg)" if is_win_bar else "var(--surface-muted)"
+        stroke = "var(--tone-ok-line)" if is_win_bar else "var(--border-subtle)"
+        svg.append(f'<rect x="{xs[i] - bw / 2:.1f}" y="{y:.1f}" width="{bw:.1f}" height="{bh:.1f}" rx="2" fill="{fill}" stroke="{stroke}"><title>Gap length: {bp:,} bp</title></rect>')
+        # Label Gap bp subtly inside bar bottom for clean reading without clashing with line above
+        if bh >= 14:
+            svg.append(f'<text x="{xs[i]:.1f}" y="{base_y - 4:.1f}" text-anchor="middle" class="ov-bar-bp">{esc(_fmt_compact_bp(bp))}</text>')
+
+    # Foreground LGZ polyline (q0..q3)
+    if base_stages:
+        poly_coords = [(xs[i], y_cnt(g)) for i, (_, g, _) in enumerate(base_stages)]
         pts_str = " ".join(f"{x:.1f},{y:.1f}" for x, y in poly_coords)
-        base_y = y_pos(0)
-        area_str = f"{poly_coords[0][0]:.1f},{base_y:.1f} {pts_str} {poly_coords[-1][0]:.1f},{base_y:.1f}"
-        svg.append(f'<polygon points="{area_str}" fill="var(--brand)" opacity=".05"/>')
         svg.append(f'<polyline points="{pts_str}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>')
 
-    if tool_branches and pts_base:
-        x0, y0 = xs[len(pts_base) - 1], y_pos(pts_base[-1][2])
+    # Multi-tool branches from q3 to Final
+    if tool_branches and base_stages:
+        x0, y0 = xs[len(base_stages) - 1], y_cnt(base_stages[-1][1])
         x1 = xs[-1]
         for b in reversed(tool_branches):
-            y1 = y_pos(b["gaps"])
+            y1 = y_cnt(b["gaps"])
             if b["winner"]:
                 svg.append(f'<line x1="{x0:.1f}" y1="{y0:.1f}" x2="{x1:.1f}" y2="{y1:.1f}" stroke="var(--gen-closed)" stroke-width="2.2" stroke-linecap="round"/>')
             else:
                 svg.append(f'<line x1="{x0:.1f}" y1="{y0:.1f}" x2="{x1:.1f}" y2="{y1:.1f}" stroke="var(--border-strong)" stroke-width="1.2" stroke-dasharray="3.5 3" stroke-linecap="round"/>')
 
         placed = sorted(
-            [{"b": b, "y": y_pos(b["gaps"]), "ly": y_pos(b["gaps"])} for b in tool_branches],
+            [{"b": b, "y": y_cnt(b["gaps"]), "ly": y_cnt(b["gaps"])} for b in tool_branches],
             key=lambda r: (r["y"], 0 if r["b"]["winner"] else 1),
         )
         min_dy = 13.5
         for i in range(1, len(placed)):
             if placed[i]["ly"] - placed[i - 1]["ly"] < min_dy:
                 placed[i]["ly"] = placed[i - 1]["ly"] + min_dy
-        max_ly = H - pad_b + 2
+        max_ly = base_y + 2
         if placed and placed[-1]["ly"] > max_ly:
             shift = placed[-1]["ly"] - max_ly
             for p in placed:
@@ -559,15 +651,16 @@ def _svg_gap_trajectory(sv, versions, tools, winning_v, auto):
             y1, ly = p["y"], p["ly"]
             if abs(ly - y1) > 2.5:
                 svg.append(f'<line x1="{x1 + 4:.1f}" y1="{y1:.1f}" x2="{x1 + 9:.1f}" y2="{ly:.1f}" stroke="var(--border-default)" stroke-width=".9"/>')
+            cl_str = f" ({b['closed']}/{b['denom']})" if b["denom"] else ""
             if b["winner"]:
-                svg.append(f'<circle cx="{x1:.1f}" cy="{y1:.1f}" r="3.8" fill="var(--gen-closed)" stroke="var(--surface-panel)" stroke-width="1.4"><title>{esc(b["full_name"])}: {b["gaps"]} gaps</title></circle>')
-                svg.append(f'<text x="{x1 + 11:.1f}" y="{ly + 3:.1f}" class="ov-lbl-win">★ {esc(b["name"])} {b["gaps"]}</text>')
+                svg.append(f'<circle cx="{x1:.1f}" cy="{y1:.1f}" r="3.8" fill="var(--gen-closed)" stroke="var(--surface-panel)" stroke-width="1.4"><title>{esc(b["full_name"])}: {b["gaps"]} gaps, closed {b["closed"]}/{b["denom"]}</title></circle>')
+                svg.append(f'<text x="{x1 + 10:.1f}" y="{ly + 3:.1f}" class="ov-lbl-win">★ {esc(b["name"])} {b["gaps"]}{esc(cl_str)}</text>')
             else:
-                svg.append(f'<circle cx="{x1:.1f}" cy="{y1:.1f}" r="2.7" fill="var(--surface-panel)" stroke="var(--border-strong)" stroke-width="1.4"><title>{esc(b["full_name"])}: {b["gaps"]} gaps</title></circle>')
-                svg.append(f'<text x="{x1 + 11:.1f}" y="{ly + 3:.1f}" class="ov-lbl-sub">{esc(b["name"])} {b["gaps"]}</text>')
+                svg.append(f'<circle cx="{x1:.1f}" cy="{y1:.1f}" r="2.7" fill="var(--surface-panel)" stroke="var(--border-strong)" stroke-width="1.4"><title>{esc(b["full_name"])}: {b["gaps"]} gaps, closed {b["closed"]}/{b["denom"]}</title></circle>')
+                svg.append(f'<text x="{x1 + 10:.1f}" y="{ly + 3:.1f}" class="ov-lbl-sub">{esc(b["name"])} {b["gaps"]}{esc(cl_str)}</text>')
 
-    for i, (_, lbl, g) in enumerate(pts_base):
-        x, y = xs[i], y_pos(g)
+    for i, (lbl, g, _) in enumerate(base_stages):
+        x, y = xs[i], y_cnt(g)
         svg.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.2" fill="var(--brand)" stroke="var(--surface-panel)" stroke-width="1.4"><title>{esc(lbl)}: {g} gaps</title></circle>')
         svg.append(f'<text x="{x:.1f}" y="{y - 7:.1f}" text-anchor="middle" class="ov-val-txt">{g}</text>')
         svg.append(f'<text x="{x:.1f}" y="{H - 8}" text-anchor="middle" class="ov-ax-lbl">{esc(lbl)}</text>')
@@ -577,12 +670,102 @@ def _svg_gap_trajectory(sv, versions, tools, winning_v, auto):
 
     svg.append("</svg>")
 
+    meta_bits = []
+    if base_stages:
+        s_g = base_stages[0][1]
+        e_g = tool_branches[0]["gaps"] if tool_branches else base_stages[-1][1]
+        meta_bits.append(f"{s_g} → {e_g}")
+    if len(bar_bps) >= 2 and bar_bps[0] > 0:
+        d_bp = bar_bps[-1] - bar_bps[0]
+        pct = round(100 * d_bp / bar_bps[0])
+        if d_bp < 0:
+            meta_bits.append(f"N {pct}%")
+    meta = f'<span class="ov-chart-meta is-ok">{esc(" · ".join(meta_bits))}</span>' if meta_bits else ""
+    return "".join(svg), meta
+
+
+def _svg_contig_continuity(stages, sv, fstats, auto):
+    """Chart 2: Gap-split Contig N50 leap & block count reduction across stages (with Scaffold N50 reference line)."""
+    W, H = 460, 176
+    pad_l, pad_r, pad_t, pad_b = 44, 18, 24, 34
+    plot_w = W - pad_l - pad_r
+    plot_h = H - pad_t - pad_b
+    base_y = pad_t + plot_h
+
+    items = []
+    use_contig = True
+    for st in stages:
+        res = _contig_continuity(st["rows"])
+        if res is not None:
+            cn50, ccnt = res
+            items.append((st["tag"], cn50, ccnt, st["is_final"]))
+
+    if not items:
+        use_contig = False
+        for k in ("q0", "q1", "q2", "q3"):
+            v = (sv.get(k) or {}).get("n50_bp")
+            if v:
+                items.append((k, int(v), None, False))
+        if auto and fstats and fstats.get("n50_bp"):
+            items.append(("Final", int(fstats["n50_bp"]), None, True))
+
+    if not items:
+        return '<p class="muted" style="margin:.5rem 0">' + bi("暂无连续性统计数据。", "No continuity data.") + "</p>", ""
+
+    scaf_n50 = (fstats or {}).get("n50_bp") or (sv.get("q3") or {}).get("n50_bp") or (sv.get("q0") or {}).get("n50_bp") or 0
+    max_v = max([1, *(x[1] for x in items), scaf_n50 if use_contig else 0])
+    y_top = max_v * 1.15
+
+    def y_pos(val):
+        return pad_t + plot_h * (1.0 - max(0, val) / max(1, y_top))
+
+    svg = [f'<svg class="ov-svg" viewBox="0 0 {W} {H}" role="img" aria-label="Contig continuity">']
+    # Y-axis gridlines (0, 50%, 100% of max_v)
+    for frac in (0.0, 0.5, 1.0):
+        v = max_v * frac
+        y = y_pos(v)
+        dash = "" if frac == 0 else ' stroke-dasharray="2.5 3"'
+        svg.append(f'<line x1="{pad_l}" y1="{y:.1f}" x2="{W - pad_r}" y2="{y:.1f}" stroke="var(--border-subtle)"{dash}/>')
+        svg.append(f'<text x="{pad_l - 6}" y="{y + 3:.1f}" text-anchor="end" class="ov-ax-txt">{esc("0" if frac == 0 else _fmt_compact_bp(round(v)))}</text>')
+
+    # Scaffold N50 dashed reference line when showing Contig N50
+    if use_contig and scaf_n50 > 0:
+        sy = y_pos(scaf_n50)
+        svg.append(f'<line x1="{pad_l}" y1="{sy:.1f}" x2="{W - pad_r}" y2="{sy:.1f}" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="4 3"/>')
+        svg.append(f'<text x="{W - pad_r}" y="{sy - 4:.1f}" text-anchor="end" class="ov-ax-txt">Scaffold N50 {esc(_fmt_compact_bp(scaf_n50))}</text>')
+
+    n = len(items)
+    slot = plot_w / max(1, n)
+    bw = min(34.0, slot * 0.48)
+    for i, (lbl, val, cnt, is_fin) in enumerate(items):
+        cx = pad_l + slot * (i + 0.5)
+        y = y_pos(val)
+        bh = max(3.0, base_y - y)
+        col = "var(--gen-closed)" if is_fin else "var(--brand)"
+        op = ".92" if is_fin else ".8"
+        tip = f"{lbl}: {'Contig' if use_contig else 'Scaffold'} N50 {val:,} bp" + (f" ({cnt} blocks)" if cnt else "")
+        svg.append(f'<rect x="{cx - bw / 2:.1f}" y="{y:.1f}" width="{bw:.1f}" height="{bh:.1f}" rx="2.5" fill="{col}" opacity="{op}"><title>{esc(tip)}</title></rect>')
+        svg.append(f'<text x="{cx:.1f}" y="{y - 5:.1f}" text-anchor="middle" class="ov-val-txt">{esc(_fmt_compact_bp(val))}</text>')
+        lcls = "ov-ax-lbl is-win" if is_fin else "ov-ax-lbl"
+        svg.append(f'<text x="{cx:.1f}" y="{base_y + 13:.1f}" text-anchor="middle" class="{lcls}">{esc(lbl)}</text>')
+        if cnt is not None:
+            svg.append(f'<text x="{cx:.1f}" y="{base_y + 25:.1f}" text-anchor="middle" class="ov-ax-txt t-zh">{cnt}段</text>')
+            svg.append(f'<text x="{cx:.1f}" y="{base_y + 25:.1f}" text-anchor="middle" class="ov-ax-txt t-en">{cnt} ctgs</text>')
+
+    svg.append("</svg>")
+
     meta = ""
-    if pts_base:
-        start_g = pts_base[0][2]
-        end_g = tool_branches[0]["gaps"] if tool_branches else pts_base[-1][2]
-        cls = "ov-chart-meta is-ok" if end_g < start_g else "ov-chart-meta"
-        meta = f'<span class="{cls}">{start_g} → {end_g}</span>'
+    if use_contig and len(items) >= 2 and items[0][1] > 0:
+        v0, v1 = items[0][1], items[-1][1]
+        pct = round(100 * (v1 - v0) / v0)
+        if pct > 0:
+            meta = f'<span class="ov-chart-meta is-ok">Contig N50 {_fmt_compact_bp(v0)} → {_fmt_compact_bp(v1)} (+{pct}%)</span>'
+        else:
+            meta = f'<span class="ov-chart-meta">Contig N50 {_fmt_compact_bp(v1)}</span>'
+    elif scaf_n50:
+        n90 = (sv.get("q3") or {}).get("n90_bp")
+        txt = f"N50 {_fmt_compact_bp(scaf_n50)}" + (f" · N90 {_fmt_compact_bp(n90)}" if n90 else "")
+        meta = f'<span class="ov-chart-meta">{esc(txt)}</span>'
     return "".join(svg), meta
 
 
@@ -611,8 +794,8 @@ def _donut_svg(cx, cy, r, sw, slices, center_big, center_sub):
 
 
 def _svg_donuts(sv, fstats, tel_info, lgz, colors, auto):
-    """Chart 2: Refined 3-donut completeness trio."""
-    W, H = 460, 174
+    """Chart 3: Refined 3-donut structural completeness trio + Anchoring & N% header meta."""
+    W, H = 460, 172
     r, sw, cy = 34, 8.5, 58
     cxs = (78, 230, 382)
 
@@ -697,7 +880,7 @@ def _svg_donuts(sv, fstats, tel_info, lgz, colors, auto):
         svg.append(f'<text x="{cx}" y="129" text-anchor="middle" class="ov-donut-cap t-zh">{esc(czh)}</text>')
         svg.append(f'<text x="{cx}" y="129" text-anchor="middle" class="ov-donut-cap t-en">{esc(cen)}</text>')
     svg.append(
-        '<g transform="translate(110,155)">'
+        '<g transform="translate(110,154)">'
         '<rect x="0" y="-6.5" width="7" height="7" rx="1.5" fill="var(--brand)"/>'
         '<text x="11" y="0" class="ov-leg-txt t-zh">LGZ / 原有</text><text x="11" y="0" class="ov-leg-txt t-en">LGZ / Orig</text>'
         '<rect x="88" y="-6.5" width="7" height="7" rx="1.5" fill="var(--gen-closed)"/>'
@@ -707,166 +890,164 @@ def _svg_donuts(sv, fstats, tel_info, lgz, colors, auto):
         "</g>"
     )
     svg.append("</svg>")
-    return "".join(svg)
 
-
-def _svg_tools_or_chrs(vm, tools, winning_v, tel_info, auto):
-    """Chart 3: Tool closure comparison bars (auto) or chromosome summary bars (LGZ-only)."""
-    W = 460
-    if auto and tools:
-        loci_total = len(vm["refinement_summary"].get("original_loci") or [])
-        win_tool = winning_v["tool"] if winning_v else None
-        rows = []
-        for t in tools:
-            name = NAMES.get(t["tool"], t["tool"])
-            decs = t.get("gap_decisions") or {}
-            cnts = t.get("counts") or {}
-            ok = t.get("status") == "published" or bool(decs) or bool(cnts)
-            if decs:
-                closed = sum(1 for d in decs.values() if d.get("state") == "closed")
-                denom = loci_total or len(decs)
-            elif cnts:
-                closed = int(cnts.get("closed") or 0)
-                denom = loci_total or sum(int(cnts.get(k) or 0) for k in ("closed", "partial", "rejected", "unfilled"))
-            else:
-                closed = 0
-                denom = loci_total
-            rows.append({
-                "tool": t["tool"], "name": name, "closed": closed, "denom": denom,
-                "ok": ok and t.get("status") != "failed",
-                "winner": t["tool"] == win_tool, "order": tool_order(t["tool"]),
-            })
-        rows.sort(key=lambda r: (0 if r["ok"] else 1, -r["closed"], r["order"]))
-        row_h = 33
-        H = max(158, 18 + len(rows) * row_h + 10)
-        bar_x, bar_w = 114, 244
-        svg = [f'<svg class="ov-svg" viewBox="0 0 {W} {H}" role="img" aria-label="Tool comparison">']
-        for i, r in enumerate(rows):
-            y = 18 + i * row_h
-            lbl = ("★ " if r["winner"] else "") + r["name"]
-            lcls = "ov-bar-lbl is-win" if r["winner"] else "ov-bar-lbl"
-            svg.append(f'<text x="{bar_x - 10}" y="{y + 10.5}" text-anchor="end" class="{lcls}">{esc(lbl)}</text>')
-            if not r["ok"]:
-                svg.append(f'<rect x="{bar_x}" y="{y}" width="{bar_w}" height="13" rx="3" fill="var(--surface-subtle)" stroke="var(--border-default)" stroke-dasharray="3 2"/>')
-                svg.append(f'<text x="{bar_x + bar_w + 10}" y="{y + 10.5}" class="ov-lbl-sub t-zh">失败</text>')
-                svg.append(f'<text x="{bar_x + bar_w + 10}" y="{y + 10.5}" class="ov-lbl-sub t-en">Failed</text>')
-            else:
-                denom = max(1, r["denom"])
-                fw = bar_w * min(1.0, r["closed"] / denom)
-                pct = round(100 * r["closed"] / denom) if r["denom"] else 0
-                svg.append(f'<rect x="{bar_x}" y="{y}" width="{bar_w}" height="13" rx="3" fill="var(--surface-muted)"/>')
-                if fw > 0:
-                    fill = "var(--gen-closed)" if r["winner"] else "var(--brand)"
-                    op = "1" if r["winner"] else ".55"
-                    svg.append(f'<rect x="{bar_x}" y="{y}" width="{max(4.0, fw):.1f}" height="13" rx="3" fill="{fill}" opacity="{op}"/>')
-                vcls = "ov-bar-val is-win" if r["winner"] else "ov-bar-val"
-                svg.append(f'<text x="{bar_x + bar_w + 10}" y="{y + 10.5}" class="{vcls}">{r["closed"]}/{r["denom"]} ({pct}%)</text>')
-        svg.append("</svg>")
-        meta = f'<span class="ov-chart-meta">{bi(f"候选 {loci_total} 位点 · ★ 交付", f"{loci_total} loci · ★ selected")}</span>' if loci_total else ""
-        return "".join(svg), bi("精修工具闭合率", "Tool Closure Rate"), meta
-
-    # LGZ-only: per-chromosome length, remaining gap & telomere status
-    chrs = vm["lgz_summary"].get("chromosomes") or []
-    ftracks = (winning_v or {}).get("tracks") or []
-    if ftracks:
-        items = [(c["chr"], int(c["length"]), sum(1 for p in c["parts"] if p["kind"] == "gap")) for c in ftracks]
-    else:
-        items = [(c["chromosome"], int(c.get("length_bp") or 0), int(c.get("remaining_gap_count") or 0)) for c in chrs]
-    shown = items[:7]
-    max_len = max([1, *(x[1] for x in shown)])
-    row_h = 21
-    H = max(158, 16 + len(shown) * row_h + 10)
-    bar_x, bar_w = 96, 224
-    svg = [f'<svg class="ov-svg" viewBox="0 0 {W} {H}" role="img" aria-label="Chromosome status">']
-    for i, (cname, clen, cgaps) in enumerate(shown):
-        y = 14 + i * row_h
-        bw = max(4.0, bar_w * clen / max_len)
-        fill = "var(--gen-closed)" if cgaps == 0 else "var(--brand)"
-        svg.append(f'<text x="{bar_x - 8}" y="{y + 9.5}" text-anchor="end" class="ov-bar-lbl">{esc(cname)}</text>')
-        svg.append(f'<rect x="{bar_x}" y="{y + 1.5}" width="{bar_w}" height="9.5" rx="2" fill="var(--surface-muted)" opacity=".55"/>')
-        svg.append(f'<rect x="{bar_x}" y="{y + 1.5}" width="{bw:.1f}" height="9.5" rx="2" fill="{fill}"/>')
-        tpair = tel_info["per_chr"].get(cname) if tel_info["available"] else None
-        tstr = ""
-        if tpair:
-            ok5 = tpair[0] in ("already_present", "extended", "accepted", "added")
-            ok3 = tpair[1] in ("already_present", "extended", "accepted", "added")
-            tstr = f" · {'●' if ok5 else '○'}{'●' if ok3 else '○'}"
-        svg.append(f'<text x="{bar_x + bar_w + 8}" y="{y + 9.5}" class="ov-bar-val">{esc(_fmt_compact_bp(clen))} · {cgaps}G{tstr}</text>')
-    svg.append("</svg>")
-    meta = f'<span class="ov-chart-meta">{bi("●/○ 5′/3′ 端粒", "●/○ 5′/3′ tel")}</span>' if tel_info["available"] else ""
-    return "".join(svg), bi("染色体状态", "Chromosomes"), meta
-
-
-def _svg_continuity_and_gap_bp(lgz, sv, fstats, auto):
-    """Chart 4: Compact side-by-side N50 (left) and Total Gap bp (right) bars."""
-    W, H = 460, 158
-    assemblies = (lgz.get("inputs") or {}).get("assemblies") or []
-    in_n50 = ((assemblies[0].get("stats") or {}).get("n50_bp")) if assemblies else None
-
-    n50_bars = []
-    if in_n50:
-        n50_bars.append(("Input", int(in_n50), "var(--border-strong)"))
-    if (sv.get("q0") or {}).get("n50_bp"):
-        n50_bars.append(("q0", int(sv["q0"]["n50_bp"]), "var(--brand)"))
-    if (sv.get("q3") or {}).get("n50_bp"):
-        n50_bars.append(("q3", int(sv["q3"]["n50_bp"]), "var(--brand)"))
-    if auto and fstats and fstats.get("n50_bp"):
-        n50_bars.append(("Final", int(fstats["n50_bp"]), "var(--gen-closed)"))
-
-    gbp_bars = []
-    for k in ("q0", "q1", "q2", "q3"):
-        val = (sv.get(k) or {}).get("gap_bp")
-        if val is None:
-            val = (sv.get(k) or {}).get("n_bp")
-        if val is not None:
-            gbp_bars.append((k, int(val), "var(--brand)"))
-    if auto and fstats is not None:
-        gbp_bars.append(("Final", int(fstats["gap_bp"]), "var(--gen-closed)"))
-
-    svg = [f'<svg class="ov-svg" viewBox="0 0 {W} {H}" role="img" aria-label="N50 and Gap bp">']
-
-    def _draw_mini_bars(x0, w, title_zh, title_en, bars):
-        top_y, bot_y = 32, 130
-        h = bot_y - top_y
-        svg.append(f'<text x="{x0 + w / 2:.1f}" y="14" text-anchor="middle" class="ov-mini-title t-zh">{esc(title_zh)}</text>')
-        svg.append(f'<text x="{x0 + w / 2:.1f}" y="14" text-anchor="middle" class="ov-mini-title t-en">{esc(title_en)}</text>')
-        svg.append(f'<line x1="{x0 + 10}" y1="{bot_y}" x2="{x0 + w - 10}" y2="{bot_y}" stroke="var(--border-default)"/>')
-        if not bars:
-            svg.append(f'<text x="{x0 + w / 2:.1f}" y="86" text-anchor="middle" class="ov-lbl-sub">—</text>')
-            return
-        max_v = max(1, max(v for _, v, _ in bars))
-        n = len(bars)
-        slot = (w - 24) / max(1, n)
-        bw = min(24.0, slot * 0.56)
-        for i, (lbl, val, col) in enumerate(bars):
-            cx = x0 + 12 + slot * (i + 0.5)
-            bh = 0.0 if val <= 0 else max(3.0, h * (val / (max_v * 1.18)))
-            y = bot_y - bh
-            svg.append(f'<rect x="{cx - bw / 2:.1f}" y="{y:.1f}" width="{bw:.1f}" height="{bh:.1f}" rx="2" fill="{col}" opacity=".86"><title>{esc(lbl)}: {val:,} bp</title></rect>')
-            svg.append(f'<text x="{cx:.1f}" y="{y - 4.5:.1f}" text-anchor="middle" class="ov-val-mini">{esc(_fmt_compact_bp(val))}</text>')
-            svg.append(f'<text x="{cx:.1f}" y="{bot_y + 14}" text-anchor="middle" class="ov-ax-txt">{esc(lbl)}</text>')
-
-    _draw_mini_bars(0, 222, "N50", "N50", n50_bars)
-    svg.append('<line x1="230" y1="12" x2="230" y2="144" stroke="var(--border-subtle)" stroke-dasharray="2.5 3"/>')
-    _draw_mini_bars(238, 222, "Gap 总长度", "Gap Length", gbp_bars)
-    svg.append("</svg>")
-
-    bits = []
-    if len(n50_bars) >= 2 and n50_bars[0][1] > 0:
-        d_n50 = n50_bars[-1][1] - n50_bars[0][1]
-        if d_n50 > 0:
-            bits.append(f"N50 +{fmt_bp_short(d_n50)}")
-    if len(gbp_bars) >= 2 and gbp_bars[0][1] > 0:
-        d_gbp = gbp_bars[-1][1] - gbp_bars[0][1]
-        pct = round(100 * d_gbp / gbp_bars[0][1])
-        if d_gbp < 0:
-            bits.append(f"Gap {pct}%")
-    meta = f'<span class="ov-chart-meta is-ok">{esc(" · ".join(bits))}</span>' if bits else ""
+    # Header right meta: Anchoring rate & N%
+    meta_bits = []
+    sel_bp = (lgz.get("q0") or {}).get("selected_source_bp")
+    in_bp = sum(int((a.get("stats") or {}).get("length_bp") or 0) for a in assemblies)
+    if sel_bp and in_bp > 0:
+        anc = min(100.0, 100.0 * sel_bp / in_bp)
+        meta_bits.append(bi(f"锚定 {anc:.1f}%", f"Anchored {anc:.1f}%"))
+    tot_fin_bp = (fstats or {}).get("total_bp") or (sv.get("q3") or {}).get("length_bp") or 0
+    fin_nbp = (fstats or {}).get("gap_bp") if fstats is not None else (sv.get("q3") or {}).get("n_bp")
+    if tot_fin_bp > 0 and fin_nbp is not None:
+        npct = 100.0 * fin_nbp / tot_fin_bp
+        meta_bits.append(f"N {npct:.2f}%")
+    meta = f'<span class="ov-chart-meta">{" · ".join(meta_bits)}</span>' if meta_bits else ""
     return "".join(svg), meta
 
 
+def _svg_chr_coverage_t2t(lgz, chr_order, fstats, tel_info, cen_map):
+    """Chart 4: Per-chromosome Assembly/Ref coverage ratio & T2T structural badges."""
+    W, H = 460, 172
+    refs = lgz.get("reference_tracks") or {}
+    chrs_map = {c.get("chromosome"): c for c in (lgz.get("chromosomes") or []) if isinstance(c, dict)}
+    fper = (fstats or {}).get("per_chr") or {}
+
+    items = []
+    for cname in chr_order:
+        if cname in fper:
+            clen, cgaps = fper[cname]["len"], fper[cname]["gaps"]
+        elif cname in chrs_map:
+            clen = int(chrs_map[cname].get("length_bp") or 0)
+            cgaps = int(chrs_map[cname].get("remaining_gap_count") or 0)
+        else:
+            continue
+        rlen = int((refs.get(cname) or {}).get("length_bp") or 0)
+        ratio = (100.0 * clen / rlen) if rlen > 0 else None
+        tpair = tel_info["per_chr"].get(cname) if tel_info["available"] else None
+        ok5 = bool(tpair and tpair[0] in ("already_present", "extended", "accepted", "added"))
+        ok3 = bool(tpair and tpair[1] in ("already_present", "extended", "accepted", "added"))
+        has_cen = bool(cen_map.get(cname))
+        is_t2t = (cgaps == 0) and (not tel_info["available"] or (ok5 and ok3))
+        items.append({
+            "chr": cname, "len": clen, "gaps": cgaps, "ref_len": rlen,
+            "ratio": ratio, "ok5": ok5, "ok3": ok3, "has_cen": has_cen, "t2t": is_t2t,
+        })
+
+    if not items:
+        return '<p class="muted" style="margin:.5rem 0">' + bi("暂无染色体统计数据。", "No chromosome data.") + "</p>", ""
+
+    has_ref = any(x["ratio"] is not None for x in items)
+    max_len = max(1, max(x["len"] for x in items))
+    shown = items[:6] if len(items) > 6 else items
+    row_h = min(24.0, (H - 34.0) / max(1, len(shown)))
+    bar_x, bar_w = 92, 198
+
+    svg = [f'<svg class="ov-svg" viewBox="0 0 {W} {H}" role="img" aria-label="Chromosome coverage">']
+    # Reference 100% dashed vertical guide line
+    if has_ref:
+        svg.append(f'<line x1="{bar_x + bar_w}" y1="10" x2="{bar_x + bar_w}" y2="{12 + len(shown) * row_h:.1f}" stroke="var(--border-default)" stroke-dasharray="2.5 3"/>')
+        svg.append(f'<text x="{bar_x + bar_w}" y="{H - 8}" text-anchor="end" class="ov-ax-txt">Ref 100%</text>')
+
+    for i, it in enumerate(shown):
+        y = 14 + i * row_h
+        frac = min(1.0, (it["ratio"] / 100.0)) if (has_ref and it["ratio"] is not None) else (it["len"] / max_len)
+        bw = max(4.0, bar_w * frac)
+        if it["t2t"]:
+            fill = "var(--gen-closed)"
+        elif has_ref and it["ratio"] is not None and it["ratio"] < 70.0:
+            fill = "var(--gen-patch)"
+        else:
+            fill = "var(--brand)"
+        tip = f'{it["chr"]}: {it["len"]:,} bp' + (f' / Ref {it["ref_len"]:,} bp ({it["ratio"]:.1f}%)' if it["ratio"] is not None else "") + f' · {it["gaps"]} gaps'
+        svg.append(f'<text x="{bar_x - 8}" y="{y + 10:.1f}" text-anchor="end" class="ov-bar-lbl">{esc(it["chr"])}</text>')
+        svg.append(f'<rect x="{bar_x}" y="{y + 2:.1f}" width="{bar_w}" height="10" rx="2" fill="var(--surface-muted)"/>')
+        svg.append(f'<rect x="{bar_x}" y="{y + 2:.1f}" width="{bw:.1f}" height="10" rx="2" fill="{fill}" opacity=".9"><title>{esc(tip)}</title></rect>')
+
+        val_str = f"{it['ratio']:.1f}%" if it["ratio"] is not None else _fmt_compact_bp(it["len"])
+        t_str = f" · {'●' if it['ok5'] else '○'}{'●' if it['ok3'] else '○'}" if tel_info["available"] else ""
+        c_str = " ◆" if it["has_cen"] else ""
+        vcls = "ov-bar-val is-win" if it["t2t"] else "ov-bar-val"
+        svg.append(f'<text x="{bar_x + bar_w + 8}" y="{y + 10:.1f}" class="{vcls}">{esc(val_str)} · {it["gaps"]}G{t_str}{c_str}</text>')
+
+    # Compact symbol legend bottom-left
+    leg_bits = []
+    if tel_info["available"]:
+        leg_bits.append("●/○ 5′/3′ 端粒" )
+    if any(x["has_cen"] for x in items):
+        leg_bits.append("◆ 着丝粒")
+    if len(items) > len(shown):
+        leg_bits.append(f"前 {len(shown)}/{len(items)} 条")
+    if leg_bits:
+        svg.append(f'<text x="{bar_x}" y="{H - 8}" class="ov-leg-txt">{esc(" · ".join(leg_bits))}</text>')
+    svg.append("</svg>")
+
+    t2t_n = sum(1 for x in items if x["t2t"])
+    meta_bits = []
+    if tel_info["available"]:
+        meta_bits.append(f"T2T {t2t_n}/{len(items)}")
+    else:
+        meta_bits.append(bi(f"无Gap {t2t_n}/{len(items)}", f"Gap-free {t2t_n}/{len(items)}"))
+    if has_ref:
+        avg_cov = sum(x["ratio"] for x in items if x["ratio"] is not None) / max(1, sum(1 for x in items if x["ratio"] is not None))
+        meta_bits.append(bi(f"均覆盖 {avg_cov:.1f}%", f"Avg {avg_cov:.1f}%"))
+    meta = f'<span class="ov-chart-meta">{" · ".join(meta_bits)}</span>'
+    return "".join(svg), meta
+
+
+def _runtime_bar_html(lgz):
+    """Compact 1-row stacked runtime bar from verified lgz_summary.timing.units."""
+    units = (lgz.get("timing") or {}).get("units") or []
+    if not units:
+        return ""
+    buckets = [
+        ("alignment", "比对分组", "Align", "var(--ds-0)"),
+        ("q0", "q0 构建", "q0", "var(--ds-5)"),
+        ("lgz", "LGZ 修补", "LGZ", "var(--ds-1)"),
+        ("refinement", "自动精修", "Refine", "var(--gen-closed)"),
+        ("delivery", "打包交付", "Package", "var(--border-strong)"),
+    ]
+    sums = {k: 0.0 for k, _, _, _ in buckets}
+    reused = {k: True for k, _, _, _ in buckets}
+    seen = {k: False for k, _, _, _ in buckets}
+    for u in units:
+        st = u.get("stage") or ""
+        sec = float(u.get("elapsed_seconds") or 0.0)
+        if st not in sums:
+            continue
+        sums[st] += max(0.0, sec)
+        seen[st] = True
+        if u.get("execution") != "cache_reused":
+            reused[st] = False
+    total = sum(sums.values())
+    if total <= 0:
+        return ""
+
+    segs = []
+    legs = []
+    for key, zh, en, col in buckets:
+        sec = sums[key]
+        if sec <= 0:
+            continue
+        pct = 100.0 * sec / total
+        dur = _fmt_dur(sec)
+        tag = " (cached)" if (seen[key] and reused[key]) else ""
+        tip = f"{zh} / {en}: {dur} ({sec:.1f}s, {pct:.1f}%){tag}"
+        segs.append(f'<span class="ov-rt-seg" style="width:{max(1.2, pct):.3f}%;background:{col}" title="{esc(tip)}"></span>')
+        legs.append(f'<span class="ov-rt-item"><i class="ov-rt-dot" style="background:{col}"></i>{bi(zh, en)} <b>{esc(dur)}</b></span>')
+
+    return (
+        '<div class="ov-runtime-bar">'
+        f'<span class="ov-rt-head">{bi("运行耗时", "Runtime")} <b>{esc(_fmt_dur(total))}</b></span>'
+        f'<span class="ov-rt-track" aria-hidden="true">{"".join(segs)}</span>'
+        f'<span class="ov-rt-legend">{"".join(legs)}</span>'
+        "</div>"
+    )
+
+
 def overview_summary_card(vm):
-    """Render the opening Overview card (P1 single-rail switcher + P2 2x2 chart grid)."""
+    """Render the opening Overview card (P1 single-rail switcher + P2 4 quality charts + runtime bar)."""
     mode = vm["meta"].get("mode")
     if mode in ("manual_only", "lgz_failed"):
         return ""
@@ -912,7 +1093,6 @@ def overview_summary_card(vm):
         + [int(row["len"]) for st in stages if st["rows"] for row in st["rows"].values()]
     )
 
-    # Quiet non-redundant header summary (scale + delivery mode only; metrics live in P1/P2)
     chr_n = len(chr_order) or (sv.get("q3") or {}).get("sequence_count") or 0
     tot_bp = (fstats or {}).get("total_bp") or (sv.get("q3") or {}).get("length_bp") or 0
     head_bits = []
@@ -925,7 +1105,7 @@ def overview_summary_card(vm):
         head_bits.append("LGZ-only")
     head_right = f'<span class="ov-head-meta">{" · ".join(head_bits)}</span>'
 
-    # P1: Connected segmented stepper + single-rail stage view
+    # P1: Stepper + single-rail stage view (zoomable & expandable)
     step_btns = []
     for i, st in enumerate(stages):
         active = st["key"] == default_key
@@ -1009,14 +1189,9 @@ def overview_summary_card(vm):
         "order": [st["key"] for st in stages if st["rows"]],
         "stages": {
             st["key"]: {
-                "tag": st["tag"],
-                "zh": st["zh"],
-                "en": st["en"],
-                "href": st["href"],
-                "jump_zh": st["jump_zh"],
-                "jump_en": st["jump_en"],
-                "show_tel": st["show_tel"],
-                "is_final": st["is_final"],
+                "tag": st["tag"], "zh": st["zh"], "en": st["en"],
+                "href": st["href"], "jump_zh": st["jump_zh"], "jump_en": st["jump_en"],
+                "show_tel": st["show_tel"], "is_final": st["is_final"],
                 "rows": {
                     cname: {"l": fmt_bp_short(r["len"]), "g": r["gaps"], "s": r["segs"]}
                     for cname, r in (st["rows"] or {}).items()
@@ -1035,21 +1210,24 @@ def overview_summary_card(vm):
     }
     payload_json = json.dumps(stage_payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
-    # P2: 2x2 concise SVG chart grid (zero verbose captions)
-    c1_svg, c1_meta = _svg_gap_trajectory(sv, versions, tools, winning_v, auto)
-    c2_svg = _svg_donuts(sv, fstats, tel_info, lgz, colors, auto)
-    c3_svg, c3_title, c3_meta = _svg_tools_or_chrs(vm, tools, winning_v, tel_info, auto)
-    c4_svg, c4_meta = _svg_continuity_and_gap_bp(lgz, sv, fstats, auto)
+    # P2: 4 genome quality charts + compact runtime strip
+    c1_svg, c1_meta = _svg_gap_combo(vm, sv, versions, tools, winning_v, fstats, auto)
+    c2_svg, c2_meta = _svg_contig_continuity(stages, sv, fstats, auto)
+    c3_svg, c3_meta = _svg_donuts(sv, fstats, tel_info, lgz, colors, auto)
+    c4_svg, c4_meta = _svg_chr_coverage_t2t(lgz, chr_order, fstats, tel_info, cen_map)
+    rt_html = _runtime_bar_html(lgz)
 
     p2_html = (
         '<div class="ov-subblock">'
         f'<div class="ov-sub-head"><h3>{bi("关键指标", "Key Metrics")}</h3></div>'
         '<div class="ov-charts-grid">'
-        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("Gap 递减趋势", "Gap Reduction")}</h4>{c1_meta}</div>{c1_svg}</article>'
-        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("完整度概览", "Completeness")}</h4></div>{c2_svg}</article>'
-        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{c3_title}</h4>{c3_meta}</div>{c3_svg}</article>'
-        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("N50 与 Gap 长度", "N50 & Gap Length")}</h4>{c4_meta}</div>{c4_svg}</article>'
-        "</div></div>"
+        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("Gap 数量与长度", "Gap Count & Length")}</h4>{c1_meta}</div>{c1_svg}</article>'
+        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("连续性跃升", "Contig Continuity")}</h4>{c2_meta}</div>{c2_svg}</article>'
+        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("结构完整度", "Structural Completeness")}</h4>{c3_meta}</div>{c3_svg}</article>'
+        f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("染色体覆盖与 T2T", "Chr Coverage & T2T")}</h4>{c4_meta}</div>{c4_svg}</article>'
+        "</div>"
+        f"{rt_html}"
+        "</div>"
     )
 
     return (
@@ -1075,55 +1253,55 @@ def overview_summary_card(vm):
 
 
 STYLE = """<style>
-.ov-head-meta{font-size:.81rem;font-weight:500;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.ov-head-meta{font-size:var(--text-sm);font-weight:500;color:var(--text-muted);font-variant-numeric:tabular-nums}
 .ov-subblock+.ov-subblock{margin-top:1.05rem;padding-top:.95rem;border-top:1px solid var(--border-subtle)}
 .ov-sub-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap;margin:0 0 .55rem}
-.ov-sub-head h3{margin:0;font-size:.88rem;font-weight:650;color:var(--text-primary)}
+.ov-sub-head h3{margin:0;font-size:var(--text-sub);font-weight:600;color:var(--text-primary)}
 .ov-p1-bar{display:inline-flex;align-items:center;gap:.65rem;flex-wrap:wrap}
 .ov-bar-sep{display:inline-block;width:1px;height:12px;background:var(--border-default)}
-.ov-jump{font-size:.78rem;font-weight:500;color:var(--accent);white-space:nowrap}
+.ov-jump{font-size:var(--text-sm);font-weight:500;color:var(--accent);white-space:nowrap}
 .ov-jump:hover{text-decoration:underline}
 .ov-stepper{display:flex;align-items:stretch;gap:3px;padding:4px;margin:0 0 .6rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle)}
-.ov-step{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:.12rem;padding:.38rem .58rem;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);text-align:left;cursor:pointer;transition:background .12s,border-color .12s,box-shadow .12s}
+.ov-step{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:.12rem;padding:.38rem .58rem;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);font-family:var(--font-sans);text-align:left;cursor:pointer;transition:background .12s,border-color .12s,box-shadow .12s}
 .ov-step:hover:not(:disabled):not(.is-active){background:var(--surface-hover);color:var(--text-primary)}
 .ov-step.is-active{border-color:var(--border-default);background:var(--surface-panel);color:var(--text-primary);box-shadow:0 1px 2px rgba(15,23,42,.06)}
 .ov-step:disabled{opacity:.58;cursor:default}
 .ov-step-top{display:flex;align-items:center;gap:.34rem;min-width:0}
-.ov-step-tag{display:inline-flex;align-items:center;padding:.03rem .32rem;border-radius:3px;background:var(--surface-muted);font:650 .69rem/1.3 var(--font-mono);color:var(--text-secondary);flex-shrink:0}
+.ov-step-tag{display:inline-flex;align-items:center;padding:.03rem .32rem;border-radius:3px;background:var(--surface-muted);font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;line-height:1.25;color:var(--text-secondary);flex-shrink:0}
 .ov-step.is-active .ov-step-tag{background:var(--brand);color:#fff}
 .ov-step.is-active.is-final .ov-step-tag{background:var(--gen-closed);color:#fff}
-.ov-step-name{font-size:.79rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ov-step-sub{font-size:.72rem;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-step-name{font-size:var(--text-sm);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-step-sub{font-size:var(--text-xs);color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ov-step.is-active .ov-step-sub{color:var(--text-secondary)}
-.ov-step-arr{display:inline-flex;align-items:center;color:var(--border-strong);font-size:.88rem;user-select:none;padding:0 1px;opacity:.7}
+.ov-step-arr{display:inline-flex;align-items:center;color:var(--border-strong);font-size:var(--text-sub);user-select:none;padding:0 1px;opacity:.7}
 .ov-tel-swatch{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand);border:1.5px solid var(--surface-panel);box-shadow:0 0 0 1px var(--brand)}
 .ov-track-frame{position:relative;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-panel);overflow:hidden;padding-bottom:2.3rem}
 .ov-axis,.ov-chr-row>summary,.ov-stage-row{display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;gap:.75rem}
-.ov-axis{padding:.42rem .85rem .36rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:.76rem;font-weight:600}
-.ov-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:.73rem}
+.ov-axis{padding:.42rem .85rem .36rem;background:var(--surface-subtle);border-bottom:1px solid var(--border-subtle);color:var(--text-secondary);font-size:var(--text-xs);font-weight:600}
+.ov-axis .story-ruler{font-weight:500;color:var(--text-muted);font-size:var(--text-xs)}
 .ov-chr-row{border-bottom:1px solid var(--border-subtle)}
 .ov-chr-row:last-child{border-bottom:0}
 .ov-chr-row>summary{cursor:pointer;list-style:none;padding:.34rem .85rem;min-height:2.05rem;transition:background .1s}
 .ov-chr-row>summary::-webkit-details-marker{display:none}
 .ov-chr-row>summary:hover,.ov-chr-row[open]>summary{background:var(--surface-subtle)}
 .ov-chr-meta{display:flex;align-items:baseline;justify-content:space-between;gap:.32rem;min-width:0}
-.ov-chr-name{display:inline-flex;align-items:center;gap:.32rem;font:600 .81rem/1.25 var(--font-mono);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-chr-name{display:inline-flex;align-items:center;gap:.32rem;font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;line-height:1.25;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ov-chr-name::before{content:'▸';font-size:10px;color:var(--text-muted);flex-shrink:0}
 .ov-chr-row[open]>summary .ov-chr-name::before{content:'▾'}
 .ov-chr-stats{display:inline-flex;align-items:baseline;gap:.3rem;flex-shrink:0;font-variant-numeric:tabular-nums}
-.ov-chr-len{font-size:.72rem;color:var(--text-muted)}
-.ov-chr-gap{font:600 .69rem/1.2 var(--font-mono);padding:.02rem .28rem;border-radius:3px;background:var(--surface-muted);color:var(--text-secondary)}
+.ov-chr-len{font-size:var(--text-xs);color:var(--text-muted)}
+.ov-chr-gap{font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;line-height:1.2;padding:.02rem .28rem;border-radius:3px;background:var(--surface-muted);color:var(--text-secondary)}
 .ov-chr-gap.is-zero{background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
 .ov-chr-detail{padding:.38rem .85rem .5rem;border-top:1px dashed var(--border-subtle);background:var(--surface-subtle)}
-.ov-chr-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.32rem .75rem;margin:0 0 .35rem;padding-left:.85rem;font-size:.75rem;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.ov-chr-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.32rem .75rem;margin:0 0 .35rem;padding-left:.85rem;font-size:var(--text-xs);color:var(--text-secondary);font-variant-numeric:tabular-nums}
 .ov-chr-summary b{color:var(--text-primary);font-weight:600}
 .ov-chr-summary .is-ok{color:var(--gen-closed);font-weight:600}
 .ov-stage-row{min-height:1.48rem;padding:.08rem 0;border-radius:3px}
 .ov-stage-row.is-current{background:var(--brand-soft)}
 .ov-stage-row.is-current.is-final{background:var(--tone-ok-bg)}
-.ov-stage-lbl{display:flex;align-items:center;justify-content:space-between;gap:.32rem;padding-left:.85rem;padding-right:.15rem;min-width:0;font-size:.74rem;color:var(--text-secondary)}
+.ov-stage-lbl{display:flex;align-items:center;justify-content:space-between;gap:.32rem;padding-left:.85rem;padding-right:.15rem;min-width:0;font-size:var(--text-xs);color:var(--text-secondary)}
 .ov-stage-lbl-l{display:inline-flex;align-items:center;gap:.3rem;min-width:0;overflow:hidden}
-.ov-stage-lbl-tag{display:inline-flex;align-items:center;padding:.02rem .28rem;border-radius:3px;background:var(--surface-panel);border:1px solid var(--border-subtle);font:650 .66rem/1.25 var(--font-mono);color:var(--text-secondary);flex-shrink:0}
+.ov-stage-lbl-tag{display:inline-flex;align-items:center;padding:.02rem .26rem;border-radius:3px;background:var(--surface-panel);border:1px solid var(--border-subtle);font-family:var(--font-mono);font-size:10px;font-weight:650;line-height:1.25;color:var(--text-secondary);flex-shrink:0}
 .ov-stage-row.is-current .ov-stage-lbl-tag{background:var(--brand);border-color:var(--brand);color:#fff}
 .ov-stage-row.is-current.is-final .ov-stage-lbl-tag{background:var(--gen-closed);border-color:var(--gen-closed);color:#fff}
 .ov-stage-lbl-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1137,7 +1315,7 @@ STYLE = """<style>
 .ov-tel.is-ok{background:var(--brand);border:1.5px solid var(--surface-panel)}
 .ov-tel.is-ext{background:var(--gen-closed);border:1.5px solid var(--surface-panel)}
 .ov-tel.is-miss{background:var(--surface-panel);border:1.5px solid var(--border-strong)}
-.ov-more-chrs>summary{padding:.42rem .85rem;font-size:.78rem;font-weight:500;color:var(--accent);background:var(--surface-subtle);cursor:pointer;border-top:1px dashed var(--border-subtle);list-style:none}
+.ov-more-chrs>summary{padding:.42rem .85rem;font-size:var(--text-sm);font-weight:500;color:var(--accent);background:var(--surface-subtle);cursor:pointer;border-top:1px dashed var(--border-subtle);list-style:none}
 .ov-more-chrs>summary::-webkit-details-marker{display:none}
 .ov-more-chrs>summary:hover{background:var(--surface-hover)}
 .story-zoom-stage .ov-track-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--chart-scale, 1))}
@@ -1155,32 +1333,39 @@ STYLE = """<style>
 .story-zoom-stage .ov-rail{margin:.42rem 1rem .42rem .8rem;height:22px;z-index:1}
 .story-zoom-stage .ov-chr-detail .ov-rail{margin:.2rem 1rem .2rem .8rem}
 .story-zoom-stage .ov-seg{top:3px;height:16px}
-.story-zoom-stage .ov-seg.is-src{min-width:6px}
-.story-zoom-stage .ov-seg.is-gap,.story-zoom-stage .ov-seg.is-patch{min-width:6px}
+.story-zoom-stage .ov-seg.is-src,.story-zoom-stage .ov-seg.is-gap,.story-zoom-stage .ov-seg.is-patch{min-width:6px}
 .ov-charts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
 .ov-chart-card{display:flex;flex-direction:column;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle);padding:.68rem .85rem .58rem;min-width:0}
 .ov-chart-head{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;margin:0 0 .32rem}
-.ov-chart-head h4{margin:0;font-size:.82rem;font-weight:650;color:var(--text-primary)}
-.ov-chart-meta{font:500 .73rem/1.2 var(--font-mono);color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ov-chart-head h4{margin:0;font-size:var(--text-sub);font-weight:600;color:var(--text-primary)}
+.ov-chart-meta{font-family:var(--font-mono);font-size:var(--text-xs);font-weight:500;line-height:1.2;color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .ov-chart-meta.is-ok{color:var(--gen-closed);font-weight:600}
 .ov-svg{display:block;width:100%;height:auto;flex:1 1 auto;background:var(--surface-panel);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:.18rem}
-.ov-ax-txt{font-family:var(--font-mono);font-size:9px;font-weight:500;fill:var(--text-muted)}
-.ov-ax-lbl{font-family:var(--font-mono);font-size:9.5px;font-weight:600;fill:var(--text-secondary)}
+.ov-ax-txt{font-family:var(--font-mono);font-size:var(--svg-micro);font-weight:500;fill:var(--text-muted)}
+.ov-ax-lbl{font-family:var(--font-mono);font-size:var(--svg-label);font-weight:600;fill:var(--text-secondary)}
 .ov-ax-lbl.is-win{fill:var(--gen-closed)}
-.ov-val-txt{font-family:var(--font-mono);font-size:9.5px;font-weight:600;fill:var(--text-primary)}
-.ov-val-mini{font-family:var(--font-mono);font-size:8.5px;font-weight:600;fill:var(--text-primary)}
-.ov-lbl-win{font-family:var(--font-mono);font-size:9.5px;font-weight:650;fill:var(--gen-closed)}
-.ov-lbl-sub{font-family:var(--font-mono);font-size:9px;font-weight:500;fill:var(--text-muted)}
-.ov-donut-big{font-family:var(--font-mono);font-size:12px;font-weight:700;fill:var(--text-primary)}
-.ov-donut-sub{font-family:var(--font-mono);font-size:8.5px;font-weight:500;fill:var(--text-muted)}
-.ov-donut-title{font-size:10px;font-weight:600;fill:var(--text-primary)}
-.ov-donut-cap{font-size:8.5px;font-weight:500;fill:var(--text-muted)}
-.ov-leg-txt{font-size:8.5px;font-weight:500;fill:var(--text-secondary)}
-.ov-bar-lbl{font-family:var(--font-mono);font-size:10px;font-weight:600;fill:var(--text-secondary)}
+.ov-val-txt{font-family:var(--font-mono);font-size:var(--svg-label);font-weight:600;fill:var(--text-primary)}
+.ov-bar-bp{font-family:var(--font-mono);font-size:var(--svg-micro);font-weight:500;fill:var(--text-muted)}
+.ov-lbl-win{font-family:var(--font-mono);font-size:var(--svg-label);font-weight:650;fill:var(--gen-closed)}
+.ov-lbl-sub{font-family:var(--font-mono);font-size:var(--svg-micro);font-weight:500;fill:var(--text-muted)}
+.ov-donut-big{font-family:var(--font-mono);font-size:var(--svg-kpi);font-weight:700;fill:var(--text-primary)}
+.ov-donut-sub{font-family:var(--font-mono);font-size:var(--svg-micro);font-weight:500;fill:var(--text-muted)}
+.ov-donut-title{font-family:var(--font-sans);font-size:var(--svg-label);font-weight:600;fill:var(--text-primary)}
+.ov-donut-cap{font-family:var(--font-sans);font-size:var(--svg-micro);font-weight:500;fill:var(--text-muted)}
+.ov-leg-txt{font-family:var(--font-sans);font-size:var(--svg-micro);font-weight:500;fill:var(--text-secondary)}
+.ov-bar-lbl{font-family:var(--font-mono);font-size:var(--svg-label);font-weight:600;fill:var(--text-secondary)}
 .ov-bar-lbl.is-win{fill:var(--gen-closed)}
-.ov-bar-val{font-family:var(--font-mono);font-size:9.5px;font-weight:600;fill:var(--text-secondary)}
+.ov-bar-val{font-family:var(--font-mono);font-size:var(--svg-micro);font-weight:600;fill:var(--text-secondary)}
 .ov-bar-val.is-win{fill:var(--gen-closed)}
-.ov-mini-title{font-size:9.5px;font-weight:600;fill:var(--text-secondary)}
+.ov-runtime-bar{display:flex;align-items:center;gap:.6rem .9rem;flex-wrap:wrap;margin-top:.75rem;padding:.46rem .78rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle);font-size:var(--text-xs);color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.ov-rt-head{white-space:nowrap;color:var(--text-muted)}
+.ov-rt-head b{color:var(--text-primary);font-family:var(--font-mono);font-weight:600}
+.ov-rt-track{flex:1 1 160px;min-width:120px;display:flex;height:7px;border-radius:999px;overflow:hidden;background:var(--surface-muted);gap:1px}
+.ov-rt-seg{display:block;height:100%}
+.ov-rt-legend{display:inline-flex;align-items:center;gap:.35rem .7rem;flex-wrap:wrap}
+.ov-rt-item{display:inline-flex;align-items:center;gap:.28rem;white-space:nowrap}
+.ov-rt-item b{font-family:var(--font-mono);font-weight:600;color:var(--text-primary)}
+.ov-rt-dot{display:inline-block;width:7px;height:7px;border-radius:2px;flex-shrink:0}
 @media (max-width:860px){
   .ov-charts-grid{grid-template-columns:1fr}
   .ov-stepper{flex-wrap:wrap}
@@ -1190,7 +1375,7 @@ STYLE = """<style>
   .ov-axis,.ov-chr-row>summary,.ov-stage-row{grid-template-columns:116px minmax(0,1fr);gap:.45rem;padding-left:.65rem;padding-right:.65rem}
   .ov-chr-detail{padding:.32rem .65rem .42rem}
   .ov-chr-summary,.ov-stage-lbl{padding-left:.35rem}
-  .ov-chr-name{font-size:.76rem}
+  .ov-chr-name{font-size:var(--text-xs)}
   .ov-step-arr,.ov-bar-sep{display:none}
   .story-zoom-stage .ov-axis,.story-zoom-stage .ov-chr-row>summary,.story-zoom-stage .ov-stage-row{grid-template-columns:136px minmax(0,1fr);gap:0;padding:0}
 }

@@ -46,7 +46,7 @@ INPUT_STYLE = """<style>
 .project-dataset-role[data-dataset-role="primary"]{background:var(--ctg-primary-fill);border-color:var(--ctg-primary-stroke);color:var(--ctg-primary-text)}
 .project-dataset-role[data-dataset-role="support"]{background:var(--ctg-companion-fill);border-color:var(--ctg-companion-stroke);color:var(--ctg-companion-text)}
 .input-aux-bar{display:flex;align-items:center;gap:.45rem .55rem;flex-wrap:wrap;margin-top:.65rem;font-size:.8rem;color:var(--text-secondary)}
-.input-qc-tag{display:inline-flex;align-items:center;gap:.36rem;padding:3px 10px;border:1px solid var(--border-subtle);border-radius:999px;background:var(--surface-subtle);color:var(--text-secondary);font:500 .79rem/1.35 inherit;white-space:nowrap}
+.input-qc-tag{display:inline-flex;align-items:center;gap:.36rem;padding:3px 10px;border:1px solid var(--border-subtle);border-radius:999px;background:var(--surface-subtle);color:var(--text-secondary);font-family:var(--font-sans);font-size:var(--text-xs);font-weight:500;line-height:1.35;white-space:nowrap}
 .input-qc-tag.is-enabled{border-color:var(--tone-ok-line);background:var(--tone-ok-bg);color:var(--tone-ok-ink)}
 button.input-qc-tag.is-clickable{cursor:pointer;transition:background .12s,border-color .12s,box-shadow .12s}
 button.input-qc-tag.is-clickable:hover{border-color:var(--gen-closed);box-shadow:0 1px 3px rgba(15,23,42,.08);filter:brightness(.98)}

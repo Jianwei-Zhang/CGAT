@@ -125,9 +125,11 @@ class ReportFrontendUITests(unittest.TestCase):
         self.assertIn('class="ov-track-frame" data-zoom-frame="1"', html)
         self.assertIn('<details class="ov-chr-row"', html)
         self.assertIn('aria-label="Gap trajectory"', html)
+        self.assertIn('aria-label="Contig continuity"', html)
         self.assertIn('aria-label="Completeness gauges"', html)
-        self.assertIn('aria-label="Tool comparison"', html)
-        self.assertIn('aria-label="N50 and Gap bp"', html)
+        self.assertIn('aria-label="Chromosome coverage"', html)
+        self.assertIn('--text-card:15px', html)
+        self.assertIn('--svg-label:9.5px', html)
         self.assertEqual(html.count('id="inputs"'), 1)
         self.assertIn("12.5%", html)
         def row(ds, ctg, chrom):
