@@ -103,8 +103,9 @@ class Q0PublicationTests(unittest.TestCase):
     def test_main_entry_publishes_cross_dataset_q0_not_first_ds(self):
         fixture, truth = bridge_fixture()
         root = complete_workspace(fixture, self.directory)
-        completed = run_prepare(root)
+        completed = run_prepare(root, threads=4)
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("Q0 placement thread budget=1", completed.stdout)  # Unpacked legacy evidence: don't start empty pools.
         self.assertEqual(dict(read_fasta(root / "grt/q/q0.fa")), {"chr1": truth})
         selected = read_tsv(root / "metadata/grt_q_segments.tsv")
         self.assertEqual([r["dataset_name"] for r in selected], ["a", "c", "b"])

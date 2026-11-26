@@ -259,6 +259,10 @@ def prepare(root, threads, mapper):
     request, receipt, cached, wanted = initial_generation(root, snapshot, mapper, threads=threads)
     full = wanted is None and receipt is None
     from .q0_junction_review import Review, dispatch, extend_draft, extra_count
+    def select_for_audit(data, review=None):
+        return select_q0_paths(data, screen_threads=threads, review=review,
+                               progress=lambda msg: print(f"LGZ q0 threshold audit: {msg}", flush=True))
+
     prior_local = []
     for n in range(MAX_REPAIRS+3):
         if receipt is None:
@@ -273,7 +277,7 @@ def prepare(root, threads, mapper):
         data = load_evidence_input(root,_draft=receipt)
         scoped = data.catalog['supplement_scope']['effective']=='decision_frontier'
         review = Review() if scoped and not cached else None
-        selection = select_q0_paths(data, **({'review':review} if review is not None else {}))
+        selection = select_for_audit(data,review)
         if review is not None and review.proposals:
             from .q0_catalog import CandidateCatalog
             extra = dispatch(review,selection,root,CandidateCatalog({},data.sources,data.parts),
@@ -291,7 +295,7 @@ def prepare(root, threads, mapper):
                 data = load_evidence_input(root,_draft=receipt)
                 if nonempty:
                     del selection
-                    selection = select_q0_paths(data)
+                    selection = select_for_audit(data)
                 output_paths = [prep.workspace_artifact_path(root,row['path']) for row in receipt['outputs']]
                 before = [prep.file_signature(p) for p in output_paths]
         count = extra_count(data.catalog)

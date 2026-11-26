@@ -108,8 +108,14 @@ class JunctionReviewTests(unittest.TestCase):
                 return native(*args,**kw)
             with ExitStack() as patches:
                 for k,opts in [('regional_enabled',{'return_value':True}),('partial_source_request',{'return_value':whole}),('prepare_partial',{'side_effect':partial}),('supplemental_groups',{'return_value':[]}),('_supplement',{'side_effect':only_warm})]:patches.enter_context(patch.object(prep,k,**opts))
-                with patch.object(mapping,'_execute',wraps=mapping._execute) as spawn:
-                    receipt=prep.prepare_evidence(root,threads=1,minimap2=mapper,supplement_scope='positive_threshold');self.assertEqual(spawn.call_count,1)
+                with (patch.object(mapping,'_execute',wraps=mapping._execute) as spawn,
+                      patch.object(admission,'select_q0_paths',wraps=admission.select_q0_paths) as selections):
+                    receipt=prep.prepare_evidence(root,threads=3,minimap2=mapper,supplement_scope='positive_threshold')
+                self.assertEqual(spawn.call_count,1)
+                # Initial formal audit, then one new selection on the nonempty local PAF.
+                self.assertEqual([c.kwargs.get('screen_threads',1) for c in selections.call_args_list],[3,3])
+                self.assertIsNotNone(selections.call_args_list[0].kwargs.get('review'))
+                self.assertIsNone(selections.call_args_list[1].kwargs.get('review'))
             self.assertEqual(prep.load_verified_evidence(root),receipt);actual=admission.load_evidence_input(root);scope=actual.catalog['supplement_scope'];self.assertEqual(review.extra_count(actual.catalog),1);self.assertEqual(len(actual.catalog['supplementary_alignments']),2);self.assertEqual(bool(scope.get('deferred_native_matrices')),cold)
             result=admission.construct_q0(actual);self.assertEqual(result.records['chr1'],truth);self.assertEqual([j.kind for j in result.paths['chr1'].path.joins],['sequence_overlap','sequence_overlap']);self.assertIn(a.source,[s.source for s in result.paths['chr1'].path.slices]);
             with patch.object(mapping,'_execute',side_effect=AssertionError('warm resume launched a mapper')):self.assertEqual(prep.prepare_evidence(root,threads=1,minimap2=mapper,supplement_scope='positive_threshold'),receipt)

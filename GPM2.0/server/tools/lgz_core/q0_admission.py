@@ -1078,9 +1078,9 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
 
 def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
                  path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
-                 progress: Callable[[str], None] = _quiet) -> Construction:
+                 progress: Callable[[str], None] = _quiet, screen_threads: int = 1) -> Construction:
     selection = select_q0_paths(data, admission_policy=admission_policy, path_policy=path_policy,
-                                quality_pass=quality_pass, progress=progress)
+                                quality_pass=quality_pass, progress=progress, screen_threads=screen_threads)
     admission, searches, occupied = selection.admission, selection.paths, selection.occupied
     if not any(search.path is not None for search in searches.values()):
         raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
@@ -1154,11 +1154,16 @@ def selector_identity() -> str:
                                     ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
 
 
-def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, **kwargs) -> Construction:
+def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, screen_threads: int = 1, **kwargs) -> Construction:
     before = selector_identity()
     progress("loading Q0 alignment evidence")
     data = load_evidence_input(root)
-    result = construct_q0(data, progress=progress, **kwargs)
+    from .q0_retained_hits import EvidenceRows
+    # The bounded worker packets support retained hits. The legacy full loader uses
+    # unpacked alignments; do not set up pools whose packets would all fall back.
+    budget = screen_threads if isinstance(data.evidence, EvidenceRows) else 1
+    progress(f"Q0 placement thread budget={budget}")
+    result = construct_q0(data, progress=progress, screen_threads=budget, **kwargs)
     if stable_id("q0-ready-evidence", load_verified_evidence(root)) != data.ready_manifest_identity:
         raise Q0EvidenceError("q0 evidence changed while selecting paths")
     if selector_identity() != before:

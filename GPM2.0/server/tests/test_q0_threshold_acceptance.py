@@ -163,13 +163,35 @@ class ThresholdAcceptanceTests(unittest.TestCase):
         from server.tools.lgz_core.q0_publication import validate_prepared_q0
         with tempfile.TemporaryDirectory() as t:
             f, truth=bridge_fixture(reverse=True); root=complete_workspace(f,Path(t)); fake=Path(t)/'q0-fixture-bin'
-            with patch.dict(os.environ,{'PATH':str(fake)+os.pathsep+os.environ['PATH']}):
-                prep.prepare_evidence(root,minimap2=str(fake/'minimap2'),supplement_scope=SCOPE)
-                run=run_prepare(root); self.assertEqual(run.returncode,0,run.stderr)
+            with (patch.dict(os.environ,{'PATH':str(fake)+os.pathsep+os.environ['PATH'],'GPM_RUN_THREADS':'3'}),
+                  patch.object(adm,'select_q0_paths',wraps=adm.select_q0_paths) as audits):
+                prep.prepare_evidence(root,threads=4,minimap2=str(fake/'minimap2'),supplement_scope=SCOPE)
+                self.assertTrue(audits.called)
+                self.assertEqual({c.kwargs.get('screen_threads',1) for c in audits.call_args_list},{4})
+                run=run_prepare(root,threads=8); self.assertEqual(run.returncode,0,run.stderr)
+                from server.tools.run_resources import execution_threads
+                self.assertIn(f'placement thread budget={execution_threads(8)}',run.stdout)
             self.assertEqual(dict(read_fasta(root/'grt/q/q0.fa')),{'chr1':truth})
             freeze=validate_prepared_q0(root)
             self.assertEqual(next(r['available'] for r in freeze['sources'] if r['source']['contig']=='c'),
                              [{'start':0,'end':200},{'start':1000,'end':1200}])
+
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'bounded spawned workers on Linux')
+    def test_published_threshold_generation_is_identical_with_actual_screen_workers(self):
+        from server.tools.lgz_core import q0_source_screen as lanes
+        with tempfile.TemporaryDirectory() as t:
+            f,truth=bridge_fixture(reverse=True);root=f.workspace(t);(root/'metadata/package.tsv').write_text('reads_qc_enabled\nfalse\n')
+            fake=Path(t)/'q0-fixture-bin'
+            with patch.dict(os.environ,{'PATH':str(fake)+os.pathsep+os.environ['PATH']}):
+                prep.prepare_evidence(root,minimap2=str(fake/'minimap2'),supplement_scope=SCOPE)
+                serial=adm.build_q0(root);logs=[]
+                # This tiny fixture only overrides the workload-size gate; packets, spawned
+                # reads, owner order, publication audit and every evidence ID are real.
+                with (patch.object(lanes,'_lanes',return_value=3),
+                      patch.object(lanes,'_weight',side_effect=lambda data,part: bool(data.reference_hits.get(part.source)))):
+                    parallel=adm.build_q0(root,screen_threads=3,progress=logs.append)
+                self.assertEqual(parallel,serial);self.assertEqual(parallel.records,{'chr1':truth})
+                self.assertGreater(int(next(s for s in logs if s.startswith('reference screen complete:')).rsplit('=',1)[1]),0)
 
     def test_weak_join_does_not_build_a_discarded_catalog_or_reread_the_source_fasta_for_dispatch(self):
         f,_=bridge_fixture(); f.links.clear(); f.raw={k:v for k,v in f.raw.items() if '_vs_ref/' in k}
