@@ -535,7 +535,7 @@ WORKBENCH_JS = r"""
       total++;
       const okChr=!chrVal||tr.dataset.chr===chrVal;
       const states=(tr.dataset.states||'').split(',');
-      const okSt=(stVal==='all')||(stVal==='closed'&&states.includes('closed'))||(stVal==='partial'&&states.includes('partial'))||(stVal==='rejected'&&states.includes('rejected'))||(stVal==='unfilled'&&states.every(s=>s==='unfilled'||s.startsWith('tool_')));
+      const okSt=(stVal==='all')||(stVal==='closed'&&states.includes('closed'))||(stVal==='rejected'&&states.includes('rejected'))||(stVal==='unfilled'&&states.every(s=>s==='unfilled'||s==='partial'||s.startsWith('tool_')));
       const okQ=!qVal||(tr.textContent||'').toLowerCase().includes(qVal);
       const vis=okChr&&okSt&&okQ;
       tr.classList.toggle('is-hidden',!vis);
@@ -613,7 +613,7 @@ STATUS_VOCAB = {
     "skipped": ("已跳过", "Skipped", "neutral"),
     "not_recorded": ("未记录", "Not recorded", "neutral"),
     "closed": ("已闭合", "Closed", "ok"),
-    "partial": ("部分填补", "Partial", "info"),
+    "partial": ("未闭合", "Unclosed", "neutral"),
     "unfilled": ("未填补", "Unfilled", "neutral"),
     "rejected": ("已拒绝", "Rejected", "err"),
     "embedded": ("已嵌入", "Embedded", "ok"),
@@ -778,15 +778,17 @@ def format_counts_html(counts, *, status=None, invalidated=False, omit_zero=Fals
         if status in {"failed", "pending", "running", "invalidated", "report_failed"}:
             return '<span class="muted">' + bi(f"无可用统计（{status}）", f"Not available ({status})") + '</span>'
         return '<span class="muted">' + bi("未记录", "Not recorded") + '</span>'
+    merged_counts = dict(counts)
+    if merged_counts.get("partial"):
+        merged_counts["unfilled"] = (merged_counts.get("unfilled") or 0) + (merged_counts.get("partial") or 0)
     labels = (
         ("closed", "已闭合", "Closed", "is-closed"),
-        ("partial", "部分填补", "Partial", "is-partial"),
-        ("unfilled", "未填补", "Unfilled", "is-unfilled"),
+        ("unfilled", "未闭合", "Unclosed", "is-unfilled"),
         ("rejected", "已拒绝", "Rejected", "is-rejected"),
     )
     chips = []
     for key, zh, en, css_cls in labels:
-        val = counts.get(key)
+        val = merged_counts.get(key)
         if val is not None and (not omit_zero or val > 0):
             chips.append(f'<span class="count-chip {css_cls}">{bi(zh, en)} <b>{esc(fmt_int(val))}</b></span>')
     if not chips:
@@ -1190,7 +1192,7 @@ def render_tool_pages(summary, provenance, final, assets, *, page_size=PAGE_SIZE
     remaining_gaps = summary["remaining_gap_count"]
     outcome = summary["outcome"]
     no_accepted_changes = (
-        accepted_edits == 0 and counts.get("closed", 0) == 0 and counts.get("partial", 0) == 0
+        accepted_edits == 0 and counts.get("closed", 0) == 0
     )
 
     # 1. Single-row status strip (native execution | CGAT admission | publication)
@@ -1236,14 +1238,12 @@ def render_tool_pages(summary, provenance, final, assets, *, page_size=PAGE_SIZE
 
     # 2. Hero Visual: 100% Stacked Gap Outcomes Bar (no redundant 4-7 KPI cards!)
     c_closed = counts.get("closed") or 0
-    c_partial = counts.get("partial") or 0
-    c_unfilled = counts.get("unfilled") or 0
+    c_unfilled = (counts.get("unfilled") or 0) + (counts.get("partial") or 0)
     c_rejected = counts.get("rejected") or 0
     stacked = svg_stacked_bar(
         [
             (c_closed, "var(--gen-closed)", f"Closed / 已闭合: {c_closed}"),
-            (c_partial, "var(--gen-partial)", f"Partial / 部分填补: {c_partial}"),
-            (c_unfilled, "var(--gen-unfilled)", f"Unfilled / 未填补: {c_unfilled}"),
+            (c_unfilled, "var(--gen-unfilled)", f"Unclosed / 未闭合: {c_unfilled}"),
             (c_rejected, "var(--gen-rejected)", f"Rejected / 已拒绝: {c_rejected}"),
         ],
         width=760,
@@ -1252,8 +1252,7 @@ def render_tool_pages(summary, provenance, final, assets, *, page_size=PAGE_SIZE
     )
     legend_bits = [
         f'<span class="legend-item"><i class="swatch" style="background:var(--gen-closed)"></i>{bi("已闭合", "Closed")} <b>{c_closed:,}</b></span>',
-        f'<span class="legend-item"><i class="swatch" style="background:var(--gen-partial)"></i>{bi("部分填补", "Partial")} <b>{c_partial:,}</b></span>' if c_partial else "",
-        f'<span class="legend-item"><i class="swatch" style="background:var(--gen-unfilled)"></i>{bi("未填补", "Unfilled")} <b>{c_unfilled:,}</b></span>' if c_unfilled else "",
+        f'<span class="legend-item"><i class="swatch" style="background:var(--gen-unfilled)"></i>{bi("未闭合", "Unclosed")} <b>{c_unfilled:,}</b></span>' if c_unfilled else "",
         f'<span class="legend-item"><i class="swatch" style="background:var(--gen-rejected)"></i>{bi("已拒绝", "Rejected")} <b>{c_rejected:,}</b></span>' if c_rejected else "",
     ]
     exact_metrics = [
@@ -1364,8 +1363,7 @@ def render_tool_pages(summary, provenance, final, assets, *, page_size=PAGE_SIZE
             '<div class="filter-chips">'
             '<button type="button" class="ctrl-btn is-active" data-gap-chip="all">' + bi("全部", "All") + '</button>'
             '<button type="button" class="ctrl-btn" data-gap-chip="closed">' + bi("已闭合", "Closed") + '</button>'
-            '<button type="button" class="ctrl-btn" data-gap-chip="partial">' + bi("部分填补", "Partial") + '</button>'
-            '<button type="button" class="ctrl-btn" data-gap-chip="unfilled">' + bi("未填补", "Unfilled") + '</button>'
+            '<button type="button" class="ctrl-btn" data-gap-chip="unfilled">' + bi("未闭合", "Unclosed") + '</button>'
             '<button type="button" class="ctrl-btn" data-gap-chip="rejected">' + bi("已拒绝", "Rejected") + '</button>'
             '</div>'
             '<input type="search" data-gap-search="1" placeholder="搜索 Gap ID / 染色体 · Search..." aria-label="Filter gaps">'

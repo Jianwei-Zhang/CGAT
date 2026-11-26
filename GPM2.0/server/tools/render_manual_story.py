@@ -25,7 +25,7 @@ OUTCOMES = {
     'closed': ('闭合', 'Closed'), 'extended': ('已延伸', 'Extended'),
     'no_candidate': ('未产生候选', 'No candidate'), 'rejected': ('候选未接纳', 'Candidate rejected'),
     'failed': ('执行失败', 'Execution failed'), 'missing_reads': ('缺少 reads', 'Reads missing'),
-    'partial': ('历史部分改动', 'Historical partial edit'),
+    'partial': ('未闭合', 'Unclosed'),
 }
 
 MANUAL_STYLE = """<style>
@@ -99,7 +99,7 @@ def _gap(sc, n):
     for r in sc['attempts']:
         attempts.append(dict(r, message=REASONS.get(r['reason'])))
         tools.append([NAMES[r['tool']], r['status'], None])
-        cells.append(['closed' if r['status'] == 'closed' else 'retained' if r['status'] in ('no_candidate', 'rejected') else 'unknown'])
+        cells.append(['closed' if r['status'] == 'closed' else 'retained' if r['status'] in ('no_candidate', 'rejected', 'partial') else 'unknown'])
     return dict(manual=dict(selected=sc['selected'], winnerName=NAMES.get(sc['selected']), after=sc['after'], attempts=attempts),
                 tools=tools, chr=[[sc['chr'], n, [[sc['target'], *sc['before'], cells]]]])
 

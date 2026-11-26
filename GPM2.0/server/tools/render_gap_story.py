@@ -37,6 +37,11 @@ def gap_card(vm):
                     seen_states.add('unknown')
                     continue
                 st_code = d['state']
+                if st_code == 'partial':
+                    # Only present closed vs unclosed; never surface partial edits as closures.
+                    seen_states.add('retained')
+                    attempts.append(['retained'])
+                    continue
                 seen_states.add(st_code)
                 item = [st_code]
                 if d.get('edits') or d.get('candidates') or d.get('incomplete') or t.get('degap_jobs_by_gap', {}).get(gid):
@@ -65,10 +70,8 @@ def gap_card(vm):
 
     legend_bits = [
         '<span class="legend-item"><i class="gap-dot is-closed"></i>' + bi('已闭合', 'Closed') + '</span>',
-        '<span class="legend-item"><i class="gap-dot is-retained"></i>' + bi('未闭合', 'Unchanged') + '</span>',
+        '<span class="legend-item"><i class="gap-dot is-retained"></i>' + bi('未闭合', 'Unclosed') + '</span>',
     ]
-    if 'partial' in seen_states:
-        legend_bits.append('<span class="legend-item"><i class="gap-dot is-partial"></i>' + bi('部分改动', 'Partial') + '</span>')
     if 'unknown' in seen_states:
         legend_bits.append('<span class="legend-item"><i class="gap-dot is-unknown"></i>' + bi('无已验证结果', 'Unverified') + '</span>')
 
@@ -219,10 +222,11 @@ function bi(zh,en){const n=node('span');n.append(node('span','t-zh',zh),node('sp
 const fmt=n=>Number(n).toLocaleString('en-US');
 const fmtShort=n=>{const v=Number(n);if(v>=1e6)return (v/1e6).toFixed(2)+' Mb';if(v>=1e3)return (v/1e3).toFixed(1)+' kb';return fmt(v)+' bp'};
 const pos=s=>`${fmt(s[0]+1)}–${fmt(s[1])}`;
-const states={closed:['●','闭合','Closed'],retained:['○','未闭合','Unchanged'],partial:['△','部分改动','Partial'],unknown:['—','未验证','Unverified']};
+const states={closed:['●','已闭合','Closed'],retained:['○','未闭合','Unclosed'],unknown:['—','未验证','Unverified']};
+const normState=c=>c==='partial'?'retained':c;
 const toolStatus={published:['已发布','Published','is-ok'],staged:['已暂存','Staged',''],pending:['等待中','Pending',''],failed:['失败','Failed','is-err'],invalidated:['已失效','Invalidated','is-err']};
 const reasons={missing_native_candidate:['原生结果缺少候选序列。','Native result lacked the candidate sequence.'],candidate_shorter_than_anchors:['候选短于侧翼锚点。','Candidate was shorter than a required flank anchor.'],native_anchors_do_not_reconstruct_baseline:['候选侧翼与原路径不一致。','The native flanks did not reproduce the baseline.'],native_junction_exterior_does_not_reconstruct_baseline:['接缝外围未与原路径吻合。','The junction exteriors did not match the baseline.'],native_integration_slice_disagrees_with_full_candidate:['取用片段与完整候选不一致。','The integration slice differed from the full candidate.'],unproven_native_overlap:['未能验证末端重叠。','The proposed overlap could not be verified.'],overlap_crosses_another_gap:['重叠区跨越了另一个 gap。','The overlap crossed another gap.'],candidate_has_no_filled_bases:['候选没有非 N 的填补碱基。','Candidate supplied no non-N bases.'],candidate_does_not_change_baseline:['候选与原路径相同。','Candidate did not change the baseline.'],native_anchor_absent:['候选中找不到对应的侧翼锚点。','The required flank anchor was absent.'],native_anchor_not_unique:['候选中的侧翼锚点不唯一。','The flank anchor was not unique in the candidate.'],gap_and_flank_cannot_be_separated:['无法将 gap 修改与已知侧翼可靠分开。','The gap edit could not be separated reliably from the known flank.'],native_change_not_bound_to_an_original_gap:['修改无法归属到原始 gap。','The change could not be bound to an original gap.'],projected_gap_unchanged:['候选投影到 gap 后没有改动。','The candidate projection did not change the gap.']};
-const rank={closed:0,partial:1,retained:2,unknown:3};
+const rank={closed:0,retained:1,unknown:2};
 function attrs(n,ci,gi,ti){n.dataset.storyOpen='auto-gap-inspector';n.dataset.gapChr=ci;n.dataset.gapIndex=gi;if(ti!==undefined&&ti!==null)n.dataset.toolIndex=ti}
 const maxLength=chr.reduce((m,r)=>Math.max(m,r[1]||0),1);
 const totalLoci=chr.reduce((s,r)=>s+r[2].length,0);
@@ -232,8 +236,8 @@ function renderToolCards(){
   if(!cardsBox||!tools.length)return;
   cardsBox.replaceChildren();
   tools.forEach(([tname,tst],ti)=>{
-    let closed=0, partial=0, unknown=0;
-    chr.forEach(([, , gaps])=>gaps.forEach(g=>{const c=g[3][ti][0];if(c==='closed')closed++;else if(c==='partial')partial++;else if(c==='unknown')unknown++;}));
+    let closed=0, unknown=0;
+    chr.forEach(([, , gaps])=>gaps.forEach(g=>{const c=normState(g[3][ti][0]);if(c==='closed')closed++;else if(c==='unknown')unknown++;}));
     const btn=node('button','gap-tool-card');btn.type='button';btn.setAttribute('aria-pressed',String(ti===activeTool));
     const head=node('div','gap-tc-head');
     head.append(node('span','gap-tc-name',tname));
@@ -249,13 +253,9 @@ function renderToolCards(){
       left.append(num,bi('闭合','closed'));
     }
     stat.append(left);
-    if(partial>0){const pSpan=node('span');pSpan.append(bi(`+${partial} 部分`,`+${partial} partial`));stat.append(pSpan);}
-    else if(totalLoci>0&&unknown<totalLoci){stat.append(node('span',null,`${Math.round(100*closed/totalLoci)}%`));}
+    if(totalLoci>0&&unknown<totalLoci){stat.append(node('span',null,`${Math.round(100*closed/totalLoci)}%`));}
     const bar=node('div','gap-tc-bar');
-    if(totalLoci>0){
-      if(closed>0){const cEl=node('i','is-c');cEl.style.width=(100*closed/totalLoci)+'%';bar.append(cEl);}
-      if(partial>0){const pEl=node('i','is-p');pEl.style.width=(100*partial/totalLoci)+'%';bar.append(pEl);}
-    }
+    if(totalLoci>0&&closed>0){const cEl=node('i','is-c');cEl.style.width=(100*closed/totalLoci)+'%';bar.append(cEl);}
     btn.append(head,stat,bar);
     btn.addEventListener('click',()=>{activeTool=ti;renderToolCards();draw();});
     cardsBox.append(btn);
@@ -268,8 +268,8 @@ function draw(){
   rows.replaceChildren();
   chr.forEach(([name,len,gaps],ci)=>{
     const row=node('div','gap-row'), meta=node('div','gap-chr-meta'), head=node('div','gap-chr-head');
-    const closed=gaps.filter(g=>g[3][tid][0]==='closed').length;
-    const allUnk=gaps.every(g=>g[3][tid][0]==='unknown');
+    const closed=gaps.filter(g=>normState(g[3][tid][0])==='closed').length;
+    const allUnk=gaps.every(g=>normState(g[3][tid][0])==='unknown');
     head.append(node('b',null,name));
     const pill=node('span','gap-chr-pill'+(closed?' has-closed':''));
     pill.append(allUnk?bi('未验证','Unverified'):bi(`${closed}/${gaps.length} 闭合`,`${closed}/${gaps.length}`));
@@ -285,7 +285,7 @@ function draw(){
     const picker=node('select');picker.setAttribute('aria-label',name+' · Gap');
     const ph=node('option',null,`Gap (${gaps.length})…`);picker.append(ph);
     gaps.forEach(([id,a,b,attempts],gi)=>{
-      const code=attempts[tid][0], state=states[code], bp=b-a;
+      const code=normState(attempts[tid][0]), state=states[code], bp=b-a;
       const title=`${name} · #${gi+1} · ${pos([a,b])} (${fmt(bp)} bp) · ${state[1]} / ${state[2]} · ${id}`;
       if(len){
         const btn=node('button','st-'+code);btn.type='button';attrs(btn,ci,gi,tid);btn.title=title;btn.setAttribute('aria-label',title);
@@ -322,7 +322,7 @@ function drawMatrix(){
     c2.append(node('span','gap-matrix-pos',pos([a,b])),node('span','gap-matrix-len',fmtShort(b-a)));
     tr.append(c1,c2);
     attempts.forEach((att,ti)=>{
-      const td=node('td'), code=att[0], st=states[code];
+      const td=node('td'), code=normState(att[0]), st=states[code];
       const btn=node('button','gap-cell-btn st-'+code);btn.type='button';
       attrs(btn,ci,gi,ti);
       const dot=node('i','gap-dot is-'+code);dot.setAttribute('aria-hidden','true');
@@ -423,9 +423,9 @@ function inspector(panel,ci,gi,initial,ctx=info){
   const tools=ctx.tools,manual=ctx.manual;
   const [name,length,gaps]=ctx.chr[ci], [gid,a,b,attempts]=gaps[gi];
   const out=panel.querySelector('[data-gap-inspector]');
-  const order=tools.map((_,i)=>i).sort((i,j)=>rank[attempts[i][0]]-rank[attempts[j][0]]||i-j);
-  const verified=attempts.filter(v=>['closed','retained','partial'].includes(v[0])).length;
-  const closed=attempts.filter(v=>v[0]==='closed').length;
+  const order=tools.map((_,i)=>i).sort((i,j)=>rank[normState(attempts[i][0])]-rank[normState(attempts[j][0])]||i-j);
+  const verified=attempts.filter(v=>['closed','retained'].includes(normState(v[0]))).length;
+  const closed=attempts.filter(v=>normState(v[0])==='closed').length;
   const titleHead=manual?(name+' · '+gid):(name+' · Gap #'+(gi+1));
   panel.querySelector('#path-event-title').replaceChildren(
     document.createTextNode(titleHead+'　'),
@@ -449,7 +449,8 @@ function inspector(panel,ci,gi,initial,ctx=info){
 
   function select(i){
     buttons.forEach(([j,btn])=>btn.setAttribute('aria-pressed',String(j===i)));
-    const [s,edits=[],cands=[],inc,n,jobs=[]]=attempts[i];
+    const [rawS,rawEdits=[],cands=[],inc,n,jobs=[]]=attempts[i];
+    const s=normState(rawS), edits=s==='closed'?rawEdits:[];
     links.replaceChildren();body.replaceChildren();
     if(tools[i][0]==='DEGAP'){
       const targets=jobs.filter(j=>j.href);
@@ -484,12 +485,7 @@ function inspector(panel,ci,gi,initial,ctx=info){
       const box=node('div','story-verdict is-warn');
       const why={failed:['工具执行失败。','Tool failed in this batch.'],pending:['工具尚未执行。','Tool has not run.'],staged:['结果已暂存，尚未发布。','Result staged, not published.'],invalidated:['发布已失效。','Publication invalidated.'],publication_unverified:['无法核对交付回执。','Publication receipt unverified.']}[tools[i][1]];
       if(why)box.append(bi(...why),document.createTextNode(' '));
-      box.append(bi('无本批已验证交付结果，不计入未闭合。','No verified delivery for this tool; not counted as unchanged.'));
-      body.append(box);return;
-    }
-    if(s==='partial'){
-      const box=node('div','story-verdict is-warn');
-      box.append(bi('该工具对此位点仅产生部分改动（仍有残余 N），未计入完整闭合。','Partial edit only (residual Ns remain); not counted as closed.'));
+      box.append(bi('无本批已验证交付结果，不计入未闭合。','No verified delivery for this tool; not counted as unclosed.'));
       body.append(box);return;
     }
     const dsName=d=>d.startsWith('cgat_refinement_')?tools[i][0]:d;
@@ -532,7 +528,7 @@ function inspector(panel,ci,gi,initial,ctx=info){
   }
 
   for(const i of order){
-    const code=attempts[i][0],st=states[code],btn=node(order.length===1?'span':'button','st-'+code);
+    const code=normState(attempts[i][0]),st=states[code],btn=node(order.length===1?'span':'button','st-'+code);
     const dot=node('i','gap-dot is-'+code);dot.setAttribute('aria-hidden','true');
     btn.append(dot,document.createTextNode(tools[i][0]+' · '),bi(st[1],st[2]));
     if(manual&&manual.attempts[i].tool===manual.selected){btn.append(bi(' · 本批采用',' · Selected'))}

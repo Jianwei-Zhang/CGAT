@@ -28,9 +28,10 @@ def _track(name_html, inner, *, raw_name=False):
     return f'<div class="preview-detail-row"><span class="preview-track-lbl">{lbl}</span><div class="preview-rail">{inner}</div></div>'
 
 
-def _row(c, domain, ref, idx, colors, tool_label=None):
+def _row(c, domain, ref, idx, colors, tool_label=None, suppressed_gids=None):
     title = c['chr']
     n = c['length']
+    suppressed = suppressed_gids or set()
     upper = []
     # Group collinear adopted slices of the same source contig so split internal
     # gaps render on one source body instead of repeating duplicate rows.
@@ -39,6 +40,11 @@ def _row(c, domain, ref, idx, colors, tool_label=None):
         a, b = p['start'], p['end']
         src = p['source']
         edit = p['edit']
+        is_partial_edit = bool(edit and p.get('gaps') and any(g in suppressed for g in p['gaps']))
+        if is_partial_edit:
+            desc = f'{title} [{a:,}, {b:,}) · {b-a:,} bp · gap (unclosed)'
+            upper.append(_part(a, b, domain, 'path-gap', desc))
+            continue
         attr = ''
         desc = f'{title} [{a:,}, {b:,}) · {b-a:,} bp'
         k = p['kind']
@@ -168,6 +174,15 @@ def final_card(vm):
         single_name = name
         opts.append(f'<option value="{i}">{esc(name)}</option>')
         idx = {k: (*pair, next(j for j, t in enumerate(tools) if t['tool'] == tool)) for k, pair in index.items()} if auto else {}
+        tool_rec = next((t for t in tools if t['tool'] == tool), None) if auto else None
+        suppressed_gids = {
+            gid for gid, dec in ((tool_rec or {}).get('gap_decisions') or {}).items()
+            if dec.get('state') == 'partial'
+        }
+        closed_count = (
+            sum(1 for dec in (tool_rec.get('gap_decisions') or {}).values() if dec.get('state') == 'closed')
+            if tool_rec and tool_rec.get('gap_decisions') else v['edits']
+        )
         note = bi('FASTA · 服务器路径', 'FASTA · Server path') if v['absolute'] else bi('FASTA · 工作区相对路径', 'FASTA · Workspace-relative path')
         path = (
             '<div class="final-fasta">'
@@ -176,7 +191,7 @@ def final_card(vm):
             + copy_btn(v['fasta'], zh='复制路径', en='Copy path')
             + '</div>'
         )
-        unchanged = '<p class="muted" style="margin:.35rem 0">' + bi('本版本未接纳新编辑，沿用 LGZ 序列。', 'No new edits were admitted; the LGZ sequence was retained.') + '</p>' if v['edits'] == 0 else ''
+        unchanged = '<p class="muted" style="margin:.35rem 0">' + bi('本版本未接纳完整闭合编辑，沿用 LGZ 序列。', 'No closed gap edits were admitted; the LGZ sequence was retained.') + '</p>' if closed_count == 0 else ''
         v_tracks = v['tracks'] or []
         chr_count = len(v_tracks)
         tot_bp = sum(c['length'] for c in v_tracks)
@@ -198,7 +213,7 @@ def final_card(vm):
             zbtn = zoom_button(f"{num} Final Path · 放大视图", f"{num} Final Path · Enlarged view")
             tracks = (
                 '<div class="final-frame" data-zoom-frame="1">' + ruler
-                + '<div class="final-preview-list">' + ''.join(_row(c, domain, refs.get(c['chr']), idx, colors, tool_disp) for c in v['tracks']) + '</div>'
+                + '<div class="final-preview-list">' + ''.join(_row(c, domain, refs.get(c['chr']), idx, colors, tool_disp, suppressed_gids) for c in v['tracks']) + '</div>'
                 + zbtn + '</div>'
             )
         else:
