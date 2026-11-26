@@ -4,9 +4,12 @@ from hashlib import sha256
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from lgz_core.q0_sources import SourceKey,Interval
-from lgz_core.q0_paths import Placement,ReferenceAnchor,PathGraph,PairLink,PathPolicy
+from lgz_core.q0_paths import Placement,ReferenceAnchor,PathGraph,PairLink,PathPolicy,search_request_path
+from lgz_core.q0_threshold_questions import questions
+import compare_wheat_panel_chromosomes as chrom_trial
 from lgz_core.q0_alignments import parse_paf_line
 from lgz_core.q0_junction_review import possible_window
 from screen_wheat_junction_flanks import screen_all,maybe_old_cut
@@ -53,6 +56,15 @@ class Targeted(unittest.TestCase):
         full=[[s,[[0,10],[30,31]]]]; reduced=[[s,[[4,12],[40,42]]],[o,[[7,9]]]]; original=footprint([[s,[[7,11],[29,33]]]])
         self.assertEqual(request_delta(full,reduced,original),dict(full_only_bp=5,reduced_only_bp=6,full_only_in_frozen_demand_bp=1,reduced_only_in_frozen_demand_bp=1,same=False))
         self.assertFalse(request_delta(None,[],original)['same']);self.assertTrue(request_delta(None,None,original)['same'])
+
+    def test_whole_graph_calibration_and_arm_specific_ranking(self):
+        a,b=p('q',0,300),p('t',200,500);z=PairLink(parse_paf_line(paf(a,b,200,300,0,100),artifact='truth',line_number=1),a.source,b.source)
+        c='chr'; ps=[a,b]; old=search_request_path(PathGraph(ps,[z],(),first_request=True)); l,r=old.path.slices
+        case=dict(left=a.segment_id,right=b.segment_id,left_strand=l.orientation,right_strand=r.orientation,kind='sequence_overlap',left_cut=l.interval.end,right_cut=r.interval.start,chromosome=c,stratum='control')
+        issues=[];data=SimpleNamespace(sources={a.source,b.source},reference_lengths={c:True},parts={},pair_links=[z]);questions(data,SimpleNamespace(admission=SimpleNamespace(placements=ps),paths={c:old}),[],issue_sink=issues.append)
+        with patch.multiple(chrom_trial,create=True,PS={c:ps},OLD={c:[z]},BACKGROUND={c:[]},NEW={('full',c):[z],('reduced',c):[]},WIN={c:old.path},ISSUES={c:issues},PLAN={'cases':[case]},BYID={'q':a.source,'t':b.source}):
+            origin=chrom_trial.ranked((c,'original'))[2];full=chrom_trial.ranked((c,'full'))[2];reduced=chrom_trial.ranked((c,'reduced'))[2];self.assertEqual(origin['selected'],full['selected']);self.assertTrue(full['cases'][0]['old_junction_selected']);self.assertFalse(reduced['cases'][0]['old_junction_selected']);self.assertNotEqual(full['selected'],reduced['selected'])
+            with patch.dict(chrom_trial.ISSUES,{c:[{'foreign':1}]}), self.assertRaises(ValueError):chrom_trial.ranked((c,'original'))
 
     def test_screen_strand_and_wrong_arm_inventory(self):
         a,b=p('q',0,300),p('t',200,500);raw=paf(a,b,200,300,0,100).encode();lookup={k:dict(length=300,contig=k,dataset='ds') for k in ('q','t')}

@@ -59,7 +59,7 @@ def genome_subset(root,snap,parts,targets):
 
 def run(base,owner,stage,chrom,workers):
     global PARTSET,RANKS,NAMES,BYID
-    start=monotonic();prior=base/'q0-whole-updated.We9jf3UC';summary,detail,positions,paths=frozen(prior/'selection',prior/'result'); screen=chrom=='all-screen'; panel_stage=chrom=='panel-stage'; cases=[]; placements=[]
+    start=monotonic();prior=base/'q0-whole-updated.We9jf3UC';summary,detail,positions,paths=frozen(prior/'selection',prior/'result'); screen=chrom=='all-screen'; panel_stage=chrom=='panel-stage'; compare=chrom=='paired-chromosomes'; cases=[]; placements=[]
     if screen:
         def candidate(group,pid,alt,sides):cases.append((group,pid,alt,sides))
         bound=measure(prior/'selection',prior/'result',on_candidate=candidate,checkpoints=(summary,detail,positions,paths))
@@ -69,9 +69,14 @@ def run(base,owner,stage,chrom,workers):
         from readmit_wheat_panel import neighborhood
         hood=neighborhood(owner);needed_parts={k for r in hood['cases'] for k in r['parts']}
     else:
-        expected=next(p for p in paths if p.chromosome==chrom)
+        if compare:
+            from compare_wheat_panel_chromosomes import matched_panel
+            _,experiment=matched_panel(base);groups=sorted({r['chromosome'] for r in experiment['cases']})
+        else:
+            expected=next(p for p in paths if p.chromosome==chrom);groups=[chrom]
         with (prior/'selection/admission.jsonl').open('rb') as f:
-            for pos in positions[chrom]:f.seek(pos);placements.append(decode(json.loads(f.readline())))
+            for group in groups:
+                for pos in positions[group]:f.seek(pos);placements.append(decode(json.loads(f.readline())))
     snap,old.ROOT,old.PARTS,order,lens=old.bind(base/'q0-latest-fork-20261123-1435/control/snapshot.json',base/'q0-source-part-lookup-20261121-1600/source-part-lookup.json')
     PARTSET=needed_parts if panel_stage else {p.segment_id for p in placements};RANKS={old.PARTS[k][0] for k in PARTSET};BYID={k:order[v[0]] for k,v in old.PARTS.items()};NAMES=defaultdict(dict)
     for k in PARTSET:
@@ -123,6 +128,9 @@ def run(base,owner,stage,chrom,workers):
             with path.open('rb') as f:
                 for line in f:
                     number,raw=line.split(b'\t',1);hit=_checked_line(raw.decode(),path,rel,int(number),prefix,names[qd],names[td],cache);yield PairLink(hit,NAMES[qd][hit.query_name.encode()],NAMES[td][hit.target_name.encode()])
+    if compare:
+        from compare_wheat_panel_chromosomes import compare_groups
+        doc=compare_groups(base,links(),placements,paths,detail,summary,BYID,lens,workers);old.write(owner/'result.json',doc);log('PAIRED_CHROMOSOMES_DONE',doc['same_selected'],doc['same_request']);return
     if panel_stage:
         from readmit_wheat_panel import prepare
         prepare(owner,snap,old.ROOT,orig,regional,spools,NAMES,hood);log('PANEL_COMMON_READY',len(PARTSET));return
