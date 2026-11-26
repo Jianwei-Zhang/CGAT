@@ -20,9 +20,9 @@ def get(path,pin):
     raw=path.read_bytes();need(sha256(raw).hexdigest()==pin,'different input: '+path.name)
     return json.loads(gzip.decompress(raw) if path.suffix=='.gz' else raw)
 
-def checkpoint(folder,binding):
+def checkpoint(folder,binding,*,on_placement=None):
     prev=''; placements=defaultdict(dict); paths={}
-    names=[f.name for f in fields(Placement)];pid,chrom=map(names.index,('placement_id','chromosome'))
+    names=[f.name for f in fields(Placement)];pid,chrom,ev=map(names.index,('placement_id','chromosome','evidence_ids'))
     def rows(name,group):
         nonlocal prev
         p=folder/name;need(p.resolve()==p and p.is_file(),'unbound checkpoint path')
@@ -36,6 +36,7 @@ def checkpoint(folder,binding):
             raise ValueError('truncated checkpoint '+name)
     for row,fingerprint in rows('admission.jsonl',None):
         v=row['Placement'];need(len(v)==len(names) and v[chrom] in GROUPS and v[pid] not in placements[v[chrom]],'duplicate or foreign admission');placements[v[chrom]][v[pid]]=fingerprint
+        if on_placement is not None:on_placement(v[chrom],v[pid],v[ev])
     for i,g in enumerate(GROUPS,1):
         (row,_),=rows(f'group-{i:03d}.jsonl',g); result=decode(row);need(isinstance(result,RequestPathResult),'not a whole-draft group');p=result.path
         if p is not None:
