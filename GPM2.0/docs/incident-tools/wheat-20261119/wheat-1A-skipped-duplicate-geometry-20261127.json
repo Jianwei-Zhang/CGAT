@@ -1,0 +1,2231 @@
+{
+  "formal_workspace_modified": false,
+  "graph_sha256": "51faec603575c1bad9bf0c035b112b401f2cbbf94454530a739d758b437099c5",
+  "limitations": [
+    "Source sums are not reference coverage unions.",
+    "Coverage units include transitive equivalences; direct paired-block overlap is reported separately.",
+    "A unit shared by two sources is an engine equivalence, not independent proof of biological duplication."
+  ],
+  "mapper_calls": 0,
+  "native_gate_unchanged": true,
+  "rows": [
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 2011,
+          "duplicate_bp": 2098,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 102,
+          "duplicate_bp": 102,
+          "node": "q0-placement-9ee5d31837b085e5e4664e18",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_652"
+          ],
+          "source_bp": 350459
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 2200,
+      "duplicate_intervals": [
+        [
+          375345,
+          375414
+        ],
+        [
+          377476,
+          377509
+        ],
+        [
+          504928,
+          505201
+        ],
+        [
+          505203,
+          505687
+        ],
+        [
+          505703,
+          506957
+        ],
+        [
+          680569,
+          680656
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 0,
+      "duplicate_regions": 6,
+      "duplicate_source_bp": 2200,
+      "longest_duplicate_free_region_bp": 370975,
+      "node": "q0-placement-b7b4576ee96e0d8e2909ddb5",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 7,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_11200"
+      ],
+      "source_bp": 865082,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 8641,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 8248,
+          "duplicate_bp": 8763,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 3630,
+          "duplicate_bp": 3630,
+          "node": "q0-placement-68b1b3219ffee0cbc4d0648e",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_9480"
+          ],
+          "source_bp": 52088
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 21034,
+      "duplicate_intervals": [
+        [
+          557138,
+          557284
+        ],
+        [
+          557289,
+          557336
+        ],
+        [
+          557360,
+          557374
+        ],
+        [
+          557378,
+          557559
+        ],
+        [
+          557560,
+          558365
+        ],
+        [
+          558367,
+          558897
+        ],
+        [
+          558898,
+          559823
+        ],
+        [
+          559826,
+          560086
+        ],
+        [
+          560087,
+          562572
+        ],
+        [
+          562590,
+          562849
+        ],
+        [
+          683208,
+          683238
+        ],
+        [
+          683239,
+          683615
+        ],
+        [
+          683617,
+          683825
+        ],
+        [
+          683826,
+          685758
+        ],
+        [
+          685760,
+          686205
+        ],
+        [
+          686206,
+          687080
+        ],
+        [
+          687081,
+          687140
+        ],
+        [
+          687141,
+          687672
+        ],
+        [
+          687673,
+          690134
+        ],
+        [
+          690135,
+          690436
+        ],
+        [
+          690438,
+          690646
+        ],
+        [
+          690647,
+          690858
+        ],
+        [
+          690859,
+          690938
+        ],
+        [
+          690939,
+          691778
+        ],
+        [
+          3024502,
+          3024589
+        ],
+        [
+          3162224,
+          3164762
+        ],
+        [
+          3164763,
+          3164768
+        ],
+        [
+          3164769,
+          3164822
+        ],
+        [
+          3250849,
+          3250877
+        ],
+        [
+          3250878,
+          3250948
+        ],
+        [
+          3250949,
+          3251366
+        ],
+        [
+          3304573,
+          3305385
+        ],
+        [
+          3305386,
+          3305470
+        ],
+        [
+          3306932,
+          3306974
+        ],
+        [
+          3307199,
+          3307305
+        ],
+        [
+          3308874,
+          3308897
+        ],
+        [
+          3309303,
+          3309353
+        ],
+        [
+          3309354,
+          3310946
+        ],
+        [
+          3310960,
+          3311481
+        ],
+        [
+          3311483,
+          3311883
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 5650,
+      "duplicate_regions": 40,
+      "duplicate_source_bp": 21034,
+      "longest_duplicate_free_region_bp": 2332724,
+      "node": "q0-placement-c7826428c3307b52bcdde975",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 41,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_11191"
+      ],
+      "source_bp": 4489998,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 97,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 97,
+      "duplicate_intervals": [
+        [
+          26234,
+          26291
+        ],
+        [
+          26293,
+          26333
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 0,
+      "duplicate_regions": 2,
+      "duplicate_source_bp": 97,
+      "longest_duplicate_free_region_bp": 24079,
+      "node": "q0-placement-bc8da9673cfc49cfa188b204",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 3,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeB_contig_21"
+      ],
+      "source_bp": 39945,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 4536,
+          "duplicate_bp": 7984,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 7984,
+      "duplicate_intervals": [
+        [
+          2399323,
+          2399376
+        ],
+        [
+          2399377,
+          2402078
+        ],
+        [
+          2402081,
+          2403863
+        ],
+        [
+          2832913,
+          2833428
+        ],
+        [
+          2841154,
+          2841603
+        ],
+        [
+          3484684,
+          3487168
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 990,
+      "duplicate_regions": 6,
+      "duplicate_source_bp": 7984,
+      "longest_duplicate_free_region_bp": 2399323,
+      "node": "q0-placement-3f1dbd90e8fec8df21a991b3",
+      "overhang_bp": 20497,
+      "safe_contiguous_regions": 7,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_4654"
+      ],
+      "source_bp": 5856080,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 276,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 6697,
+          "duplicate_bp": 6697,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 659,
+          "node": "q0-placement-68b1b3219ffee0cbc4d0648e",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_9480"
+          ],
+          "source_bp": 52088
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 7632,
+      "duplicate_intervals": [
+        [
+          1585481,
+          1589192
+        ],
+        [
+          1589193,
+          1590019
+        ],
+        [
+          1590021,
+          1590095
+        ],
+        [
+          1590122,
+          1590237
+        ],
+        [
+          1590240,
+          1590506
+        ],
+        [
+          1590515,
+          1590563
+        ],
+        [
+          1590566,
+          1591008
+        ],
+        [
+          1591009,
+          1592224
+        ],
+        [
+          17174190,
+          17174618
+        ],
+        [
+          17175289,
+          17175311
+        ],
+        [
+          17176879,
+          17176908
+        ],
+        [
+          17176912,
+          17176974
+        ],
+        [
+          17177172,
+          17177211
+        ],
+        [
+          17178674,
+          17178753
+        ],
+        [
+          42921919,
+          42921999
+        ],
+        [
+          42922224,
+          42922271
+        ],
+        [
+          42927103,
+          42927167
+        ],
+        [
+          42927168,
+          42927253
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 7609,
+      "duplicate_regions": 18,
+      "duplicate_source_bp": 7632,
+      "longest_duplicate_free_region_bp": 25743166,
+      "node": "q0-placement-fa2c82cc58877f4ffb970c78",
+      "overhang_bp": 2,
+      "safe_contiguous_regions": 19,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_4653"
+      ],
+      "source_bp": 45919382,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 1125,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 28,
+          "duplicate_bp": 28,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 151,
+          "node": "q0-placement-68b1b3219ffee0cbc4d0648e",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_9480"
+          ],
+          "source_bp": 52088
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 153,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 1457,
+      "duplicate_intervals": [
+        [
+          368920,
+          368962
+        ],
+        [
+          370406,
+          370490
+        ],
+        [
+          371242,
+          371267
+        ],
+        [
+          1020917,
+          1021070
+        ],
+        [
+          3935519,
+          3935547
+        ],
+        [
+          16787552,
+          16787662
+        ],
+        [
+          16787663,
+          16787698
+        ],
+        [
+          16787699,
+          16788679
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 1450,
+      "duplicate_regions": 8,
+      "duplicate_source_bp": 1457,
+      "longest_duplicate_free_region_bp": 12852005,
+      "node": "q0-placement-fec8404f6d684ac482e123ac",
+      "overhang_bp": 8829,
+      "safe_contiguous_regions": 9,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_1095"
+      ],
+      "source_bp": 16952952,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 2099,
+          "duplicate_bp": 2099,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 2099,
+      "duplicate_intervals": [
+        [
+          18835,
+          19058
+        ],
+        [
+          19059,
+          19132
+        ],
+        [
+          19133,
+          19359
+        ],
+        [
+          19360,
+          20043
+        ],
+        [
+          20044,
+          20938
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 1,
+      "duplicate_regions": 5,
+      "duplicate_source_bp": 2099,
+      "longest_duplicate_free_region_bp": 22168,
+      "node": "q0-placement-f8121e7084b2090bc70f3f1d",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 6,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeD_contig_3150"
+      ],
+      "source_bp": 41666,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 656,
+          "duplicate_bp": 656,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 656,
+      "duplicate_intervals": [
+        [
+          2138,
+          2459
+        ],
+        [
+          2460,
+          2702
+        ],
+        [
+          2704,
+          2797
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 0,
+      "duplicate_regions": 3,
+      "duplicate_source_bp": 656,
+      "longest_duplicate_free_region_bp": 16457,
+      "node": "q0-placement-59d63f00d72f9058501657da",
+      "overhang_bp": 2,
+      "safe_contiguous_regions": 4,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeD_contig_7111"
+      ],
+      "source_bp": 19254,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 5097,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 150,
+          "duplicate_bp": 150,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 2732,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 3568,
+          "node": "q0-placement-a01bf676fa263c33e80d113c",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_9492"
+          ],
+          "source_bp": 50069
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 11547,
+      "duplicate_intervals": [
+        [
+          3837501,
+          3840566
+        ],
+        [
+          3840567,
+          3840582
+        ],
+        [
+          3840583,
+          3840659
+        ],
+        [
+          3840660,
+          3841072
+        ],
+        [
+          4727054,
+          4727120
+        ],
+        [
+          4727121,
+          4727199
+        ],
+        [
+          6632049,
+          6632109
+        ],
+        [
+          6632110,
+          6632577
+        ],
+        [
+          6632578,
+          6634327
+        ],
+        [
+          6634337,
+          6635390
+        ],
+        [
+          6635391,
+          6635758
+        ],
+        [
+          6635766,
+          6635933
+        ],
+        [
+          6635934,
+          6636267
+        ],
+        [
+          6636269,
+          6636735
+        ],
+        [
+          6636736,
+          6636904
+        ],
+        [
+          6636907,
+          6637030
+        ],
+        [
+          9253424,
+          9253430
+        ],
+        [
+          9253433,
+          9253482
+        ],
+        [
+          9253483,
+          9253515
+        ],
+        [
+          9260392,
+          9260455
+        ],
+        [
+          10665533,
+          10666609
+        ],
+        [
+          10666610,
+          10666928
+        ],
+        [
+          10666929,
+          10667388
+        ],
+        [
+          10667389,
+          10667546
+        ],
+        [
+          10667549,
+          10667812
+        ],
+        [
+          10667815,
+          10668124
+        ],
+        [
+          13756535,
+          13756588
+        ],
+        [
+          13758910,
+          13759007
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 11547,
+      "duplicate_regions": 28,
+      "duplicate_source_bp": 11547,
+      "longest_duplicate_free_region_bp": 3837501,
+      "node": "q0-placement-6aff612b8a1049a0397c7386",
+      "overhang_bp": 2257,
+      "safe_contiguous_regions": 29,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_2645"
+      ],
+      "source_bp": 17389727,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 112,
+          "duplicate_bp": 112,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 8663,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 24,
+          "node": "q0-placement-74fda16f80816c2eb9f7f5a6",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000054l"
+          ],
+          "source_bp": 220288873
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 8799,
+      "duplicate_intervals": [
+        [
+          1861942,
+          1861975
+        ],
+        [
+          1870252,
+          1870314
+        ],
+        [
+          15320300,
+          15321671
+        ],
+        [
+          15321690,
+          15322516
+        ],
+        [
+          15322521,
+          15323539
+        ],
+        [
+          15323548,
+          15323558
+        ],
+        [
+          15323559,
+          15324154
+        ],
+        [
+          15324155,
+          15324354
+        ],
+        [
+          15324355,
+          15324921
+        ],
+        [
+          15324931,
+          15325298
+        ],
+        [
+          15325299,
+          15325662
+        ],
+        [
+          15325663,
+          15326682
+        ],
+        [
+          15326696,
+          15327825
+        ],
+        [
+          15327842,
+          15328781
+        ],
+        [
+          15328785,
+          15328951
+        ],
+        [
+          19489828,
+          19489876
+        ],
+        [
+          19491878,
+          19491942
+        ],
+        [
+          22967713,
+          22967737
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 8755,
+      "duplicate_regions": 18,
+      "duplicate_source_bp": 8799,
+      "longest_duplicate_free_region_bp": 13449986,
+      "node": "q0-placement-d81a7a1063b4a699972963f8",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 19,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_3209"
+      ],
+      "source_bp": 28452699,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 890,
+          "node": "q0-placement-68b1b3219ffee0cbc4d0648e",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_9480"
+          ],
+          "source_bp": 52088
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 890,
+      "duplicate_intervals": [
+        [
+          1111547,
+          1111897
+        ],
+        [
+          1111899,
+          1112094
+        ],
+        [
+          1112095,
+          1112440
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 890,
+      "duplicate_regions": 3,
+      "duplicate_source_bp": 890,
+      "longest_duplicate_free_region_bp": 1111547,
+      "node": "q0-placement-ef3b470463e80eaf759f9d32",
+      "overhang_bp": 8637,
+      "safe_contiguous_regions": 4,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_3206"
+      ],
+      "source_bp": 1302090,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 44,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 832,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 876,
+      "duplicate_intervals": [
+        [
+          2317884,
+          2317890
+        ],
+        [
+          2317891,
+          2317972
+        ],
+        [
+          2324849,
+          2324866
+        ],
+        [
+          2324867,
+          2324961
+        ],
+        [
+          6573327,
+          6573363
+        ],
+        [
+          6573365,
+          6573372
+        ],
+        [
+          6573373,
+          6573395
+        ],
+        [
+          6573396,
+          6573445
+        ],
+        [
+          6573446,
+          6573478
+        ],
+        [
+          6573479,
+          6573484
+        ],
+        [
+          6573485,
+          6573515
+        ],
+        [
+          6579085,
+          6579112
+        ],
+        [
+          6579113,
+          6579142
+        ],
+        [
+          6579145,
+          6579173
+        ],
+        [
+          6579174,
+          6579231
+        ],
+        [
+          6579246,
+          6579294
+        ],
+        [
+          6579295,
+          6579330
+        ],
+        [
+          6579331,
+          6579352
+        ],
+        [
+          6579353,
+          6579368
+        ],
+        [
+          6579369,
+          6579387
+        ],
+        [
+          6580357,
+          6580464
+        ],
+        [
+          6580465,
+          6580500
+        ],
+        [
+          6580501,
+          6580509
+        ],
+        [
+          6580511,
+          6580536
+        ],
+        [
+          7023395,
+          7023415
+        ],
+        [
+          7023416,
+          7023440
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 873,
+      "duplicate_regions": 26,
+      "duplicate_source_bp": 876,
+      "longest_duplicate_free_region_bp": 4248366,
+      "node": "q0-placement-ea449114255937caab8095c7",
+      "overhang_bp": 10,
+      "safe_contiguous_regions": 27,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_3205"
+      ],
+      "source_bp": 7083333,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 4199,
+          "duplicate_bp": 4199,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 4199,
+      "duplicate_intervals": [
+        [
+          1408879,
+          1410324
+        ],
+        [
+          1410326,
+          1413080
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 4199,
+      "duplicate_regions": 2,
+      "duplicate_source_bp": 4199,
+      "longest_duplicate_free_region_bp": 1590047,
+      "node": "q0-placement-324c9729c0ed26d68b86b6ca",
+      "overhang_bp": 89369,
+      "safe_contiguous_regions": 3,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_2408"
+      ],
+      "source_bp": 2267170,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 3136,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 166,
+          "duplicate_bp": 166,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 623,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 62,
+          "node": "q0-placement-5b761b3c575cae951e7eb097",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2409"
+          ],
+          "source_bp": 3283782
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 3987,
+      "duplicate_intervals": [
+        [
+          5795005,
+          5795517
+        ],
+        [
+          5795520,
+          5796015
+        ],
+        [
+          5796016,
+          5796687
+        ],
+        [
+          7087744,
+          7087752
+        ],
+        [
+          7087754,
+          7087784
+        ],
+        [
+          7087785,
+          7087794
+        ],
+        [
+          7087795,
+          7087833
+        ],
+        [
+          7087834,
+          7087866
+        ],
+        [
+          7087867,
+          7087874
+        ],
+        [
+          7087875,
+          7087905
+        ],
+        [
+          7093476,
+          7093503
+        ],
+        [
+          7093504,
+          7093533
+        ],
+        [
+          7093536,
+          7093564
+        ],
+        [
+          7093565,
+          7093586
+        ],
+        [
+          7093587,
+          7093655
+        ],
+        [
+          7093656,
+          7093691
+        ],
+        [
+          7093692,
+          7093713
+        ],
+        [
+          7093714,
+          7093729
+        ],
+        [
+          7093730,
+          7093747
+        ],
+        [
+          7093749,
+          7093757
+        ],
+        [
+          7094298,
+          7094325
+        ],
+        [
+          7094720,
+          7094769
+        ],
+        [
+          7094770,
+          7094790
+        ],
+        [
+          7094791,
+          7094829
+        ],
+        [
+          7094830,
+          7094864
+        ],
+        [
+          7094865,
+          7094897
+        ],
+        [
+          8260819,
+          8260897
+        ],
+        [
+          8261192,
+          8261219
+        ],
+        [
+          8767587,
+          8767619
+        ],
+        [
+          8770657,
+          8770687
+        ],
+        [
+          12718597,
+          12719950
+        ],
+        [
+          12865575,
+          12865599
+        ],
+        [
+          12865600,
+          12865684
+        ],
+        [
+          12865790,
+          12865848
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 3987,
+      "duplicate_regions": 34,
+      "duplicate_source_bp": 3987,
+      "longest_duplicate_free_region_bp": 5795005,
+      "node": "q0-placement-bf84a2033410f98bdae3febe",
+      "overhang_bp": 25773,
+      "safe_contiguous_regions": 35,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_1864"
+      ],
+      "source_bp": 13038139,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 1126,
+          "duplicate_bp": 1126,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 1126,
+      "duplicate_intervals": [
+        [
+          28634,
+          29302
+        ],
+        [
+          29303,
+          29616
+        ],
+        [
+          29617,
+          29652
+        ],
+        [
+          29653,
+          29763
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 0,
+      "duplicate_regions": 4,
+      "duplicate_source_bp": 1126,
+      "longest_duplicate_free_region_bp": 28633,
+      "node": "q0-placement-f9da8e9a169c367420bd3fba",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 5,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeB_contig_6400"
+      ],
+      "source_bp": 44045,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 2352,
+          "node": "q0-placement-5b761b3c575cae951e7eb097",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2409"
+          ],
+          "source_bp": 3283782
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 2352,
+      "duplicate_intervals": [
+        [
+          12845,
+          13197
+        ],
+        [
+          13206,
+          13483
+        ],
+        [
+          13484,
+          14416
+        ],
+        [
+          14417,
+          14580
+        ],
+        [
+          14581,
+          14716
+        ],
+        [
+          14718,
+          14811
+        ],
+        [
+          14813,
+          15213
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 2343,
+      "duplicate_regions": 7,
+      "duplicate_source_bp": 2352,
+      "longest_duplicate_free_region_bp": 14,
+      "node": "q0-placement-492340f9a93c9b19cb0b91f6",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 8,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeD_contig_1175"
+      ],
+      "source_bp": 2383,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 3548,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 3548,
+      "duplicate_intervals": [
+        [
+          3146220,
+          3146861
+        ],
+        [
+          3146862,
+          3147631
+        ],
+        [
+          3147632,
+          3148327
+        ],
+        [
+          3148328,
+          3148574
+        ],
+        [
+          3148575,
+          3149772
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 3548,
+      "duplicate_regions": 5,
+      "duplicate_source_bp": 3548,
+      "longest_duplicate_free_region_bp": 3146220,
+      "node": "q0-placement-c1756e5e95ae0156e86edced",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 6,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_1855"
+      ],
+      "source_bp": 3528316,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 2199,
+          "node": "q0-placement-9ee5d31837b085e5e4664e18",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_652"
+          ],
+          "source_bp": 350459
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 2199,
+      "duplicate_intervals": [
+        [
+          429234,
+          430605
+        ],
+        [
+          430609,
+          431437
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 2199,
+      "duplicate_regions": 2,
+      "duplicate_source_bp": 2199,
+      "longest_duplicate_free_region_bp": 878324,
+      "node": "q0-placement-6754a0fd7d27a6b36d07afe9",
+      "overhang_bp": 9227,
+      "safe_contiguous_regions": 3,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_2735"
+      ],
+      "source_bp": 1309761,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 253,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 253,
+      "duplicate_intervals": [
+        [
+          684945,
+          685033
+        ],
+        [
+          685268,
+          685307
+        ],
+        [
+          690124,
+          690188
+        ],
+        [
+          690189,
+          690251
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 253,
+      "duplicate_regions": 4,
+      "duplicate_source_bp": 253,
+      "longest_duplicate_free_region_bp": 1926290,
+      "node": "q0-placement-9efc0048de962e2fce4c4693",
+      "overhang_bp": 18532,
+      "safe_contiguous_regions": 5,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_10722"
+      ],
+      "source_bp": 2616541,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 495,
+          "node": "q0-placement-af3108ffec067e93ce34d574",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2674"
+          ],
+          "source_bp": 153801
+        },
+        {
+          "direct_block_duplicate_bp": 3737,
+          "duplicate_bp": 5875,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 17279,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        },
+        {
+          "direct_block_duplicate_bp": 114,
+          "duplicate_bp": 114,
+          "node": "q0-placement-feb51aaa604e51388e7b368d",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_14590"
+          ],
+          "source_bp": 89973
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 50,
+          "node": "q0-placement-a01bf676fa263c33e80d113c",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_9492"
+          ],
+          "source_bp": 50069
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 6313,
+          "node": "q0-placement-03d210baaa9902f60ae1d516",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2408"
+          ],
+          "source_bp": 599443
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 30126,
+      "duplicate_intervals": [
+        [
+          1777972,
+          1778467
+        ],
+        [
+          1959951,
+          1960001
+        ],
+        [
+          2019272,
+          2019676
+        ],
+        [
+          2019678,
+          2019685
+        ],
+        [
+          2019686,
+          2019709
+        ],
+        [
+          2019710,
+          2019759
+        ],
+        [
+          2019760,
+          2019792
+        ],
+        [
+          2019793,
+          2019800
+        ],
+        [
+          2019801,
+          2023330
+        ],
+        [
+          2023331,
+          2025398
+        ],
+        [
+          2025400,
+          2025506
+        ],
+        [
+          2025507,
+          2025524
+        ],
+        [
+          2025525,
+          2025592
+        ],
+        [
+          2025593,
+          2026646
+        ],
+        [
+          2026647,
+          2026673
+        ],
+        [
+          2026674,
+          2026684
+        ],
+        [
+          2026685,
+          2026757
+        ],
+        [
+          2026758,
+          2026794
+        ],
+        [
+          2026795,
+          2026803
+        ],
+        [
+          2026805,
+          2027356
+        ],
+        [
+          2027357,
+          2027941
+        ],
+        [
+          3075702,
+          3075907
+        ],
+        [
+          3075911,
+          3076850
+        ],
+        [
+          3076867,
+          3077996
+        ],
+        [
+          3078010,
+          3079029
+        ],
+        [
+          3079030,
+          3080327
+        ],
+        [
+          3080328,
+          3080527
+        ],
+        [
+          3080528,
+          3081123
+        ],
+        [
+          3081124,
+          3084372
+        ],
+        [
+          3248025,
+          3250674
+        ],
+        [
+          3250677,
+          3251323
+        ],
+        [
+          3251324,
+          3252112
+        ],
+        [
+          3252113,
+          3252274
+        ],
+        [
+          3252275,
+          3253105
+        ],
+        [
+          3253110,
+          3253158
+        ],
+        [
+          3253159,
+          3253213
+        ],
+        [
+          3253216,
+          3253299
+        ],
+        [
+          3253300,
+          3254354
+        ],
+        [
+          3705763,
+          3707671
+        ],
+        [
+          3707672,
+          3708054
+        ],
+        [
+          3708057,
+          3709504
+        ],
+        [
+          3886029,
+          3886275
+        ],
+        [
+          3886276,
+          3887155
+        ],
+        [
+          3887160,
+          3887613
+        ],
+        [
+          3887620,
+          3887923
+        ],
+        [
+          3887929,
+          3888019
+        ],
+        [
+          3888042,
+          3888093
+        ],
+        [
+          3888094,
+          3888134
+        ],
+        [
+          3888137,
+          3888213
+        ],
+        [
+          4716211,
+          4716325
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 4278,
+      "duplicate_regions": 50,
+      "duplicate_source_bp": 30126,
+      "longest_duplicate_free_region_bp": 1777972,
+      "node": "q0-placement-a41b92692e4b0b685b7be5db",
+      "overhang_bp": 7,
+      "safe_contiguous_regions": 51,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_6095"
+      ],
+      "source_bp": 4928306,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 2481,
+          "duplicate_bp": 2481,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 564,
+          "duplicate_bp": 564,
+          "node": "q0-placement-f8e90c7826291acb3b77fff7",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_6955"
+          ],
+          "source_bp": 55765
+        },
+        {
+          "direct_block_duplicate_bp": 36,
+          "duplicate_bp": 36,
+          "node": "q0-placement-5b761b3c575cae951e7eb097",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2409"
+          ],
+          "source_bp": 3283782
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 3081,
+      "duplicate_intervals": [
+        [
+          596947,
+          597388
+        ],
+        [
+          597389,
+          597409
+        ],
+        [
+          597412,
+          597470
+        ],
+        [
+          597471,
+          597516
+        ],
+        [
+          732071,
+          732107
+        ],
+        [
+          1223208,
+          1224822
+        ],
+        [
+          1224824,
+          1225041
+        ],
+        [
+          1225042,
+          1225323
+        ],
+        [
+          1225336,
+          1225705
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 0,
+      "duplicate_regions": 9,
+      "duplicate_source_bp": 3081,
+      "longest_duplicate_free_region_bp": 508326,
+      "node": "q0-placement-29fa90c7a52dfa312346a2d3",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 10,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_1473"
+      ],
+      "source_bp": 1486097,
+      "terminal_only_duplicates": false
+    },
+    {
+      "conflicts": [
+        {
+          "direct_block_duplicate_bp": 224,
+          "duplicate_bp": 224,
+          "node": "q0-placement-75a214db7e19d5a5ee457b88",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_4417"
+          ],
+          "source_bp": 4172974
+        },
+        {
+          "direct_block_duplicate_bp": 3359,
+          "duplicate_bp": 3359,
+          "node": "q0-placement-139ec80fa6fdc3f0231ae7f6",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2670"
+          ],
+          "source_bp": 426767
+        },
+        {
+          "direct_block_duplicate_bp": 4539,
+          "duplicate_bp": 4539,
+          "node": "q0-placement-9ee5d31837b085e5e4664e18",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_652"
+          ],
+          "source_bp": 350459
+        },
+        {
+          "direct_block_duplicate_bp": 2148,
+          "duplicate_bp": 2148,
+          "node": "q0-placement-9fb9adabae0989d4b96159b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_650"
+          ],
+          "source_bp": 1559437
+        },
+        {
+          "direct_block_duplicate_bp": 0,
+          "duplicate_bp": 124,
+          "node": "q0-placement-eb00a39ca2e77d6043d777ba",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7509"
+          ],
+          "source_bp": 8193910
+        },
+        {
+          "direct_block_duplicate_bp": 2301,
+          "duplicate_bp": 2301,
+          "node": "q0-placement-008d9495b218f6af474435eb",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_4880"
+          ],
+          "source_bp": 36215
+        },
+        {
+          "direct_block_duplicate_bp": 1,
+          "duplicate_bp": 1,
+          "node": "q0-placement-5b761b3c575cae951e7eb097",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2409"
+          ],
+          "source_bp": 3283782
+        }
+      ],
+      "duplicate_inside_anchor_hull_bp": 12696,
+      "duplicate_intervals": [
+        [
+          515810,
+          516056
+        ],
+        [
+          516057,
+          517393
+        ],
+        [
+          517400,
+          517709
+        ],
+        [
+          517715,
+          517856
+        ],
+        [
+          517857,
+          517973
+        ],
+        [
+          1045742,
+          1047677
+        ],
+        [
+          1047678,
+          1048524
+        ],
+        [
+          1048557,
+          1048914
+        ],
+        [
+          1048915,
+          1049438
+        ],
+        [
+          1049439,
+          1050317
+        ],
+        [
+          1592375,
+          1592435
+        ],
+        [
+          1627716,
+          1627788
+        ],
+        [
+          1627789,
+          1627856
+        ],
+        [
+          1627859,
+          1627956
+        ],
+        [
+          1627958,
+          1628305
+        ],
+        [
+          1628306,
+          1628372
+        ],
+        [
+          1628373,
+          1629663
+        ],
+        [
+          1629670,
+          1629850
+        ],
+        [
+          1629877,
+          1629979
+        ],
+        [
+          1629980,
+          1630207
+        ],
+        [
+          1630208,
+          1630253
+        ],
+        [
+          1630254,
+          1630530
+        ],
+        [
+          1630531,
+          1631121
+        ],
+        [
+          1762036,
+          1762931
+        ],
+        [
+          1762932,
+          1764328
+        ],
+        [
+          1767385,
+          1767395
+        ],
+        [
+          2569934,
+          2569935
+        ],
+        [
+          2872542,
+          2872597
+        ],
+        [
+          2872598,
+          2872630
+        ],
+        [
+          2879508,
+          2879545
+        ],
+        [
+          4127690,
+          4127763
+        ],
+        [
+          4127766,
+          4127857
+        ]
+      ],
+      "duplicate_overlapping_actual_reference_anchor_bp": 2272,
+      "duplicate_regions": 32,
+      "duplicate_source_bp": 12696,
+      "longest_duplicate_free_region_bp": 1248145,
+      "node": "q0-placement-ca8853b26bd9794289c9d593",
+      "overhang_bp": 0,
+      "safe_contiguous_regions": 33,
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_1469"
+      ],
+      "source_bp": 4259245,
+      "terminal_only_duplicates": false
+    }
+  ],
+  "schema": "wheat_skipped_duplicate_geometry_v1",
+  "summary": {
+    "duplicate_inside_anchor_hull_bp_sum": 128838,
+    "duplicate_overlapping_actual_reference_anchor_bp_sum": 60844,
+    "duplicate_source_bp_sum": 128838,
+    "overhang_bp": 183142,
+    "skipped_nodes": 22,
+    "source_bp": 161892211,
+    "terminal_only_nodes": 0
+  }
+}

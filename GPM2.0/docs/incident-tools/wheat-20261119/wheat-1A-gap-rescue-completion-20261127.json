@@ -1,0 +1,53 @@
+{
+  "acceptance": "NOT_MET: hull-only path rescue gains zero; split-first conservative admission gains 2784683 reference bp, not a selected-Q0 gain.",
+  "cross_validation_3B_3D_started": false,
+  "execution_host": "agent-X86-34",
+  "files": {
+    "wheat-1A-hull-rescue-selection-20261127.json": "f01cb892b90fc6c0556fdd05ee678e064416a529170e9d723b088b58d4c5582c",
+    "wheat-1A-skipped-duplicate-geometry-20261127.json": "2c9ac762d334f75f2f81607a482326e4d7ee318e085a6b491ae52c65e0a0f62b",
+    "wheat-1A-split-first-admission-summary-20261127.json": "669d7954bfc9a7706be359b8a3211d3789ed9a2cfa25aec70342b84f72bf542a",
+    "wheat_continuity_gap_rescue_readonly.py": "7a80f11c6463beb3ad6402105d4626d16778c28fedc36814d027a44e2de1e53a",
+    "wheat_duplicate_geometry_readonly.py": "5abbb574883a6ec10e73e5a37a53ee6a6c89c6917e96b7548c233cb637bea7c4",
+    "wheat_split_first_indexed_readonly.py": "12613fba3cce4fb744955ab1be35120a1d135bf847114d46de02bc8e44406332"
+  },
+  "formal_q0_lgz": "HOLD",
+  "formal_workspace_modified": false,
+  "host": "180:18083",
+  "jobs": {
+    "43136199": {
+      "end": "2026-11-27T00:11:29+08:00",
+      "owner": "q0-continuity-gap-rescue-20261126.3gx6KLqs",
+      "start": "2026-11-26T23:58:11+08:00",
+      "state": "SUCCEEDED"
+    },
+    "43136207": {
+      "end": "2026-11-27T00:00:54+08:00",
+      "owner": "q0-continuity-gap-rescue-20261126.3gx6KLqs",
+      "start": "2026-11-27T00:00:47+08:00",
+      "state": "SUCCEEDED"
+    },
+    "43136223": {
+      "end": "2026-11-27T00:10:55+08:00",
+      "owner": "q0-continuity-gap-indexed-20261127.mASZonvB",
+      "start": "2026-11-27T00:08:11+08:00",
+      "state": "SUCCEEDED"
+    }
+  },
+  "limitations": [
+    "Duplicate units are engine-derived equivalences, not independent biological proof.",
+    "Reason unions overlap; missing reference attribution uses an explicit priority order.",
+    "Split-first trial requires local support >=500kb, local fraction >=75%, original high-MAPQ/collinearity/density and foreign-barrier gates. It does not establish all possible regional policies ineffective.",
+    "New admission candidates have not been promoted to a selected path or production policy."
+  ],
+  "mapper_calls": 0,
+  "old_comparator_sha256_rechecked": "cd9069e54e64cce94ba7d4790afd2c575d85ffc227722b04eca56bf6e04ea847",
+  "production_engine_modified": false,
+  "regional_comparison": {
+    "archive_only": true,
+    "end": "2026-11-26T23:56:31+08:00",
+    "job": "43099391",
+    "state": "SUCCEEDED"
+  },
+  "schema": "wheat_1A_gap_rescue_completion_v1",
+  "snapshot_at": "2026-11-27T00:13:14+08:00"
+}

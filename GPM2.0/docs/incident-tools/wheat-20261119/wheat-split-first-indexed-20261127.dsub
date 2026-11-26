@@ -1,0 +1,20 @@
+#!/bin/bash
+#DSUB -n jm19_1A_split_first_indexed
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=2,mem=16384MB"
+#DSUB -o split_indexed_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c indexed-split-kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+base=$(dirname "$PWD")
+selection="$base/q0-continuity-indexed-20261126.CgydRhOS"
+admission="$base/q0-continuity-20261126.RAbGvNba"
+code=$(mktemp -d /tmp/wheat-split-first-code.XXXXXXXX)
+tar -xzf "$selection/tools.tgz" -C "$code"
+export PYTHONPATH="$PWD:$selection:$code/tools"
+python3 -Bu -m unittest -v test_wheat_split_first_indexed
+python3 -Bu wheat_split_first_indexed_readonly.py "$admission" "$PWD"
