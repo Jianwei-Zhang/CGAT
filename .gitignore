@@ -36,6 +36,7 @@
 
 # Local runtime artifacts
 /tmp/
+/output/
 **/*.sqlite
 **/*.zip
 **/imported/
