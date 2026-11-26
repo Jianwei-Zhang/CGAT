@@ -41,7 +41,7 @@ DIALOG = """<dialog id="path-event-dialog" tabindex="-1" aria-labelledby="path-e
 <style>
 html:has(#path-event-dialog){scrollbar-gutter:stable}
 html:has(#path-event-dialog[open]){overflow:hidden}
-#path-event-dialog{padding:0;box-sizing:border-box;width:min(840px,94vw);max-height:88vh;overflow:auto;color:var(--text-primary);background:var(--surface-panel);border:1px solid var(--border-default);border-radius:10px;box-shadow:0 20px 50px rgba(15,23,42,.24)}
+#path-event-dialog{padding:0;box-sizing:border-box;width:min(1040px,94vw);max-height:90vh;overflow:auto;color:var(--text-primary);background:var(--surface-panel);border:1px solid var(--border-default);border-radius:10px;box-shadow:0 20px 50px rgba(15,23,42,.24)}
 #path-event-dialog.is-wide{width:min(1480px,96vw);max-height:92vh}
 #path-event-dialog:focus{outline:none}
 #path-event-dialog::backdrop{background:rgba(15,23,42,.44);backdrop-filter:blur(1.5px)}
@@ -52,7 +52,9 @@ html:has(#path-event-dialog[open]){overflow:hidden}
 .story-dlg-close{flex-shrink:0;display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle);color:var(--text-secondary);font:600 18px/1 sans-serif;cursor:pointer;transition:background .12s,border-color .12s,color .12s}
 .story-dlg-close:hover{background:var(--surface-hover);border-color:var(--border-default);color:var(--text-primary)}
 .story-dlg-body{padding:1rem 1.15rem 1.15rem;font-size:.86rem;line-height:1.55}
-.story-plot-frame{margin:.55rem 0;padding:.55rem .65rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle)}
+.story-plot-frame{margin:.6rem 0;padding:.7rem .85rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle)}
+.story-plot-key{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.4rem .9rem;margin-top:.45rem;padding-top:.4rem;border-top:1px solid var(--border-subtle);font-size:.76rem;color:var(--text-muted)}
+.story-plot-key-items{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.35rem .85rem}
 .story-meta-strip{display:flex;flex-wrap:wrap;gap:.35rem .9rem;align-items:center;font-size:.82rem;color:var(--text-secondary);margin:.35rem 0}
 .story-meta-strip code{font-size:.82em}
 .story-verdict{margin:.65rem 0 0;padding:.5rem .75rem;border-left:3px solid var(--brand);border-radius:0 var(--radius-sm) var(--radius-sm) 0;background:var(--surface-subtle);color:var(--text-primary);font-size:.84rem}
@@ -259,56 +261,115 @@ def _zoom(e, *, top_label="q0", bottom_label="Donor", is_guide=False):
     if qmin == qmax:
         qmin = max(0, a - 50)
         qmax = b + 50
-    pad_l, plot_w = 92, 680
+    q_span = max(1, qmax - qmin)
+    pad_l, plot_w = 114, 820
 
-    def axis(x, lo, hi):
-        return pad_l + (x - lo) * plot_w / max(1, hi - lo)
-
-    h_svg = 122 if donor else 64
-    svg = [f'<svg class="repair-zoom" viewBox="0 0 800 {h_svg}" role="img" aria-label="Local repair evidence / 局部修补证据">']
-    svg.append(f'<text x="8" y="34" font-size="11.5" font-weight="600" fill="var(--text-primary)">{esc(top_label)}</text>')
-    svg.append(f'<text x="{pad_l}" y="16" font-size="10" fill="var(--text-muted)">{qmin+1:,}</text>')
-    svg.append(f'<text x="{pad_l + plot_w}" y="16" text-anchor="end" font-size="10" fill="var(--text-muted)">{qmax:,}</text>')
-
+    dmin = dmax = d_span = 0
+    use_shared = False
     if donor:
         dmin = min([donor["start"]] + [h["source"][0] for h in anchors])
         dmax = max([donor["end"]] + [h["source"][1] for h in anchors])
+        d_span = max(1, dmax - dmin)
+        use_shared = max(q_span, d_span) / min(q_span, d_span) <= 6.0
+
+    if use_shared:
+        shared = max(q_span, d_span)
+        px_per_bp = plot_w / shared
+        qw = q_span * px_per_bp
+        dw = d_span * px_per_bp
+        q_x0 = pad_l + (plot_w - qw) / 2
+        if anchors:
+            top_mid_bp = (min(h["q"][0] for h in anchors) + max(h["q"][1] for h in anchors)) / 2
+            top_mid_x = q_x0 + (top_mid_bp - qmin) * px_per_bp
+            d_x0 = max(pad_l, min(pad_l + plot_w - dw, top_mid_x - dw / 2))
+        else:
+            d_x0 = pad_l + (plot_w - dw) / 2
+    else:
+        q_x0, qw = pad_l, plot_w
+        d_x0, dw = pad_l, plot_w
+
+    def qx(x):
+        return q_x0 + (x - qmin) * qw / q_span
+
+    h_svg = 166 if donor else 82
+    svg = [f'<svg class="repair-zoom" viewBox="0 0 960 {h_svg}" role="img" aria-label="Local repair evidence / 局部修补证据">']
+    t_lbl = top_label if len(top_label) <= 13 else top_label[:12] + "…"
+    svg.append(f'<text x="10" y="39" font-size="12" font-weight="600" fill="var(--text-primary)"><title>{esc(top_label)}</title>{esc(t_lbl)}</text>')
+    svg.append(f'<text x="{q_x0:.1f}" y="18" font-size="10.5" fill="var(--text-muted)">{qmin+1:,}</text>')
+    svg.append(f'<text x="{q_x0 + qw:.1f}" y="18" text-anchor="end" font-size="10.5" fill="var(--text-muted)">{qmax:,}</text>')
+
+    if donor:
         rev = donor["strand"] == "-"
 
         def dx(x):
-            return axis(dmax - x if rev else x - dmin, 0, max(1, dmax - dmin))
+            return d_x0 + (dmax - x if rev else x - dmin) * dw / d_span
 
         rib_fill = "var(--border-strong)" if is_guide else "var(--ds-1)"
         for h in anchors:
             x, y = h["source"] if h["strand"] == "+" else h["source"][::-1]
+            qa_bp, qb_bp = h["q"]
+            sa_bp, sb_bp = h["source"]
+            rib_tip = f'{top_label} {qa_bp+1:,}–{qb_bp:,} ({qb_bp-qa_bp:,} bp) ↔ {bottom_label} {sa_bp+1:,}–{sb_bp:,} ({sb_bp-sa_bp:,} bp, {h["strand"]})'
             svg.append(
-                f'<polygon points="{axis(h["q"][0], qmin, qmax):.4f},36 {axis(h["q"][1], qmin, qmax):.4f},36 '
-                f'{dx(y):.4f},84 {dx(x):.4f},84" fill="{rib_fill}" opacity=".26"/>'
+                f'<polygon points="{qx(qa_bp):.4f},40 {qx(qb_bp):.4f},40 '
+                f'{dx(y):.4f},108 {dx(x):.4f},108" fill="{rib_fill}" opacity=".26">'
+                f'<title>{esc(rib_tip)}</title></polygon>'
             )
         start, end = sorted((dx(donor["start"]), dx(donor["end"])))
-        svg.append(f'<text x="8" y="92" font-size="11.5" font-weight="600" fill="var(--text-secondary)">{esc(bottom_label)}</text>')
+        b_lbl = bottom_label if len(bottom_label) <= 13 else bottom_label[:12] + "…"
+        svg.append(f'<text x="10" y="118" font-size="12" font-weight="600" fill="var(--text-secondary)"><title>{esc(bottom_label)}</title>{esc(b_lbl)}</text>')
         l_coord = f"{dmax:,} (rev)" if rev else f"{dmin+1:,}"
         r_coord = f"{dmin+1:,}" if rev else f"{dmax:,}"
-        svg.append(f'<text x="{pad_l}" y="112" font-size="10" fill="var(--text-muted)">{esc(l_coord)}</text>')
-        svg.append(f'<text x="{pad_l + plot_w}" y="112" text-anchor="end" font-size="10" fill="var(--text-muted)">{esc(r_coord)}</text>')
-        svg.append(f'<rect x="{pad_l}" y="85" width="{plot_w}" height="8" rx="2" fill="var(--border-default)"/>')
-        if is_guide:
-            svg.append(f'<rect x="{start:.4f}" y="84" width="{max(2.0, end-start):.4f}" height="10" rx="2" fill="var(--tone-info-line)" stroke="var(--accent)" stroke-dasharray="3 2"/>')
+        if dw >= 145:
+            svg.append(f'<text x="{d_x0:.1f}" y="140" font-size="10.5" fill="var(--text-muted)">{esc(l_coord)}</text>')
+            svg.append(f'<text x="{d_x0 + dw:.1f}" y="140" text-anchor="end" font-size="10.5" fill="var(--text-muted)">{esc(r_coord)}</text>')
         else:
-            svg.append(f'<rect x="{start:.4f}" y="83" width="{max(2.5, end-start):.4f}" height="12" rx="2" fill="var(--ds-1)"/>')
+            svg.append(f'<text x="{max(pad_l, d_x0 - 6):.1f}" y="140" text-anchor="end" font-size="10.5" fill="var(--text-muted)">{esc(l_coord)}</text>')
+            svg.append(f'<text x="{min(pad_l + plot_w, d_x0 + dw + 6):.1f}" y="140" text-anchor="start" font-size="10.5" fill="var(--text-muted)">{esc(r_coord)}</text>')
+        svg.append(f'<rect x="{d_x0:.4f}" y="108" width="{max(4.0, dw):.4f}" height="12" rx="3" fill="var(--border-default)"/>')
+        for h in anchors:
+            da, db = sorted((dx(h["source"][0]), dx(h["source"][1])))
+            svg.append(f'<rect x="{da:.4f}" y="108" width="{max(2.0, db-da):.4f}" height="12" rx="2" fill="var(--brand)" opacity=".55"/>')
+        slice_bp = donor["end"] - donor["start"]
+        slice_tip = f'{bottom_label} {donor["start"]+1:,}–{donor["end"]:,} ({slice_bp:,} bp, {donor["strand"]})'
+        if is_guide:
+            svg.append(f'<rect x="{start:.4f}" y="106" width="{max(3.0, end-start):.4f}" height="16" rx="3" fill="var(--tone-info-line)" stroke="var(--accent)" stroke-dasharray="3 2"><title>{esc(slice_tip)}</title></rect>')
+        else:
+            svg.append(f'<rect x="{start:.4f}" y="106" width="{max(3.5, end-start):.4f}" height="16" rx="3" fill="var(--ds-1)"><title>{esc(slice_tip)}</title></rect>')
+        if slice_bp > 0:
+            dmid = (start + end) / 2
+            svg.append(f'<text x="{min(pad_l + plot_w - 36, max(pad_l + 36, dmid)):.1f}" y="158" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--ds-1)">{slice_bp:,} bp</text>')
 
-    lo, hi = axis(a, qmin, qmax), axis(b, qmin, qmax)
+    lo, hi = qx(a), qx(b)
     # State only the changed interval, not that every base here is N: a repair may trim flanks.
-    svg.append(f'<rect x="{pad_l}" y="26" width="{plot_w}" height="8" rx="2" fill="var(--border-strong)"/>')
+    svg.append(f'<rect x="{q_x0:.4f}" y="28" width="{max(4.0, qw):.4f}" height="12" rx="3" fill="var(--border-strong)" opacity=".65"/>')
     for h in anchors:
-        qa, qb = axis(h["q"][0], qmin, qmax), axis(h["q"][1], qmin, qmax)
-        svg.append(f'<rect x="{min(qa, qb):.4f}" y="26" width="{max(1.5, abs(qb-qa)):.4f}" height="8" fill="var(--brand)" opacity=".55"/>')
-    svg.append(f'<rect x="{lo:.4f}" y="24" width="{max(2.5, hi-lo):.4f}" height="12" rx="2" fill="var(--gen-patch)"/>')
+        qa, qb = qx(h["q"][0]), qx(h["q"][1])
+        atip = f'{top_label} {h["q"][0]+1:,}–{h["q"][1]:,} ({h["q"][1]-h["q"][0]:,} bp)'
+        svg.append(f'<rect x="{min(qa, qb):.4f}" y="28" width="{max(2.0, abs(qb-qa)):.4f}" height="12" rx="2" fill="var(--brand)" opacity=".78"><title>{esc(atip)}</title></rect>')
+    rtip = f'{top_label} {a+1:,}–{b:,} ({b-a:,} bp)'
+    svg.append(f'<rect x="{lo:.4f}" y="26" width="{max(3.5, hi-lo):.4f}" height="16" rx="3" fill="var(--gen-patch)"><title>{esc(rtip)}</title></rect>')
     mid = (lo + hi) / 2
     if b > a:
-        svg.append(f'<text x="{min(pad_l + plot_w - 36, max(pad_l + 36, mid)):.1f}" y="16" text-anchor="middle" font-size="10" font-weight="600" fill="var(--tone-warn-ink)">{b-a:,} bp</text>')
+        svg.append(f'<text x="{min(pad_l + plot_w - 40, max(pad_l + 40, mid)):.1f}" y="18" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--tone-warn-ink)">{b-a:,} bp</text>')
     svg.append("</svg>")
-    return f'<div class="story-plot-frame">{"".join(svg)}</div>'
+    key_items = [
+        '<span class="legend-item"><i class="swatch" style="background:var(--brand);opacity:.78"></i>' + bi("侧翼锚点", "Flank anchors") + '</span>',
+        '<span class="legend-item"><i class="swatch" style="background:var(--gen-patch)"></i>' + bi("原替换区间", "Replaced interval") + '</span>',
+    ]
+    if donor:
+        if is_guide:
+            key_items.append('<span class="legend-item"><i class="swatch" style="background:var(--tone-info-line);border:1px dashed var(--accent)"></i>' + bi("引导参照区间", "Guide span") + '</span>')
+        else:
+            key_items.append('<span class="legend-item"><i class="swatch" style="background:var(--ds-1)"></i>' + bi("采纳供体片段", "Admitted donor slice") + '</span>')
+    scale_note = ""
+    if donor:
+        scale_note = (
+            '<span>' + (bi("上下轨道等比例尺（按记录的侧翼窗口范围绘制）", "Shared bp scale (recorded flank window)")
+                        if use_shared else bi("上下轨道独立比例尺（跨度差异 > 6×）", "Independent scales (span ratio > 6×)")) + '</span>'
+        )
+    key_bar = f'<div class="story-plot-key"><div class="story-plot-key-items">{"".join(key_items)}</div>{scale_note}</div>'
+    return f'<div class="story-plot-frame">{"".join(svg)}{key_bar}</div>'
 
 
 def structural_detail(d, step_idx=None, total_steps=1):
