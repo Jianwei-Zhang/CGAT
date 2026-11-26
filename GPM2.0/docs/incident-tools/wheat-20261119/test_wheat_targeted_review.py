@@ -10,6 +10,8 @@ from lgz_core.q0_sources import SourceKey,Interval
 from lgz_core.q0_paths import Placement,ReferenceAnchor,PathGraph,PairLink,PathPolicy,search_request_path
 from lgz_core.q0_threshold_questions import questions
 import compare_wheat_panel_chromosomes as chrom_trial
+from summarize_wheat_chromosome_controls import group_summary
+from measure_wheat_native_phases import phases
 from lgz_core.q0_alignments import parse_paf_line
 from lgz_core.q0_junction_review import possible_window
 from screen_wheat_junction_flanks import screen_all,maybe_old_cut
@@ -64,7 +66,15 @@ class Targeted(unittest.TestCase):
         issues=[];data=SimpleNamespace(sources={a.source,b.source},reference_lengths={c:True},parts={},pair_links=[z]);questions(data,SimpleNamespace(admission=SimpleNamespace(placements=ps),paths={c:old}),[],issue_sink=issues.append)
         with patch.multiple(chrom_trial,create=True,PS={c:ps},OLD={c:[z]},BACKGROUND={c:[]},NEW={('full',c):[z],('reduced',c):[]},WIN={c:old.path},ISSUES={c:issues},PLAN={'cases':[case]},BYID={'q':a.source,'t':b.source}):
             origin=chrom_trial.ranked((c,'original'))[2];full=chrom_trial.ranked((c,'full'))[2];reduced=chrom_trial.ranked((c,'reduced'))[2];self.assertEqual(origin['selected'],full['selected']);self.assertTrue(full['cases'][0]['old_junction_selected']);self.assertFalse(reduced['cases'][0]['old_junction_selected']);self.assertNotEqual(full['selected'],reduced['selected'])
+            report=group_summary(dict(original=origin,full=full,reduced=reduced),['control'],{});self.assertFalse(report['same_paths']);self.assertTrue(report['cases'][0]['full_selects_old']);self.assertFalse(report['cases'][0]['reduced_selects_old'])
             with patch.dict(chrom_trial.ISSUES,{c:[{'foreign':1}]}), self.assertRaises(ValueError):chrom_trial.ranked((c,'original'))
+
+    def test_native_timing_refuses_partial_or_different_cohorts(self):
+        index=b'[M::main::2.000*2.1] loaded/built the index for 7 target sequence(s)\n[M::mm_idx_stat::2.600*2.0] distinct minimizers: n; total length: 1000\n'
+        done=b'[M::worker_pipeline::3.500*1.4] mapped 3 sequences\n[M::main] Real time: 3.800 sec; CPU: 5.000 sec; Peak RSS: 2.300 GB\n'
+        m=phases(index+done,3,7,1000);self.assertEqual((m['pre_query_s'],m['query_s'],m['tail_s']),(2.6,.9,.3))
+        for raw,q,t,b in ((index,3,7,1000),(index+done,4,7,1000),(index+done,3,8,1000),(index+done,3,7,1001)):
+            with self.assertRaises(ValueError):phases(raw,q,t,b)
 
     def test_screen_strand_and_wrong_arm_inventory(self):
         a,b=p('q',0,300),p('t',200,500);raw=paf(a,b,200,300,0,100).encode();lookup={k:dict(length=300,contig=k,dataset='ds') for k in ('q','t')}

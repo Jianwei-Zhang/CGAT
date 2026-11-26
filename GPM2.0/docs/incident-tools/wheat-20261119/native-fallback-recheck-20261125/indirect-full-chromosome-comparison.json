@@ -1,0 +1,286 @@
+{
+  "groups": {
+    "1A": {
+      "cases": [
+        {
+          "full_edge": {
+            "directed_neighbors": [],
+            "left_source_selected": true,
+            "present_path": true,
+            "right_source_selected": false
+          },
+          "full_selects_old": false,
+          "original_selected": true,
+          "reduced_edge": {
+            "directed_neighbors": [
+              {
+                "kind": "sequence_overlap",
+                "left_shift_bp": 0,
+                "right_shift_bp": 0,
+                "same_strands": true
+              }
+            ],
+            "left_source_selected": true,
+            "present_path": true,
+            "right_source_selected": true
+          },
+          "reduced_selects_old": true,
+          "stratum": "indirect-1A--"
+        },
+        {
+          "full_edge": {
+            "directed_neighbors": [],
+            "left_source_selected": false,
+            "present_path": true,
+            "right_source_selected": false
+          },
+          "full_selects_old": false,
+          "original_selected": true,
+          "reduced_edge": {
+            "directed_neighbors": [
+              {
+                "kind": "sequence_overlap",
+                "left_shift_bp": 0,
+                "right_shift_bp": 0,
+                "same_strands": true
+              }
+            ],
+            "left_source_selected": true,
+            "present_path": true,
+            "right_source_selected": true
+          },
+          "reduced_selects_old": true,
+          "stratum": "indirect-1A-+"
+        }
+      ],
+      "changed_cut_slices": null,
+      "full_keeps_entire_original_path": false,
+      "full_rows": 62397,
+      "original_rows": 62248,
+      "path_metrics": {
+        "full": {
+          "gap_bp": 14600,
+          "join_kinds": {
+            "reference_unknown": 146,
+            "sequence_overlap": 5
+          },
+          "slices": 152,
+          "source_slice_bp": 48135140,
+          "unproven_join": 146,
+          "weak_placement": 22
+        },
+        "original": {
+          "gap_bp": 14600,
+          "join_kinds": {
+            "reference_unknown": 146,
+            "sequence_overlap": 7
+          },
+          "slices": 154,
+          "source_slice_bp": 48574190,
+          "unproven_join": 146,
+          "weak_placement": 23
+        },
+        "reduced": {
+          "gap_bp": 14500,
+          "join_kinds": {
+            "reference_unknown": 145,
+            "sequence_overlap": 7
+          },
+          "slices": 153,
+          "source_slice_bp": 48551366,
+          "unproven_join": 145,
+          "weak_placement": 22
+        }
+      },
+      "placements": 383,
+      "reduced_keeps_entire_original_path": false,
+      "reduced_rows": 62303,
+      "request_delta": {
+        "full_only_bp": 3391,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 2000,
+        "reduced_only_in_frozen_demand_bp": 2000,
+        "same": false
+      },
+      "same_join_types_and_gap_lengths": false,
+      "same_paths": false,
+      "same_source_order_and_strand": false
+    },
+    "4A": {
+      "cases": [
+        {
+          "full_edge": {
+            "directed_neighbors": [
+              {
+                "kind": "sequence_overlap",
+                "left_shift_bp": 0,
+                "right_shift_bp": 0,
+                "same_strands": true
+              }
+            ],
+            "left_source_selected": true,
+            "present_path": true,
+            "right_source_selected": true
+          },
+          "full_selects_old": true,
+          "original_selected": true,
+          "reduced_edge": {
+            "directed_neighbors": [],
+            "left_source_selected": false,
+            "present_path": true,
+            "right_source_selected": false
+          },
+          "reduced_selects_old": false,
+          "stratum": "indirect-4A--"
+        }
+      ],
+      "changed_cut_slices": null,
+      "full_keeps_entire_original_path": true,
+      "full_rows": 119594,
+      "original_rows": 119445,
+      "path_metrics": {
+        "full": {
+          "gap_bp": 15500,
+          "join_kinds": {
+            "reference_unknown": 155,
+            "sequence_overlap": 9
+          },
+          "slices": 165,
+          "source_slice_bp": 67023797,
+          "unproven_join": 155,
+          "weak_placement": 23
+        },
+        "original": {
+          "gap_bp": 15500,
+          "join_kinds": {
+            "reference_unknown": 155,
+            "sequence_overlap": 9
+          },
+          "slices": 165,
+          "source_slice_bp": 67023797,
+          "unproven_join": 155,
+          "weak_placement": 23
+        },
+        "reduced": {
+          "gap_bp": 20800,
+          "join_kinds": {
+            "reference_unknown": 208,
+            "sequence_overlap": 8
+          },
+          "slices": 217,
+          "source_slice_bp": 67117291,
+          "unproven_join": 208,
+          "weak_placement": 29
+        }
+      },
+      "placements": 555,
+      "reduced_keeps_entire_original_path": false,
+      "reduced_rows": 119495,
+      "request_delta": {
+        "full_only_bp": 4000,
+        "full_only_in_frozen_demand_bp": 4000,
+        "reduced_only_bp": 95828,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": false
+      },
+      "same_join_types_and_gap_lengths": false,
+      "same_paths": false,
+      "same_source_order_and_strand": false
+    },
+    "7D": {
+      "cases": [
+        {
+          "full_edge": {
+            "directed_neighbors": [
+              {
+                "kind": "sequence_overlap",
+                "left_shift_bp": 0,
+                "right_shift_bp": 0,
+                "same_strands": true
+              }
+            ],
+            "left_source_selected": true,
+            "present_path": true,
+            "right_source_selected": true
+          },
+          "full_selects_old": true,
+          "original_selected": true,
+          "reduced_edge": {
+            "directed_neighbors": [
+              {
+                "kind": "sequence_overlap",
+                "left_shift_bp": 0,
+                "right_shift_bp": 0,
+                "same_strands": true
+              }
+            ],
+            "left_source_selected": true,
+            "present_path": true,
+            "right_source_selected": true
+          },
+          "reduced_selects_old": true,
+          "stratum": "indirect-7D--"
+        }
+      ],
+      "changed_cut_slices": 0,
+      "full_keeps_entire_original_path": true,
+      "full_rows": 560423,
+      "original_rows": 560430,
+      "path_metrics": {
+        "full": {
+          "gap_bp": 13500,
+          "join_kinds": {
+            "reference_unknown": 135,
+            "sequence_overlap": 6
+          },
+          "slices": 142,
+          "source_slice_bp": 98394573,
+          "unproven_join": 135,
+          "weak_placement": 11
+        },
+        "original": {
+          "gap_bp": 13500,
+          "join_kinds": {
+            "reference_unknown": 135,
+            "sequence_overlap": 6
+          },
+          "slices": 142,
+          "source_slice_bp": 98394573,
+          "unproven_join": 135,
+          "weak_placement": 11
+        },
+        "reduced": {
+          "gap_bp": 13500,
+          "join_kinds": {
+            "reference_unknown": 135,
+            "sequence_overlap": 6
+          },
+          "slices": 142,
+          "source_slice_bp": 98394573,
+          "unproven_join": 135,
+          "weak_placement": 11
+        }
+      },
+      "placements": 432,
+      "reduced_keeps_entire_original_path": true,
+      "reduced_rows": 560410,
+      "request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "same_join_types_and_gap_lengths": true,
+      "same_paths": true,
+      "same_source_order_and_strand": true
+    }
+  },
+  "limits": "All admitted placements, competitors and old links in each chromosome graph; locations fixed to the real frozen whole-wheat admission, not new whole-wheat admission. Per-chromosome request lengths are not global unique bases. No old parent mapped.",
+  "mapping": "b43c87a03d6f9b3e7cb33aea22293086f88e95a961d6149f47303736b5231538",
+  "panel": "15fd2e5a2ff25b04b67648285b012a1c713a120174419e8a92e3b98bc63a3c02",
+  "questions": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "result": "d04d3d13cd1c689e838dc1f609e30598ae76f75d34c72098a644ff1a26afa799",
+  "schema": "wheat_indirect_calibrated_graph_summary_v1",
+  "selection": "5c4b0771b6a8112396adc21c710e748c3aaad44db11c0f5dc77edca8ec9aa31b"
+}
