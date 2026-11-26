@@ -119,6 +119,13 @@ class ReportFrontendUITests(unittest.TestCase):
         html = render_overview(vm)
         self.assertLess(html.index('id="inputs"'), html.index('id="chr-groups"'))
         self.assertLess(html.index('id="chr-groups"'), html.index('id="auto-refinement"'))
+        self.assertIn('id="assembly-overview"', html)
+        self.assertLess(html.index('id="assembly-overview"'), html.index('id="inputs"'))
+        self.assertIn('id="ov-stage-data"', html)
+        self.assertIn('aria-label="Gap trajectory"', html)
+        self.assertIn('aria-label="Completeness gauges"', html)
+        self.assertIn('aria-label="Tool comparison"', html)
+        self.assertIn('aria-label="N50 and Gap bp"', html)
         self.assertEqual(html.count('id="inputs"'), 1)
         self.assertIn("12.5%", html)
         def row(ds, ctg, chrom):

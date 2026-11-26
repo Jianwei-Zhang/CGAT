@@ -6,6 +6,7 @@ import re
 try:
     from render_final_story import final_card
     from render_gap_story import gap_card
+    from render_overview_summary import overview_summary_card
     from render_terminal_story import terminal_card
     from render_repair_story import repair_card, DIALOG
     from render_path_story import input_card, assignment_card, q0_card
@@ -18,6 +19,7 @@ try:
 except ModuleNotFoundError:
     from .render_final_story import final_card
     from .render_gap_story import gap_card
+    from .render_overview_summary import overview_summary_card
     from .render_terminal_story import terminal_card
     from .render_repair_story import repair_card, DIALOG
     from .render_path_story import input_card, assignment_card, q0_card
@@ -96,6 +98,7 @@ def render_overview(vm):
         lgz = vm["lgz_summary"]
         body = (
             _run_notices(vm)
+            + overview_summary_card(vm)
             + input_card(lgz["inputs"])
             + assignment_card(
                 lgz.get("assignment", {}),
