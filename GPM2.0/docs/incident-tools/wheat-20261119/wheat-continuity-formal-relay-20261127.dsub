@@ -1,0 +1,17 @@
+#!/bin/bash
+#DSUB -n jm19_q0_formal_continuity
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=32,mem=327680MB"
+#DSUB -D "(43137178=ENDED&&43137228=ENDED)"
+#DSUB -o formal_relay_%J.out
+set -eo pipefail
+umask 077
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 PYTHONFAULTHANDLER=1
+set -u
+sha256sum --quiet -c relay-kit.sha256
+# The gate independently requires both dependencies to have SUCCEEDED. ENDED
+# also lets a failed dependency produce an explicit HOLD instead of waiting forever.
+python3 -Bu wheat_q0_conditional_relay.py --config "$PWD/relay-config.json"
