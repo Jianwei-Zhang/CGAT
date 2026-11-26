@@ -1,0 +1,111 @@
+{
+  "schema": "wheat_continuity_transition_and_relay_ready_v1",
+  "date": "2026-11-27",
+  "installation": {
+    "continuous_q0_policy_change": {
+      "admission_policy_version": 2,
+      "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+      "path_policy_version": 3,
+      "reference_locus_padding_bp": 100000,
+      "schema": "q0_continuity_2064cb4c_v1"
+    },
+    "status": "continuity_engine_installed_and_one_original_parent_verified",
+    "transition_sha256": "248ee1e7a93edc6e5c1e14199d1e8c7f0b7e4fed04f2d1d5e3518da4fb631941",
+    "source_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+    "checkpoint_files_unchanged": 25,
+    "protected_control_files_unchanged": true,
+    "representative_parent": {
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+      "input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+      "unit_id": "q0_chr:Un"
+    },
+    "all_25_parent_payloads_revalidated": false,
+    "formal_main_started": false,
+    "mapper_calls": 0,
+    "validation_job_untouched": 43137178,
+    "reader_declaration_sha256": "50afbe0eb69f54d85c588950950d22035e6a73dea977773122e6529e5f472a84",
+    "installation_receipt_sha256": "74d1490a0aaba3940d08d25d4aa9725abaaeaa34d4c6013d870dbceebfc4f96e",
+    "job_id": 43137228,
+    "state": "SUCCEEDED",
+    "start_time_cst": "2026-11-27 03:16:24",
+    "end_time_cst": "2026-11-27 03:21:18",
+    "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-continuity-transition-20261127.bs5d44Do",
+    "installed_files_independently_verified": 40,
+    "downloaded_artifact_sha256": {
+      "transition.json": "248ee1e7a93edc6e5c1e14199d1e8c7f0b7e4fed04f2d1d5e3518da4fb631941",
+      "candidate-prepared.json": "9fff8e7ae538118830b0d0bd796027b30aeec1662ae094e18e201d2bcc89a069",
+      "kit.sha256": "6171fdcbd7408dcab073713d2e92a9a5eafe1bb2317d1c95f078d5a3119ee508",
+      "entry-repair.json": "216deeb676da42df578798d4c8068535b4ee21ea4e1cbab30ed7abfd448df874",
+      "install-only.json": "1dcee627c24d16d1383afe86dcff918a369459e7aceb7610464361a1c9e62ee2",
+      "validation-selected.json": "23452fab7858daaebb61d31ed289b2a1c16e4db7fd8938482b57d95e2ecf8cc4",
+      "control-before.json": "9cf5194224ddffc0d11532fd551c01158f962ade12ed5b4a489b3ea79b5ae85e",
+      "installed-reader.json": "50afbe0eb69f54d85c588950950d22035e6a73dea977773122e6529e5f472a84",
+      "installation/receipt.json": "74d1490a0aaba3940d08d25d4aa9725abaaeaa34d4c6013d870dbceebfc4f96e"
+    }
+  },
+  "relay": {
+    "job_id": 43137230,
+    "state_at_verification": "WAITING",
+    "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-continuity-relay-20261127.hFdplD9I",
+    "dependencies": "43137178=ENDED&&43137228=ENDED",
+    "both_must_succeed_before_formal": true,
+    "cpu": 32,
+    "memory_mib": 327680,
+    "kit_sha256": "adab7ab1bab85080326d50a2b9f494263b3f185e55035b8fc4fa6b436769bbdb",
+    "config_sha256": "01226b1e7b904879806524982b26eedbbaddfc8568b23d93ea7894a01bf292ed",
+    "guard_sha256": "a46085c67431f547f0590feb72005af38f6f9a0cdbb63f5d1c6a3b5ec45ceb4d",
+    "gate": {
+      "main_trusted_paths": 21,
+      "complete_groups": 22,
+      "minimum_selected_source_bp": 11000000000,
+      "source_coordinate_overlaps": 0,
+      "new_selected_cross_chromosome_old_q0_conflicts": 0
+    },
+    "on_failure": "HOLD and preserve; no automatic retry",
+    "formal_main_started": false,
+    "config": {
+      "schema": "wheat_continuity_conditional_relay_v1",
+      "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+      "validation_job": {
+        "job_id": 43137178,
+        "name": "jm19_q0_production22_cached",
+        "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-20261127.4iGSWNXm"
+      },
+      "install_job": {
+        "job_id": 43137228,
+        "name": "jm19_q0_continuity_install",
+        "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-continuity-transition-20261127.bs5d44Do"
+      },
+      "transition": {
+        "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-continuity-transition-20261127.bs5d44Do/transition.json",
+        "sha256": "248ee1e7a93edc6e5c1e14199d1e8c7f0b7e4fed04f2d1d5e3518da4fb631941"
+      },
+      "transition_kit": {
+        "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-continuity-transition-20261127.bs5d44Do/kit.sha256",
+        "sha256": "6171fdcbd7408dcab073713d2e92a9a5eafe1bb2317d1c95f078d5a3119ee508"
+      },
+      "validation_source": {
+        "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-20261127.4iGSWNXm/production-source.json",
+        "sha256": "830ea56101f91ee71a4ea9a7e6dd30983285896d9858ab5a36b507ccc00aa962"
+      },
+      "validation_kit": {
+        "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-20261127.4iGSWNXm/kit.sha256",
+        "sha256": "6f8ceed999f725ea3ddae8e93d13d9c45d7cbb5124be3b9a44ea7bfc0f956ba3"
+      }
+    }
+  },
+  "compute_scheduler_probe": {
+    "job_id": 43137248,
+    "state": "SUCCEEDED",
+    "node": "agent-X86-34",
+    "query_result_sha256": "06b5b82f34f4466334805fd8db1653a947bd803237684d28d0099ef21f04f6b0",
+    "scope": "Read-only scheduler command availability and authorization on the actual successor node; no mapper or formal engine"
+  },
+  "local_tests": {
+    "transition_install_resume": 89,
+    "conditional_guard": 9,
+    "all_passed": true
+  },
+  "master_modified": false,
+  "formal_release_published": false
+}

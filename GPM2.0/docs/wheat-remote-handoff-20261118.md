@@ -5711,3 +5711,34 @@ Donau 作业 `43029926` 于 21:07:29 正常结束（退出码 0；总墙钟 26 �
 - 提交元数据：`incident-tools/wheat-20261119/wheat-production22-submission-20261127.json`。
   日志`production22_43137178.out`，逐组checkpoint在`selection/`，最终审计在
   `result/production22-audit.json`。科学结果需看覆盖/连续性/告警及跨组源占用后再决定；正式Q0/LGZ继续HOLD。
+
+
+## 2026-11-27 03:24 连续引擎正式预装完成，已挂条件自动接力
+
+用户已明确授权：43137178成功且21主路径、≥11Gb获选源长、零源坐标重复、无新增
+跨染色体旧Q0输出冲突时，不再等待人工确认，自动启动正式Q0→LGZ；不满足则保留现场停止。
+
+- 预装 **43137228 / SUCCEEDED**，03:16:24–03:21:18，X86-45，1CPU/4GiB。
+  owner `q0-continuity-transition-20261127.bs5d44Do`，正式工作区已切到2064cb4c，
+  transition SHA `248ee1e7a93edc6e5c1e14199d1e8c7f0b7e4fed04f2d1d5e3518da4fb631941`。
+  **此前5b7408fc的selection-reuse transition已被替代，不能再拿它启动或重放安装。**
+- 仅9个Q0源码模块变化（含4个新增模块），38个运行时条目加launcher/reader声明共40项
+  安装字节已独立核对。正常锁、完整备份和安装journal保留；25个父checkpoint及保护控制
+  文件原字节不变。实读`q0_chr:Un`通过；不冒称全部25份PAF payload已重验。
+  AdmissionPolicy v2 / PathPolicy v3变更显式声明，2064cb4c九个关键模块精确锁定，
+  mapper/原始补证策略AST不变，未经独立授权的准入改动仍拒绝。
+- **43137230 / WAITING** 是已提交的条件正式接力，不是普通无条件重提。
+  owner `q0-continuity-relay-20261127.hFdplD9I`；依赖
+  `(43137178=ENDED&&43137228=ENDED)`，32CPU/320GiB、X86-34。
+  调度器确认预装依赖已满足，仍等待43137178；WAITING阶段未启动正式流程。
+  守门程序另要求两个前驱均SUCCEEDED，并重开完整22组检查点/源码/报告/安装身份核验。
+  通过后exec新transition绑定的routed resume，不重装、不直接跑stock run_all.sh。
+  失败写`gate-hold.json`退出；通过写`gate-go.json`、实际资源证明和一次性启动intent。
+- ≥11Gb定义为11,000,000,000bp获选源切片，不计人工N；跨染色体冲突按源坐标与冻结
+  22组基线逐区间比较新增部分，不靠计数抵消。未入选候选告警不是这项获选输出门禁。
+  原正式流程仍自行验证/准备正式证据，不把隔离FirstRequestSelection冒充正式Q0。
+- 计算节点只读调度器探针 **43137248 / SUCCEEDED**，03:22:42–03:22:43，确认后继脚本
+  在X86-34可查询真实调度器，不依赖本对话或登录端后台轮询。预装及探针mapper调用0。
+- 源码：`ea3e4c62`（显式迁移授权）、`09d912f0`（条件接力守门）。定向89+9测试通过。
+  现场凭据 `incident-tools/wheat-20261119/wheat-continuity-transition-relay-ready-20261127.json`；
+  设计/门禁 `q0-continuity-conditional-relay-20261127.md`。正式运行尚未开始，不等于已通过全麦验收。
