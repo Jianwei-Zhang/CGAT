@@ -188,6 +188,32 @@ class CandidatePreparationTests(unittest.TestCase):
         self.assertEqual(transition['positive_threshold_policy_changes'],self.manifest['positive_threshold_policy_changes'])
         self.assertEqual(self.snapshot(),self.before)
 
+    def test_threshold_reuses_only_journal_bound_identical_legacy_support(self):
+        self.bind_threshold_candidate()
+        relative = '.prepare_lib/tools/workspace_layout.py'
+        target = self.work/relative
+        target.write_bytes((self.bundle/'support/workspace_layout.py').read_bytes())
+        journal = json.loads(self.journal.read_text())
+        journal['installed'].append({'relative':relative, 'sha256':prep.digest(target)})
+        self.journal.write_text(json.dumps(journal))
+        before = self.snapshot()
+        report = prep.prepare(self.bundle)
+        self.assertIn(relative, report['unchanged_runtime_files'])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_threshold_rejects_changed_support_even_if_previous_bytes_are_owned(self):
+        self.bind_threshold_candidate()
+        relative = '.prepare_lib/tools/workspace_layout.py'
+        target = self.work/relative
+        target.write_text('# previously installed different support\n')
+        journal = json.loads(self.journal.read_text())
+        journal['installed'].append({'relative':relative, 'sha256':prep.digest(target)})
+        self.journal.write_text(json.dumps(journal))
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, 'existing workspace layout'):
+            prep.prepare(self.bundle)
+        self.assertEqual(self.snapshot(), before)
+
     def test_threshold_rejects_undeclared_or_changed_policy_delta(self):
         self.bind_threshold_candidate()
         self.manifest['positive_threshold_policy_changes']={}

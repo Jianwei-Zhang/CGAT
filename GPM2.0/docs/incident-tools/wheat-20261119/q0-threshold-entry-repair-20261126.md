@@ -31,7 +31,7 @@
 ```bash
 # 在已有正确 x86 环境与隔离的、内容已核对的迁移目录中执行。
 python3 -Bu resume_q0_science.py --transition "$PWD/transition.json" --install-runtime --install-only
-python3 -Bu read_q0_science.py --transition "$PWD/transition.json" --server-dir "$WORK" --describe-only
+# install 已生成并绑定真实 reader 声明；不再重复 --describe-only 全量扫描。
 python3 -Bu resume_q0_science.py --transition "$PWD/transition.json" --validate-only --validate-unit q0_chr:Un
 ```
 
@@ -46,3 +46,17 @@ python3 -Bu resume_q0_science.py --transition "$PWD/transition.json" --validate-
 正式续跑仍需先审阅 22 组结果与新证据引用，然后使用**同一新 transition 的**
 `resume_q0_science.py --transition ... --threads 32`（不再加安装参数）；它保留原始路由
 checkpoint 的核验与复用。不要直接调用 stock `run_all.sh`，不要跳过最终科学验收。
+
+## 16:00 后安装事实与下一代兼容
+
+`q0-threshold-entry-20261126.JjS32RPJ` 的安装已完成，源码 `4b29638e`，
+transition `e1c31548e0bd733db85a6e8c5a9c3c3becd59df5c58aa6ecc6fd6f136dd96a6d`。
+`43098456` 在安装完成后重复 describe 扫描时被主动停止，不是安装失败；
+`43098462` 用安装器已封存的真实声明完成 `q0_chr:Un` 验证。
+25 份原 checkpoint 和受保护控制文件均未改写，未启动正式计算。
+详见 `q0-selection-reuse-preflight-20261126.json` 的 prior_entry。
+
+下一代 selection 复用迁移必须以上述实际安装为前驱，不再使用 11/22 的旧入口 SHA。
+已安装的 `workspace_layout.py` 仅在前次成功 journal 绑定且新旧字节相同时接受；
+不允许任意已有文件混入。冻结外层的 `file_identity` 不支持 `within=`，新 Q0 的兼容
+分支调用其原实现并保留路径包含及稳定目标检查，不更换原检查点模块。

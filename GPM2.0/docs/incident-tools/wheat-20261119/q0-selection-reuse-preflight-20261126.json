@@ -1,0 +1,83 @@
+{
+  "schema": "wheat_selection_reuse_preflight_v1",
+  "date": "2026-11-26",
+  "prior_entry": {
+    "status": "threshold_entry_installed_and_one_original_parent_verified",
+    "transition_sha256": "e1c31548e0bd733db85a6e8c5a9c3c3becd59df5c58aa6ecc6fd6f136dd96a6d",
+    "source_revision": "4b29638e78c4d99afa3ba87ee8551204f024b8c8",
+    "checkpoint_files_unchanged": 25,
+    "protected_control_files_unchanged": true,
+    "representative_parent": {
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+      "input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+      "unit_id": "q0_chr:Un"
+    },
+    "all_25_parent_payloads_revalidated": false,
+    "formal_main_started": false,
+    "mapper_calls": 0,
+    "full_draft_job_untouched": 43084475,
+    "comparison_job_untouched": 43086929,
+    "reader_declaration_sha256": "e460f05fbc2fdf801a0b454719326de0391a79bcce73aee1debc0e424fb1dfa8",
+    "installation_receipt_sha256": "1f56b3e7725700e34cf1880a382c2dc3f3fc0c64a1c8886cbbc947e33ccd817e"
+  },
+  "historical_cache_metadata": {
+    "job_id": 43098553,
+    "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-cache-metadata-v2-20261126.ss93RqpH",
+    "full_report_sha256": "0eca51c7b413620c9c79ef43f322b9ef58ed93103de6b0f4fdbd82b8328b82bd",
+    "summary": {
+      "auditor_sha256": "4c6db26879e2ccf998bdb0eb58a1d77388de41b5cde93c81a3862434616310cc",
+      "checked_requests": 59278,
+      "completed": true,
+      "counts": {
+        "metadata_eligible": 59278
+      },
+      "elapsed_s": 180.26,
+      "expected_requests": 59278,
+      "historical_projection_mode": {
+        "projection_only": 59278
+      },
+      "mapper_starts": 0,
+      "metadata_eligible_fraction_of_all": 1.0,
+      "misses": [],
+      "new_request_hit_rate_proven": false,
+      "paf_or_fasta_payloads_read": false,
+      "raw_bytes_by_status": {
+        "metadata_eligible": 9378344730
+      },
+      "raw_content_hashes_verified": false,
+      "runtime_sha256": {
+        "q0_alignments.py": "bfd6e1f9ebb6cc6445fbd125a5bd11e69839bd35ab12cd5e472c4d897d745daa",
+        "q0_query_windows.py": "140f6222e5bd4b5fd448daf35be98625a354f1eb26a8df0f0e7e06792a00cb51",
+        "q0_regional_mapping.py": "ea95252181055145a6989a654ba6cd9680c7dfcec98d593cfefac02969c9b831"
+      },
+      "schema": "wheat_regional_metadata_eligibility_v1",
+      "scope": "Same historical requests: actual success/command/guard metadata checked; PAF and context sizes only. Not proof of new-request keys, full payload integrity, or projected-cache hits.",
+      "source_root": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/gpm_server",
+      "unexamined_requests": 0
+    }
+  },
+  "obsolete_job": {
+    "job_id": 43032833,
+    "stopped_by_user_authorization": true,
+    "end_time_cst": "2026-11-26 16:32:32",
+    "scheduler_terminal_state": "FAILED",
+    "data_deleted": false
+  },
+  "local_validation": {
+    "q0_tests": 447,
+    "passed": 446,
+    "skipped": 1,
+    "seconds": 307.271,
+    "transition_tests_passed": 18,
+    "frozen_original_outer_prepare_and_reuse": "passed",
+    "whole_wheat_speedup_measured": false,
+    "logs": {
+      "q0-regression.log": "e1fd8f1fcb1968e125acdf07e5a29b46551314c7ad1f1be6437c444cfb889147",
+      "selection-tests.log": "81eb4a7b20f15e58f96e79bbecf45b2df2e45aa7a385ea29a6a7c557238f2c0e",
+      "transition-tests.log": "28a8f32568bca03db22f915c6de5563c20c4ef2b2026e4cf709e344a9821a331",
+      "legacy-check.log": "924b70cf0fbdcf4ce27417fc71919b52056819ac3ad04253e3b3fb7eac9be63c"
+    }
+  },
+  "new_selection_reuse_installed": false,
+  "formal_main_started": false
+}

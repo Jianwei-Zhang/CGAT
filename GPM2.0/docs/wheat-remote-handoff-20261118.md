@@ -5077,3 +5077,32 @@ Donau 作业 `43029926` 于 21:07:29 正常结束（退出码 0；总墙钟 26 �
 - **`jm19-compare-614589f-20261118/gpm_server/prepare_q0_evidence.sh` 仍是旧入口。** 只读核对了实际脚本（SHA `172785e098202f1c5f0027eec7de2b7368e8d710074520fc7bcfaa36a37f196f`）、其绑定的 11/22 transition、reader 和已安装的 `q0_preparation.py`。该 builder 不接收 `supplement_scope`，区域候选阶段对 `native_requests` 调用 `_supplement` 时未设 `cache_only`，默认是 `False`。因此冷缓存**可能启动旧整段原生比对**；不要用旧 `run_all.sh` 或这个 launcher 来续新版。核查没有执行旧 builder、改写 launcher 或安装 runtime。原工作区当时也未产生 `metadata/grt_q0_evidence.json` 和 `grt/q/q0.fa`。
 - 运行中的 `43084475` 是独立的冻结选路对照，`43086929` 只做结果比较；二者都不是上述正式入口。候选工具包已在独立目录 `q0-formal-placement-budget.Q7M6PYWa/tools.tgz` 封存，内容核对到 `4cbd93ba` 的 Server 工具；**包存在不等于原工作区已切换**。不要只给旧脚本添参数，也不要绕过原生路由检查点直接调用普通 CLI。既有[真实 `q0_chr:Un` 放入普通检查点读者的对照](incident-tools/wheat-20261119/q0-parent-checkpoint-fork-closure-20261123.json)明确被拒绝，不能删掉扩展凭据来伪造通过。
 - 下一步：待两份 22 组结果封存，核对几何差异及新证据实际引用；正式提交前另行绑定新区间补证策略 `positive_threshold`、当前工具和原 25 个父单元的真实来源/路由凭据，保留旧工作区和正式验收门槛。已验的 15 批只在请求一致时采用；不能把草案断点、这个预检或缓存清单当正式交付。[正式入口只读核查快照](incident-tools/wheat-20261119/native-fallback-recheck-20261125/formal-launcher-preflight.json)。
+
+
+### 11/26 16:47 CST — 入口已迁移；优先消除重复正式选路，历史 raw 缓存已全量元数据核验
+
+- 上一条 14:59 的“入口仍旧”已被后续实际安装覆盖：`4b29638e` 在
+  `q0-threshold-entry-20261126.JjS32RPJ` 安装成功；`43098462` 用真实旧读者验证
+  `q0_chr:Un` 成功。25 份父 checkpoint 与保护文件不变，未运行正式 Q0。
+  `43098456` 的 FAILED 是安装成功后主动停止冗余第二遍 provenance 扫描，不能重装来“修复”。
+- `43098553 / SUCCEEDED`，16:40:17–16:43:18，ARM、4 核/4 GiB：
+  **59,278/59,278 历史请求元数据均满足 raw 复用条件，0 miss，0 未检查，180.26 秒**。
+  原始成功/命令/guard 元数据身份核对，PAF 和 context 只查存在与大小；不启 mapper、不读
+  PAF/FASTA payload。历史方法全部是 `projection_only`，即复用 raw 后投影，不能宣称
+  59,278 个最终投影热命中，也不能据此证明未来新请求的命中率或所有大文件内容完整。
+  完整报告 SHA `0eca51c7b413620c9c79ef43f322b9ef58ed93103de6b0f4fdbd82b8328b82bd`。
+  首次有时限检查 `43098544` 仅完成 47,453 条且全部通过；这不是 80% 命中率。
+- 按用户授权停止无后续依赖的旧慢草案 `43032833`，调度终态 FAILED，16:32:32；
+  这是主动取消，不是科学验收失败。数据保留，完成基线 `43061436` 不动。
+- 新实现将最终通过阈值验收的完整 PathSelection 写为 ready manifest 绑定的同代产物，
+  下游复核输入、内容、selector、策略、源占用后直接使用；仍跑最终阈值验收和序列重建。
+  规划用 FirstRequestSelection/checkpoint 不能直接发布。补证/junction 改变证据后仍重选。
+  解决的是最后一遍重复定位/建图/排名及同代 warm-ready 重选；尚未实现任意冷启动直接
+  把旧 59,278 条证据变为一遍正式选路，不承诺“固定节省 12–16 小时”。
+- 本地 Q0 447 项中 446 通过、1 跳过；迁移 18 项通过；真实冻结旧外层模块上的合成
+  工作区已验证 prepare→accepted selection→禁止再次选路的 downstream build 完整一致。
+  这些不是整麦提速实测或 Q0→LGZ 交付证明。此时新 selection 代码尚未远端安装。
+- 16:47 快照：`43084475` RUNNING，已进入 1B 建图/排名；`43086929` WAITING。
+  不重提、不热替换二者冻结代码。等 22 组报告封存，按
+  `q0-selection-reuse-and-go-no-go-20261126.md` 验收后才切正式流程。
+  继续在 track 分支，不合 master；之后仅拆包回迁通用引擎改进。

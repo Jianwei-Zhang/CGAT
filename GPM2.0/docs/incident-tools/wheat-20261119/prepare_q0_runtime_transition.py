@@ -244,10 +244,11 @@ def prepare(bundle):
         relative = '.prepare_lib/tools/workspace_layout.py'
         # This support module is new in the legacy runtime. An existing file
         # needs a separate reviewed migration, never an assumed overwrite.
-        if child(work, relative).exists():
-            raise ValueError('unexpected existing workspace layout support')
         source = sources['support/workspace_layout.py']
-        runtime.append({'relative':relative, 'prior_sha256':None, 'source':source,
+        prior = installed.get(relative)
+        if child(work, relative).exists() and (prior is None or prior != source['sha256']):
+            raise ValueError('unexpected existing workspace layout support')
+        runtime.append({'relative':relative, 'prior_sha256':prior, 'source':source,
                         'new_sha256':source['sha256']})
     for name in ('transition.json', LAUNCHER, 'candidate-prepared.json'):
         if child(bundle, name).exists():
