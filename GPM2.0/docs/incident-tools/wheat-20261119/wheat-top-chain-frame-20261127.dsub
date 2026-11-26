@@ -1,0 +1,21 @@
+#!/bin/bash
+#DSUB -n jm19_1A_atom_frame_audit
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=4,mem=40960MB"
+#DSUB -o top_chain_frame_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c frame-kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+base=$(dirname "$PWD")
+original="$base/q0-continuity-indexed-20261126.CgydRhOS"
+phase1="$base/q0-top-chain-locus-20261127.CTotPSFG"
+code=$(mktemp -d /tmp/wheat-atom-frame-code.XXXXXXXX)
+tar -xzf "$original/tools.tgz" -C "$code"
+export PYTHONPATH="$PWD:$phase1:$original:$code/tools"
+python3 -Bu -m unittest -v test_wheat_top_chain_locus
+python3 -Bu wheat_top_chain_locus_loop_readonly.py "$base" "$original" "$base/q0-continuity-20261126.RAbGvNba" "$base/q0-local-chain-20261126.nyLKgP1a" "$PWD"
+python3 -Bu wheat_locus_loop_result_audit.py "$PWD" "$original" "$base/q0-continuity-20261126.RAbGvNba"

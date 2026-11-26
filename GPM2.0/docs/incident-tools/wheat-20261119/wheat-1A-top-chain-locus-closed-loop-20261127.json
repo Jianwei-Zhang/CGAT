@@ -1,0 +1,391 @@
+{
+  "admission_sha256": "0b872615ce554c1d357cc795720fe9c214d52e7fa0949d6c5fdb1522c948a581",
+  "admission_variants": {
+    "10": {
+      "combined_reference_bp": 421658502,
+      "new_reference_bp": 59417831,
+      "old_q0_conflict_placements": [],
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 402032573
+      },
+      "placements": 61,
+      "reference_bp": 419939211,
+      "source_bp_sum": 1149357881,
+      "sources": 58
+    },
+    "5": {
+      "combined_reference_bp": 421665851,
+      "new_reference_bp": 59425180,
+      "old_q0_conflict_placements": [],
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 402032573
+      },
+      "placements": 62,
+      "reference_bp": 419946560,
+      "source_bp_sum": 1154405324,
+      "sources": 58
+    }
+  },
+  "baseline_graph_sha256": "51faec603575c1bad9bf0c035b112b401f2cbbf94454530a739d758b437099c5",
+  "elapsed_s": 166.56179758161306,
+  "filtered_pair_seal_sha256": "61f56e569e03a13e15ea13972ed5827a59ce98d91dfca998e2d49325c0094285",
+  "formal_workspace_modified": false,
+  "fragment_refinement_run": false,
+  "limitations": [
+    "Locus-aware equivalence is an isolated scientific policy trial, not lossless optimization.",
+    "Unknown loci remain unconstrained; greedy component-locus intersections can depend on native map order.",
+    "Reference domains use actual overlapping anchors when available and conservative placement envelopes otherwise.",
+    "Native same-source/orientation ambiguity exclusions remain unchanged.",
+    "Old-Q0 agreement is not independent biological truth."
+  ],
+  "mapper_calls": 0,
+  "results": {
+    "chain_10_locus_100000": {
+      "admission_reference_bp": 421658502,
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 11643,
+          "envelope_only_atoms": 7660,
+          "inconsistent_anchor_frame_atoms": 46,
+          "unknown_atoms": 10
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 100000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 5636,
+        "union_audit": {
+          "accepted_unions": 2067,
+          "maximum_rejected_map_bp": 6808,
+          "rejected_atom_bp_sum": 1309300,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 7839
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 70,
+        "gap_placeholder_bp": 7000,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 380690016,
+        "score": [
+          524473879,
+          -70,
+          -70,
+          -67,
+          -71,
+          220288873
+        ],
+        "slice_N50_bp": 63202776,
+        "slices": 71,
+        "source_bp": 524473879
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "chain_10_locus_100000-path.json.gz",
+      "path_sha256": "d596437335b18223c2aec78d0470ba64bcf70376d51b375bef90fcc5ba4119c5",
+      "reference_gain_vs_baseline_bp": 146791432,
+      "reference_loss_vs_baseline_bp": 743322,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 253542694
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 316041910
+        }
+      },
+      "same_85_slice_geometry_replayable": true,
+      "spine_diagnostics": {
+        "fallback_skips": {},
+        "full_proposal_passed": true,
+        "proposal_nodes": 71,
+        "proposal_source_length_weight": 524473879,
+        "score_calls": 1
+      }
+    },
+    "chain_10_locus_1000000": {
+      "admission_reference_bp": 421658502,
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 11675,
+          "envelope_only_atoms": 7660,
+          "inconsistent_anchor_frame_atoms": 14,
+          "unknown_atoms": 10
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 1000000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 5636,
+        "union_audit": {
+          "accepted_unions": 2139,
+          "maximum_rejected_map_bp": 6808,
+          "rejected_atom_bp_sum": 1302775,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 7767
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 69,
+        "gap_placeholder_bp": 6900,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 354012519,
+        "score": [
+          496021180,
+          -69,
+          -69,
+          -66,
+          -70,
+          220288873
+        ],
+        "slice_N50_bp": 63202776,
+        "slices": 70,
+        "source_bp": 496021180
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "chain_10_locus_1000000-path.json.gz",
+      "path_sha256": "fc53e58a42eb2dca471a018571b2dd346f070bf31ecf56179daa59fc3abe0aa1",
+      "reference_gain_vs_baseline_bp": 120113935,
+      "reference_loss_vs_baseline_bp": 743322,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 253542694
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 316041910
+        }
+      },
+      "same_85_slice_geometry_replayable": true,
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 1
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 71,
+        "proposal_source_length_weight": 524473879,
+        "score_calls": 72
+      }
+    },
+    "chain_10_native_equivalence": {
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 58,
+        "gap_placeholder_bp": 5800,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 285705339,
+        "score": [
+          372696581,
+          -58,
+          -58,
+          -55,
+          -59,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 59,
+        "source_bp": 372696581
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "not_promoted_if_below_incumbent": true,
+      "path_file": "chain_10_native_equivalence-path.json.gz",
+      "path_sha256": "8f7be2db850e5b939663c45c2b52255a56b9d58e34735100de97a8d47aad4c53",
+      "reference_gain_vs_baseline_bp": 51929690,
+      "reference_loss_vs_baseline_bp": 866257,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 253542694
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 316041910
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 12
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 71,
+        "proposal_source_length_weight": 524473879,
+        "score_calls": 72
+      }
+    },
+    "same_admission_locus_100000": {
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 10734,
+          "envelope_only_atoms": 7379,
+          "inconsistent_anchor_frame_atoms": 18,
+          "unknown_atoms": 8
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 100000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 5302,
+        "union_audit": {
+          "accepted_unions": 1761,
+          "maximum_rejected_map_bp": 6808,
+          "rejected_atom_bp_sum": 1250868,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 7312
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 106,
+        "gap_placeholder_bp": 10600,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 344179178,
+        "score": [
+          429902619,
+          -106,
+          -106,
+          -105,
+          -107,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 107,
+        "source_bp": 429902619
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "same_admission_locus_100000-path.json.gz",
+      "path_sha256": "bf7a90cca0513e9162d27d61fd3cf1ac2719673f135d8f7bb7a43396138bf12e",
+      "reference_gain_vs_baseline_bp": 109537272,
+      "reference_loss_vs_baseline_bp": 0,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 222272638
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 246799488
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {},
+        "full_proposal_passed": true,
+        "proposal_nodes": 107,
+        "proposal_source_length_weight": 429902619,
+        "score_calls": 1
+      }
+    },
+    "same_admission_locus_1000000": {
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 10745,
+          "envelope_only_atoms": 7379,
+          "inconsistent_anchor_frame_atoms": 7,
+          "unknown_atoms": 8
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 1000000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 5302,
+        "union_audit": {
+          "accepted_unions": 1827,
+          "maximum_rejected_map_bp": 6808,
+          "rejected_atom_bp_sum": 1244435,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 7246
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 105,
+        "gap_placeholder_bp": 10500,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 341260656,
+        "score": [
+          424974313,
+          -105,
+          -105,
+          -104,
+          -106,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 106,
+        "source_bp": 424974313
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "same_admission_locus_1000000-path.json.gz",
+      "path_sha256": "aa963125ef87127db6e6c5716eb4836816dd3b551fd735fb0b27de8310717995",
+      "reference_gain_vs_baseline_bp": 106618750,
+      "reference_loss_vs_baseline_bp": 0,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 222272638
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 246799488
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 1
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 107,
+        "proposal_source_length_weight": 429902619,
+        "score_calls": 108
+      }
+    }
+  },
+  "schema": "wheat_top_chain_locus_1A_closed_loop_v1"
+}

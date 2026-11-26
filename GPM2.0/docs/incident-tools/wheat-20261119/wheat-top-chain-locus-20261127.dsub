@@ -1,0 +1,22 @@
+#!/bin/bash
+#DSUB -n jm19_1A_top_chain_locus
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=8,mem=81920MB"
+#DSUB -o top_chain_locus_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c top-chain-locus-kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+base=$(dirname "$PWD")
+source_owner="$base/q0-continuity-indexed-20261126.CgydRhOS"
+admission_owner="$base/q0-continuity-20261126.RAbGvNba"
+legacy_owner="$base/q0-local-chain-20261126.nyLKgP1a"
+code=$(mktemp -d /tmp/wheat-top-chain-locus-code.XXXXXXXX)
+tar -xzf "$source_owner/tools.tgz" -C "$code"
+export PYTHONPATH="$PWD:$source_owner:$code/tools"
+python3 -Bu -m unittest -v test_wheat_top_chain_locus
+python3 -Bu wheat_top_chain_locus_loop_readonly.py "$base" "$source_owner" "$admission_owner" "$legacy_owner" "$PWD"
+sha256sum top-chain-admission.json top-chain-locus-closed-loop.json

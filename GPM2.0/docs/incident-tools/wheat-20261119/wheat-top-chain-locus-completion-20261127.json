@@ -1,0 +1,60 @@
+{
+  "accepted_scope": "1A isolated closed loop; eligible to start 3B/3D checks, not formal whole-wheat acceptance",
+  "canonical_end": "2026-11-27T01:03:09+08:00",
+  "canonical_job": "43136355",
+  "canonical_owner": "q0-top-chain-canonical-20261127.AVZGRNxP",
+  "canonical_start": "2026-11-27T00:58:18+08:00",
+  "canonical_state": "SUCCEEDED",
+  "caveats": [
+    "Scientific policy change, not a lossless performance-only optimization.",
+    "Native map-order greedy component constraints are not claimed globally optimal.",
+    "Zero old-Q0 conflicts only applies where the comparator has source overlap.",
+    "New paths lose 743322 bp of original reference coverage while adding much more; the retained fallback is not an interval-superset guarantee.",
+    "Cross validation includes 1A/3B/3D physical source-interval reuse checks; it is not all 22 groups."
+  ],
+  "code": {
+    "wheat_group_evidence_readonly.py": "fdabe52b62dc8850610fa7ce1d9a0e8c74b1b39c19d8e2bb17a8a82a47139f6b",
+    "wheat_locus_guard_readonly.py": "bd3d331afd00b55c6d16c6eb7a1fc5cdc75c4e2e3571283887a7a588671e294a",
+    "wheat_locus_loop_result_audit.py": "e2e8a453ecd1ceb2122ef564e90cb7bf1512564ce657fbcd6c42db831f46c950",
+    "wheat_top_chain_admission_readonly.py": "e8dcf4d711f15a689ba32ef503d22dcfb54f0aee1e4198a04a0d251dea8536cb",
+    "wheat_top_chain_cross_readonly.py": "392d91ff86c57ab5c2b6875e5ada4b9e1e5a79265dd7782b196f7cb0edf2a584",
+    "wheat_top_chain_locus_loop_readonly.py": "3bc568079a4ab42ba86e6ebf96191ba4ceeecd09e9a73c8e847c7cb8b397b7db"
+  },
+  "critical_correctness_guards": [
+    "Reference domains compare reference-forward atom START, not arbitrary internal anchor positions.",
+    "Qualify pair blocks with all original competitors first, then remove native ambiguity IDs; never requalify after competitor removal.",
+    "Unknown or internally inconsistent reference frames cannot alone justify deleting homology.",
+    "Whole-path native score/duplicate validation remains active.",
+    "The original 85-slice path remains geometrically replayable as a fallback."
+  ],
+  "cross_completed": false,
+  "cross_resources": {
+    "cpu": 8,
+    "groups": [
+      "3B",
+      "3D"
+    ],
+    "memory_mb": 81920,
+    "node": "agent-X86-34",
+    "screen_workers": 4
+  },
+  "cross_validation_job": "43136372",
+  "cross_validation_owner": "q0-top-chain-cross-20261127.XLaIRQyk",
+  "cross_validation_start": "2026-11-27T01:05:30+08:00",
+  "cross_validation_state_at_snapshot": "RUNNING",
+  "formal_q0_lgz": "HOLD",
+  "formal_workspace_modified": false,
+  "intermediate_atom_frame_job": "43136330",
+  "intermediate_results_are_not_canonical": true,
+  "mapper_calls": 0,
+  "master_modified": false,
+  "native_cache_owner": "q0-top-chain-locus-20261127.CTotPSFG",
+  "native_cache_producer_job": "43136291",
+  "native_equivalence_control": "reconstructed original atoms, units, ambiguity IDs all equal before applying locus policy",
+  "receipts": {
+    "independent_audit_sha256": "4ae3adf0ee69ef456531ef3fdeabef61bd149d55bb54b202aae9d7ea42f09532",
+    "loop_sha256": "bcab3dc094aee5deaa57dc3823039b705d1b4e7a818e4f2ad1606374c7ececad"
+  },
+  "schema": "wheat_top_chain_locus_1A_completion_v1",
+  "test_count_local": 36
+}

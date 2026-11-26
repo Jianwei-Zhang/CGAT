@@ -12,8 +12,8 @@ from wheat_single_group_replay_readonly import (producer,bind,mapping,retained_g
     retained_names,read_selected,need,sha256_file)
 
 
-def load_links(base,owner,sources):
-    began=monotonic();group='1A';main=base/'q0-whole-local-maps.soHq9Z6J'
+def load_links(base,owner,sources,*,group_label="1A"):
+    began=monotonic();group=group_label;main=base/'q0-whole-local-maps.soHq9Z6J'
     snap,ROOT,PARTS,order,lens=bind(base/'q0-latest-fork-20261123-1435/control/snapshot.json',base/'q0-source-part-lookup-20261121-1600/source-part-lookup.json')
     ids=sorted(PARTS);members={ids[i]:s for i,s in enumerate(order)};selected_parts={k for k,s in members.items() if s in sources};selected_ranks={PARTS[k][0] for k in selected_parts}
     byname={r['path']:r for r in snap['files']};links=[];geometry=retained_geometry_cache();fullnames={ds:retained_names({s.contig:n for s,n in lens.items() if s.dataset==ds}) for ds in {s.dataset for s in lens}}
