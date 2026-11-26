@@ -16,7 +16,8 @@
 
 ## 当前前置证据
 
-- 历史缓存只读核验及入口安装回执：`q0-selection-reuse-preflight-20261126.json`。
+- 历史缓存只读核验及前驱入口回执：`q0-selection-reuse-preflight-20261126.json`。
+- 新 selection 复用已安装：`q0-selection-reuse-installed-20261126.json`，安装作业43098569成功。
 - 59,278 条历史 raw 元数据全通过不是全部投影热命中，不是未来请求键必然一致。
 - `43084475` 与 `43086929` 使用各自冻结包，必须等真实结果封存；不以排队/提交成功放行。
 - 本次不运行微优化 benchmark、发布 CI、update.sh 或 master 合并。

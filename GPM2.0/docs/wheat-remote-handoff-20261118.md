@@ -5106,3 +5106,20 @@ Donau 作业 `43029926` 于 21:07:29 正常结束（退出码 0；总墙钟 26 �
   不重提、不热替换二者冻结代码。等 22 组报告封存，按
   `q0-selection-reuse-and-go-no-go-20261126.md` 验收后才切正式流程。
   继续在 track 分支，不合 master；之后仅拆包回迁通用引擎改进。
+
+
+### 11/26 16:55 CST — selection 复用已实际安装；正式运行仍等22组门禁
+
+- `43098569 / SUCCEEDED`，16:50:08–16:54:41，X86-04、1核/4 GiB；仅安装与旧父读者验证。
+  正式入口的新 transition 在 `q0-selection-reuse-20261126.DjPxKFgH/transition.json`，
+  SHA `5b7408fc2337cf00b92cec23fe0b322c349b6312f50440246c99ec506ae6aec0`，
+  源码 `7c7a12b7`（引擎提交 `a294e3ef`）。旧的 `JjS32RPJ` 已成为前驱，不能继续用它启动。
+- 本次仅4个 Q0 模块实际变化（含新增 selection cache）；mapper/原始缓存键相关模块不变，
+  AdmissionPolicy、PathPolicy、mapper及补证策略 AST 全部一致。安装保留正常锁、备份、journal，
+  未重复扫描第二遍 describe。25 份原 checkpoint、计划/资源/受保护外层文件保持原字节；
+  `q0_chr:Un` 真实验证通过，不冒称全部25份大文件已重验。完整下载回执已逐项核对 SHA。
+- 正式主流程未启动，mapper调用0。当前 `43084475` RUNNING、`43086929` WAITING；
+  不重提、不修改冻结包。22组门禁通过后使用上述新 transition 的 routed resume（32线程），
+  不执行 stock run_all.sh、不再安装本次包。此成功只证明安装/兼容，不证明整麦提速或LGZ成功。
+- 证据：`incident-tools/wheat-20261119/q0-selection-reuse-installed-20261126.json`。
+  tracking分支的通用引擎与事故证据已分开提交；master不合并。
