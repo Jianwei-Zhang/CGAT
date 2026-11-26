@@ -1,0 +1,23 @@
+#!/bin/bash
+#DSUB -n jm19_1A_continuous_spine_cuts
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=8,mem=81920MB"
+#DSUB -o continuous_selection_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c selection-kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+owner=$PWD
+base=$(dirname "$owner")
+admission="$base/q0-continuity-20261126.RAbGvNba"
+legacy="$base/q0-local-chain-20261126.nyLKgP1a"
+code=$(mktemp -d /tmp/wheat-continuous-selection-code.XXXXXXXX)
+tar -xzf tools.tgz -C "$code"
+export PYTHONPATH="$code/tools:$owner"
+python3 -Bu -m unittest -v test_wheat_continuity_refinement
+python3 -Bu wheat_continuity_path_refinement_readonly.py "$base" "$owner" "$admission" "$legacy" "$legacy"
+python3 -Bu wheat_continuity_result_audit.py "$owner" "$admission/old-grt-q-segments.tsv"
+sha256sum continuity-final-selection.json continuity-selected-path-audit.json

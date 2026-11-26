@@ -1,0 +1,135 @@
+{
+  "combined_with_frozen_reference_bp": {
+    "75": 362240671,
+    "80": 326300086,
+    "90": 303856199
+  },
+  "counts": {
+    "frozen_placements": 383,
+    "sources_done": 16826,
+    "verified_sequence_bp": 16471017932
+  },
+  "elapsed_s": 846.6740639358759,
+  "formal_workspace_modified": false,
+  "fractions": [
+    90,
+    80,
+    75
+  ],
+  "group": "1A",
+  "limitations": [
+    "Experimental gates are predeclared diagnostic settings, not new production defaults.",
+    "Continuity may carry small foreign signals or unsupported sequence; source conflicts and reference conflicts are distinct.",
+    "Old Q0 is a comparator, not independent biological truth.",
+    "Admission footprints are not selected Q0 coverage; selection and actual slice risk audit remain required.",
+    "Frozen admission is retained for the downstream comparison, not rerun propagation.",
+    "No formal Q0-LGZ or 3B/3D release is authorized by this receipt alone."
+  ],
+  "lookup_sha256": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+  "mapper_calls": 0,
+  "old_q0_comparison": {
+    "75": {
+      "reference_union_bp": {
+        "same_group_same_orientation": 222272638
+      },
+      "source_union_bp": {
+        "same_group_same_orientation": 246799488
+      }
+    },
+    "80": {
+      "reference_union_bp": {
+        "same_group_same_orientation": 222272638
+      },
+      "source_union_bp": {
+        "same_group_same_orientation": 246799488
+      }
+    },
+    "90": {
+      "reference_union_bp": {
+        "same_group_same_orientation": 218062604
+      },
+      "source_union_bp": {
+        "same_group_same_orientation": 241462960
+      }
+    }
+  },
+  "original_reference_policy": {
+    "competing_identity_margin": 0.02,
+    "kmer_size": 15,
+    "minimum_anchor_bp": 100,
+    "minimum_base_entropy": 1.2,
+    "minimum_distinct_kmer_fraction": 0.5,
+    "minimum_reference_identity": 0.9,
+    "minimum_reference_mapq": 20,
+    "minimum_whole_support_fraction": 0.2,
+    "version": 1
+  },
+  "outputs": {
+    "continuity-source-audit.jsonl.gz": {
+      "bytes": 283586,
+      "sha256": "0654bd6c8ec0c80795aaffa678a459365b023f3f612192527c5f2646ad12cb81"
+    },
+    "continuous75-placements.jsonl.gz": {
+      "bytes": 2531572,
+      "sha256": "5d439eb41fc48ee9f25dce9c0c86f5147d195f6927b8fc6bbb0427ba7202d9ce"
+    },
+    "continuous80-placements.jsonl.gz": {
+      "bytes": 2038668,
+      "sha256": "cdc7e1d8f5530bf8ae94b0ad81ee086e6e3a7ceed7562122fe73fcfd9cdda425"
+    },
+    "continuous90-placements.jsonl.gz": {
+      "bytes": 1750489,
+      "sha256": "1516cd6cf730c5cc5b0fde3e75028ade6a297ce88ee477caeb5a70eef34908db"
+    },
+    "frozen-placements.jsonl.gz": {
+      "bytes": 2093769,
+      "sha256": "913fb731818040fe76fd9e0cc77786ef5e419d8cfc04580ad33d6dd14b30b65a"
+    },
+    "screened-reference-anchors.jsonl.gz": {
+      "bytes": 157375310,
+      "sha256": "9c4fbfeef67122e8ad827b436b400cb09e47fe53830b4305a4659eafcf82b2f6"
+    }
+  },
+  "policy": {
+    "foreign_cluster_gap_bp": 50000,
+    "maximum_main_overlap_fraction": 0.1,
+    "minimum_chain_fraction_of_carried_source": 0.2,
+    "minimum_foreign_density": 0.5,
+    "minimum_internal_foreign_bp": 100000,
+    "minimum_internal_fraction": 0.01,
+    "minimum_main_chain_bp": 100000,
+    "minimum_terminal_foreign_bp": 10000
+  },
+  "reference_coverage_bp": {
+    "75": 354132490,
+    "80": 314670671,
+    "90": 284593535,
+    "frozen": 129162948,
+    "qualified": 445132656
+  },
+  "schema": "wheat_continuous_dominant_admission_v1",
+  "snapshot_sha256": "2c8bd6a23eb339f71f16ab0a1e68f74562546532733ae98d3deae3d6609b1f3d",
+  "variants": {
+    "75": {
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "placements": 43,
+      "source_bp_sum": 669794819,
+      "sources": 41
+    },
+    "80": {
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "placements": 37,
+      "source_bp_sum": 598866396,
+      "sources": 35
+    },
+    "90": {
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "placements": 26,
+      "source_bp_sum": 547281827,
+      "sources": 25
+    }
+  }
+}
