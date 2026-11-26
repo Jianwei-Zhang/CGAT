@@ -1,0 +1,52 @@
+{
+  "schema": "wheat_1A_missing_reference_by_blocker_v1",
+  "frozen_summary_sha256": "d23a49af479b6c9b81916518e8034d4044ea31b5c97229c5d0ce1624138fc9d4",
+  "blocker_sha256": "0c22fe25d692dfb2c3bcae70bcddd5459c33b9cad06fa31462290e89cac97d92",
+  "admitted_reference_bp": 129162948,
+  "selected_reference_bp": 42204808,
+  "missing_reference_union_bp": 86958140,
+  "by_reason": {
+    "selected_placement_outside_final_slice": {
+      "missing_reference_union_bp": 1072,
+      "exclusive_missing_reference_bp": 1063
+    },
+    "no_qualified_pair_blocks_to_selected": {
+      "missing_reference_union_bp": 1371698,
+      "exclusive_missing_reference_bp": 1287178
+    },
+    "has_reference_order_slot": {
+      "missing_reference_union_bp": 3584677,
+      "exclusive_missing_reference_bp": 3524304
+    },
+    "valid_but_not_score_improving": {
+      "missing_reference_union_bp": 7893,
+      "exclusive_missing_reference_bp": 7138
+    },
+    "no_pair_evidence_to_selected": {
+      "missing_reference_union_bp": 128525,
+      "exclusive_missing_reference_bp": 68868
+    },
+    "no_end_spanning_pair_evidence": {
+      "missing_reference_union_bp": 78771365,
+      "exclusive_missing_reference_bp": 78636768
+    },
+    "no_direct_reference_blocks": {
+      "missing_reference_union_bp": 0,
+      "exclusive_missing_reference_bp": 0
+    },
+    "no_two_sided_compatible_join_slot": {
+      "missing_reference_union_bp": 3276316,
+      "exclusive_missing_reference_bp": 3249723
+    },
+    "crossed_or_empty_cut_veto": {
+      "missing_reference_union_bp": 0,
+      "exclusive_missing_reference_bp": 0
+    }
+  },
+  "shared_between_reason_categories_bp": 183098,
+  "notes": [
+    "Each missing category is a reference-coordinate union after subtracting actual selected slice anchors.",
+    "Category unions can overlap; only exclusive contributions plus shared-between-categories close the missing-coverage ledger.",
+    "Reference-order-slot cases are necessary-condition candidates, not guaranteed recoverable placements."
+  ]
+}

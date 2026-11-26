@@ -1,0 +1,101 @@
+{
+  "counts": {
+    "dna_verified_bp": 16471017932,
+    "processed_source_bp": 21565431519,
+    "skipped_before_DNA": 10318,
+    "sources_with_dominant90_placements": 286,
+    "sources_with_regional_placements": 4517
+  },
+  "elapsed_s": 701.1927209200803,
+  "formal_workspace_modified": false,
+  "gain_loss_vs_frozen": {
+    "dominant90": {
+      "gained_bp": 175885734,
+      "lost_bp": 18076513
+    },
+    "regional": {
+      "gained_bp": 308068988,
+      "lost_bp": 61924
+    }
+  },
+  "group": "1A",
+  "limitations": [
+    "Reference footprints are actual paired-block unions, not hulls.",
+    "These are reference-only counterfactual placements, not full formal admission propagation.",
+    "No independent truth assembly; zero surviving-anchor conflict does not prove no biological cross-subgenome misplacement.",
+    "Flye A/B/D name labels are flags, not ground truth.",
+    "Original identity/competition/complexity/MAPQ/collinearity gates remain; central-99% trimming is not used for admission.",
+    "The interval chain is conservative about overlapping anchors and does not certify global optimum.",
+    "Dominant90 additionally requires the local chain to retain at least 90% of its region group support.",
+    "The all-locus conflict union includes inferior-hit conflicts; each retained anchor still passed its own original identity-margin mask.",
+    "Worker completion order is not scientific candidate order; subsequent selection must sort candidate placements deterministically."
+  ],
+  "mapper_calls": 0,
+  "outputs": {
+    "dominant90-placements.jsonl.gz": {
+      "bytes": 1763748,
+      "sha256": "65f92f7ad3d3c7df3b44709ec7061389f8a6bf171ecda81e07211525003e8513"
+    },
+    "frozen-placements.jsonl.gz": {
+      "bytes": 2093769,
+      "sha256": "65a4755dfa5e393592d52b97371486047ffb1b261d27277dfe53b90da935d6b1"
+    },
+    "local-chain-source-audit.jsonl.gz": {
+      "bytes": 2314843,
+      "sha256": "809fcf8e576e870fd54ad600964bb10317197c3db4a4c2613cd0071f4fa9fca2"
+    },
+    "regional-placements.jsonl.gz": {
+      "bytes": 9638688,
+      "sha256": "4824b71e10da89d9ca5a1ed5df304f34ec8e9a549a81e4183e7f7306ee9414f9"
+    }
+  },
+  "placement_counts": {
+    "dominant90": 3082,
+    "frozen": 383,
+    "regional": 24319
+  },
+  "policy": {
+    "admission": {
+      "competing_identity_margin": 0.02,
+      "kmer_size": 15,
+      "minimum_anchor_bp": 100,
+      "minimum_base_entropy": 1.2,
+      "minimum_distinct_kmer_fraction": 0.5,
+      "minimum_reference_identity": 0.9,
+      "minimum_reference_mapq": 20,
+      "minimum_whole_support_fraction": 0.2,
+      "version": 1
+    },
+    "carried_sequence": "anchor hull may bridge unsupported sequence and overlap the all-locus conflict union; that union includes conflicts rejected only for weaker hits, not a veto on stronger qualifying anchors",
+    "chain": "maximum weighted source-disjoint exact collinear actual anchors",
+    "conflict_rule": "split source intervals at all surviving foreign chr/strand anchors",
+    "dominance_fraction": 0.9
+  },
+  "reference_coverage_bp": {
+    "dominant90": 286972169,
+    "frozen": 129162948,
+    "qualified": 445132656,
+    "regional": 437170012
+  },
+  "safety": {
+    "regional_all_locus_conflict_union_carried_bp_sum": 426637465,
+    "regional_cross_ABD_qualified_anchor_overlap_bp_sum": 0,
+    "regional_foreign_qualified_anchor_overlap_bp_sum": 0
+  },
+  "schema": "wheat_local_chain_admission_diagnostic_v1",
+  "source_count": 16826,
+  "source_label_bp_sum": {
+    "dominant90": {
+      "A": 292867451,
+      "B": 2519179,
+      "D": 3051769,
+      "unlabelled": 228272377
+    },
+    "regional": {
+      "A": 464518488,
+      "B": 15681276,
+      "D": 15050379,
+      "unlabelled": 460931871
+    }
+  }
+}

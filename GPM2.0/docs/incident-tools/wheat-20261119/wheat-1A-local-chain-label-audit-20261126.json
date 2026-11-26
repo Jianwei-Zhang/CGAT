@@ -1,0 +1,76 @@
+{
+  "schema": "wheat_1A_name_label_reference_audit_v1",
+  "results": {
+    "frozen": {
+      "reference_union_bp_by_name_label": {
+        "B": 1725623,
+        "D": 2183469,
+        "A": 127410487,
+        "unlabelled": 2778292
+      },
+      "sources_by_label": {
+        "B": 143,
+        "D": 179,
+        "A": 57,
+        "unlabelled": 4
+      },
+      "placements_by_label": {
+        "B": 143,
+        "D": 179,
+        "A": 57,
+        "unlabelled": 4
+      },
+      "B_or_D_reference_union_bp": 2454485,
+      "B_or_D_only_reference_bp_without_A_or_unlabelled": 1613333
+    },
+    "regional": {
+      "reference_union_bp_by_name_label": {
+        "A": 425436273,
+        "B": 11249782,
+        "D": 10975837,
+        "unlabelled": 413029204
+      },
+      "sources_by_label": {
+        "A": 817,
+        "B": 1583,
+        "D": 1736,
+        "unlabelled": 381
+      },
+      "placements_by_label": {
+        "A": 8194,
+        "B": 2996,
+        "D": 2859,
+        "unlabelled": 10270
+      },
+      "B_or_D_reference_union_bp": 13827351,
+      "B_or_D_only_reference_bp_without_A_or_unlabelled": 3958226
+    },
+    "dominant90": {
+      "reference_union_bp_by_name_label": {
+        "A": 282937732,
+        "B": 1767440,
+        "D": 2173226,
+        "unlabelled": 218149547
+      },
+      "sources_by_label": {
+        "A": 40,
+        "B": 114,
+        "D": 128,
+        "unlabelled": 4
+      },
+      "placements_by_label": {
+        "A": 1365,
+        "B": 154,
+        "D": 171,
+        "unlabelled": 1392
+      },
+      "B_or_D_reference_union_bp": 2624345,
+      "B_or_D_only_reference_bp_without_A_or_unlabelled": 1949295
+    }
+  },
+  "limitations": [
+    "Names are origin labels, not independent biological ground truth.",
+    "Unlabelled sources here are hifiasm contigs; shared reference coverage is not proof of independent correct subgenome assignment.",
+    "No conflicting surviving foreign-group anchor in the regional placements does not mean zero latent misplacement."
+  ]
+}
