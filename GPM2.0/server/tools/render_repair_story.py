@@ -42,6 +42,7 @@ DIALOG = """<dialog id="path-event-dialog" tabindex="-1" aria-labelledby="path-e
 html:has(#path-event-dialog){scrollbar-gutter:stable}
 html:has(#path-event-dialog[open]){overflow:hidden}
 #path-event-dialog{padding:0;box-sizing:border-box;width:min(1040px,94vw);max-height:90vh;overflow:auto;color:var(--text-primary);background:var(--surface-panel);border:1px solid var(--border-default);border-radius:10px;box-shadow:0 20px 50px rgba(15,23,42,.24)}
+#path-event-dialog.is-compact{width:min(620px,92vw)}
 #path-event-dialog.is-wide{width:min(1480px,96vw);max-height:92vh}
 #path-event-dialog:focus{outline:none}
 #path-event-dialog::backdrop{background:rgba(15,23,42,.44);backdrop-filter:blur(1.5px)}
@@ -80,6 +81,7 @@ html:has(#path-event-dialog[open]){overflow:hidden}
     if(!d||!d.content)return;
     prior=d.trigger||null; scroll=window.scrollY;
     panel.classList.toggle('is-wide',!!d.wide);
+    panel.classList.toggle('is-compact',!!d.compact);
     const titleEl=panel.querySelector('#path-event-title');
     if(d.titleZh&&d.titleEn){
       const z=document.createElement('span');z.className='t-zh';z.textContent=d.titleZh;
@@ -162,6 +164,7 @@ html:has(#path-event-dialog[open]){overflow:hidden}
       if(!t||t.tagName!=='TEMPLATE')return;
       prior=button; scroll=window.scrollY;
       panel.classList.toggle('is-wide',t.dataset.wide==='1');
+      panel.classList.toggle('is-compact',t.dataset.compact==='1');
       const titleEl=panel.querySelector('#path-event-title');
       if(t.dataset.titleZh&&t.dataset.titleEn){
         const z=document.createElement('span');z.className='t-zh';z.textContent=t.dataset.titleZh;
@@ -182,7 +185,7 @@ html:has(#path-event-dialog[open]){overflow:hidden}
   document.addEventListener('click',handleOpen);
   document.addEventListener('cgat-locus-picker',handleOpen);
   panel.addEventListener('close',()=>{
-    panel.classList.remove('is-wide');
+    panel.classList.remove('is-wide','is-compact');
     panel.querySelector('[data-story-content]').replaceChildren();
     if(prior&&prior.isConnected)prior.focus({preventScroll:true});
     window.scrollTo({top:scroll,left:window.scrollX,behavior:"instant"}); prior=null;
