@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   cardHasGaps,
   filterPreviewCards,
@@ -170,4 +171,11 @@ test("Preview controls expose search for >= 6 chromosomes, gaps filter when gaps
   const emptyFilterHtml = renderProjectPreviewPage(state, { embedded: true, hideHeading: true });
   assert.match(emptyFilterHtml, /project-preview-filter-empty/);
   assert.match(emptyFilterHtml, /data-preview-filter-clear/);
+});
+
+test("empty dataset note hover keeps stable column width via grid overlap without display toggling", () => {
+  const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
+  assert.match(css, /\.project-dataset-note\[data-empty="true"\]\s*\{[^}]*display:\s*grid/);
+  assert.match(css, /\.project-dataset-note\[data-empty="true"\]\s*>\s*span\s*\{[^}]*grid-area:\s*1\s*\/\s*1/);
+  assert.doesNotMatch(css, /\.project-dataset-note\[data-empty="true"\][^{]*\{[^}]*display:\s*(?:none|inline)/);
 });
