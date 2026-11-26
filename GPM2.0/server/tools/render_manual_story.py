@@ -29,15 +29,15 @@ OUTCOMES = {
 }
 
 MANUAL_STYLE = """<style>
-.manual-head-bar{display:flex;align-items:center;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap;margin:0 0 .55rem}
+.manual-head-bar{display:flex;align-items:center;justify-content:space-between;gap:.5rem 1rem;flex-wrap:wrap;margin:0 0 .55rem;font-size:.8rem}
 .manual-batch-picker{display:inline-flex;align-items:center;gap:.4rem;font-size:.81rem;color:var(--text-secondary)}
 .manual-batch-picker select{padding:.22rem .5rem;border:1px solid var(--border-default);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-primary);font:600 .8rem/1.25 var(--font-mono)}
-.manual-locus-bar{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;padding:.4rem .35rem .15rem .85rem}
+.manual-locus-bar{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;padding:.45rem .85rem .15rem}
 .manual-locus-lbl{font-size:.75rem;color:var(--text-muted);font-weight:600}
 .manual-legacy-row{padding:.38rem .55rem;border-bottom:1px solid var(--border-subtle);font-size:.83rem}
-#manual-refinement .final-axis,#manual-refinement .final-preview-row>summary,#manual-refinement .preview-detail-row{grid-template-columns:228px minmax(0,1fr)}
+#manual-refinement .final-axis,#manual-refinement .final-preview-row>summary,#manual-refinement .preview-detail-row{grid-template-columns:196px minmax(0,1fr)}
 @media (max-width:760px){
-  #manual-refinement .final-axis,#manual-refinement .final-preview-row>summary,#manual-refinement .preview-detail-row{grid-template-columns:132px minmax(0,1fr)}
+  #manual-refinement .final-axis,#manual-refinement .final-preview-row>summary,#manual-refinement .preview-detail-row{grid-template-columns:124px minmax(0,1fr)}
 }
 </style>"""
 
@@ -124,8 +124,8 @@ def _batch(batch, number):
     colors = {k: i % 6 for i, k in enumerate(dict.fromkeys(m[0] for c in tracks for p in c['before'] for m in p['members']))}
 
     legend_bits = [f'<span class="legend-item"><i class="swatch" style="background:var(--ds-{col})"></i>{esc(ds)}</span>' for ds, col in colors.items()]
-    legend_bits.append('<span class="legend-item"><i class="swatch" style="background:var(--gen-patch)"></i>' + bi('本批接纳修改', 'Admitted in batch') + '</span>')
-    legend_bits.append('<span class="legend-item"><i class="swatch is-orig-gap"></i>Gap</span>')
+    legend_bits.append('<span class="legend-item"><i class="swatch" style="background:var(--gen-closed)"></i>' + bi('本批已闭合 / 延伸', 'Admitted closure / extension') + '</span>')
+    legend_bits.append('<span class="legend-item"><i class="swatch is-orig-gap"></i>' + bi('未闭合 Gap', 'Unclosed gap') + '</span>')
     body.append('<div class="story-toolbar"><div class="legend-row" style="margin:0">' + ''.join(legend_bits) + '</div></div>')
     body.append(
         '<div class="final-frame is-no-zoom"><div class="final-axis"><span>' + bi('染色体', 'Chromosome') + '</span><span class="story-ruler">'
@@ -149,7 +149,7 @@ def _batch(batch, number):
                 if not p['members']:
                     desc = f'{p["id"]} · [{a:,}, {b:,})' + (' · ' + NAMES[scenes[p['loci'][0]]['selected']] if changed else '')
                     cls = 'adopted refined' if changed else 'path-gap'
-                    shade = 'background:var(--gen-patch);' if changed else ''
+                    shade = 'background:var(--gen-closed);' if changed else ''
                     boxes.append(_part(a, b, domain, cls, desc, attrs=attr, shade=shade))
                 else:
                     x = a
