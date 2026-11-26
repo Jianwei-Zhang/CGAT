@@ -19,6 +19,7 @@ def contract():
     return {'semantics': SEMANTICS, 'minimum_anchor_bp': 100, 'join_reach_bp': 2000,
             'maximum_repairs': MAX_REPAIRS, 'readless_only': True,
             'rule_sha256': sha256_file(here.with_name('q0_threshold_questions.py')),
+            'junction_review_sha256': sha256_file(here.with_name('q0_junction_review.py')),
             'paf_chunks_sha256': sha256_file(here.with_name('q0_paf_chunks.py')),
             'retained_hit_sha256': sha256_file(here.with_name('q0_retained_hits.py')),
             'native_frontier_sha256': sha256_file(here.with_name('q0_native_frontier.py')),
@@ -86,7 +87,8 @@ def complete_window_accounting(catalog):
         if type(done) is not int or done < 0 or type(skipped) is not int or skipped < 0:
             raise Q0EvidenceError('invalid threshold regional phase counts')
         n += done
-    if n != sum(t['kind'] == 'regional_discovery' for t in catalog['supplementary_alignments']):
+    from .q0_junction_review import extra_count
+    if n + extra_count(catalog) != sum(t['kind'] == 'regional_discovery' for t in catalog['supplementary_alignments']):
         raise Q0EvidenceError('threshold regional phase completion differs from tasks')
     return True
 
@@ -152,6 +154,8 @@ def validate_catalog(root, manifest, catalog):
     lengths={SourceKey(**r['source']):r['length'] for r in catalog['sources']}
     q=decode(scope['threshold_request'],lengths)
     from .q0_native_frontier import validate_inventory
+    from .q0_junction_review import extra_count
+    extra_count(catalog)
     validate_inventory(catalog)
     if mode=='base_only':
         if q!={} or scope['unsearched_part_intervals'] or catalog['supplementary_alignments'] or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery')):

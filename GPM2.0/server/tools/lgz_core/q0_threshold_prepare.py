@@ -125,7 +125,7 @@ def _supplement_links(root, parts, tasks, short_geometry, threads):
 
 
 def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1, selection_checkpoint=None,
-                      existing_catalog=None, supplementary=(), on_updated_questions=None):
+                      existing_catalog=None, supplementary=(), on_updated_questions=None, junction_dispatch=None):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
     from .q0_admission import EvidenceInput, select_request_paths
     from .q0_threshold_questions import questions
@@ -185,8 +185,21 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
     links.extend(_supplement_links(root, parts, supplementary, short_geometry, threads))
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     del links, edges  # the immutable selection input now owns these references
+    from .q0_junction_review import Review
+    review = Review() if junction_dispatch is not None else None
     selected = select_request_paths(data, screen_threads=threads, progress=log,
+                                    **({"review": review} if review is not None else {}),
                                     **({"checkpoint": selection_checkpoint} if selection_checkpoint is not None else {}))
+    if review is not None:
+        extra = junction_dispatch(review,selected)
+        if extra:
+            fresh = tuple(_supplement_links(root,parts,extra,short_geometry,threads))
+            if fresh:
+                # The original base, source offsets and evidence IDs stay in memory. One
+                # re-selection, never one per competitor; empty local hits change no path.
+                data.pair_links += fresh
+                del fresh,selected
+                selected = select_request_paths(data, screen_threads=threads, progress=log)
     log("paths selected; calculating first supplement request")
     issues = [] if on_updated_questions is not None else None
     need, counts = questions(data, selected, assignments, **({'issue_sink':issues.append} if issues is not None else {}))
@@ -206,6 +219,7 @@ def initial_generation(root, snapshot, mapper, *, threads=1):
     snapshot.threads = threads
     initial = snapshot.read()
     seqs,lengths,assignments,options,_,alignments,_,inputs = initial
+    snapshot.junction_preset = options.get('minimap_preset','asm10')
     if 'q0_supplement_scope' in options:
         raise Q0EvidenceError('set threshold scope on the evidence command')
     tool = prep.executable_identity(mapper); policy = prep.supplement_policy(SCOPE); builder = prep.builder_identity()
@@ -244,15 +258,45 @@ def prepare(root, threads, mapper):
     snapshot = _ThresholdInputs(root)
     request, receipt, cached, wanted = initial_generation(root, snapshot, mapper, threads=threads)
     full = wanted is None and receipt is None
+    from .q0_junction_review import Review, dispatch, extend_draft, extra_count
+    prior_local = []
     forced_native = frozenset()
     for n in range(MAX_REPAIRS+3):
         if receipt is None:
             receipt,_,_ = prep._prepare_evidence_pass(root,threads=threads,minimap2=mapper,supplement_scope=SCOPE,
                 draft=True,frontier_override=None if full else wanted,fallback_reason='threshold_full_fallback' if full else None,
                 expected_input=request,repair_inputs=snapshot,forced_native=forced_native)
+        if prior_local:
+            base = prep.json_file(prep.artifact_path(root,receipt['catalog']))
+            receipt = extend_draft(root,receipt,base,prior_local)
         output_paths = [prep.workspace_artifact_path(root, row['path']) for row in receipt['outputs']]
         before = [prep.file_signature(p) for p in output_paths]
-        data = load_evidence_input(root,_draft=receipt); selection = select_q0_paths(data)
+        data = load_evidence_input(root,_draft=receipt)
+        scoped = data.catalog['supplement_scope']['effective']=='decision_frontier'
+        review = Review() if scoped and not cached else None
+        selection = select_q0_paths(data, **({'review':review} if review is not None else {}))
+        if review is not None and review.proposals:
+            from .q0_catalog import CandidateCatalog
+            extra = dispatch(review,selection,root,CandidateCatalog({},data.sources,data.parts),
+                             data.catalog['supplementary_alignments'],receipt['tool'],snapshot.junction_preset,
+                             threads,sum(data.reference_lengths.values()))
+            if extra:
+                snapshot.verify()
+                if before != [prep.file_signature(p) for p in output_paths]:
+                    raise Q0EvidenceError('threshold output changed during junction review')
+                receipt = extend_draft(root,receipt,data.catalog,extra)
+                # Do not keep two full source and PAF heaps alive. The ordinary loader
+                # verifies the new closure and final selection still enforces every gate.
+                nonempty = any(prep.artifact_path(root,t['paf']).stat().st_size for t in extra)
+                del data
+                data = load_evidence_input(root,_draft=receipt)
+                if nonempty:
+                    del selection
+                    selection = select_q0_paths(data)
+                output_paths = [prep.workspace_artifact_path(root,row['path']) for row in receipt['outputs']]
+                before = [prep.file_signature(p) for p in output_paths]
+        count = extra_count(data.catalog)
+        prior_local = data.catalog['supplementary_alignments'][-count:] if count else []
         try:
             audit(data,selection)
         except ThresholdRepairRequired as stopped:

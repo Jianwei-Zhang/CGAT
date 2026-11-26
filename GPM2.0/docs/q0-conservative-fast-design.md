@@ -139,3 +139,9 @@ E 实测 `43060826 / SUCCEEDED`（与 A 同 x86-52、8 核、完整 766 个来�
 [全麦决定原回执](incident-tools/wheat-20261119/native-fallback-recheck-20261125/whole-updated-demand.json)（SHA-256 `ef67a79f96a87adb9cd13d86c652b0fe4c6b769a717d5ddadda9196414eabffa`）、[两条查询的交叉核对](incident-tools/wheat-20261119/native-fallback-recheck-20261125/whole-comparison.json)、[新旧区间交集](incident-tools/wheat-20261119/native-fallback-recheck-20261125/whole-coordinate-change.json)、[按既有配对覆盖核算的目标规模](incident-tools/wheat-20261119/native-fallback-recheck-20261125/pair-scope-whole-after.json)。私有全量问题坐标和逐窗关联保留在前述核算目录的 `result/`、`compare/result/`，不提交到仓库。
 
 收尾时在跟踪分支复跑原生回退及阈值验收 19 项、配对范围核算 4 项，全部通过；另逐组对原始两份问题表核验了公开汇总的 22 行计数。
+
+### 2026-11-26：只在缺证接头旁复核竞争来源，不更换目标库
+
+3,337 是停止追查的**达标定位数**，不是还需补跑的竞争比对数。达标定位仍不为排名追查竞争态。例外从**缺证接头**出发：仅在另一来源的同一放置能分别覆盖当前片段两端的参考投影，且相邻的两个实际朝向端（最多各 2 kb）有至少 100 bp 连续参考重叠时，才值得检查。另一侧若已有可靠切点就直接复用，不能成立则不补；同一替代区间若已被选路占用，也不另作新片段。只对缺的端对做局部搜索，按原搜索身份优先复用已有结果。参考重叠本身不是接头证据；有新比对证据才交回原选路算法决定，不强制接入。
+
+在全麦的 22 个冻结组，3,331 个达标定位邻接缺证接头，共找到 3,083 对两端参考位置都相符的候选。加入端朝向、实际重叠和已占用片段条件，剩下**最多 24 个不同的局部比对窗**，累计查询 46,882 bp、目标 48,000 bp。这个上界还没有扣掉已有的精确比对和另一侧不成立的情形；它不是实际启动次数、闭合数或时间预测。[逐组上界](incident-tools/wheat-20261119/native-fallback-recheck-20261125/junction-review-bound.json)由 [measure_wheat_junction_bound.py](incident-tools/wheat-20261119/measure_wheat_junction_bound.py) 核对原定位、路径和问题清单得到，没有重新运行小麦 mapper。

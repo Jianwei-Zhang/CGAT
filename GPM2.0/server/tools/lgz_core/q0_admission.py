@@ -982,18 +982,20 @@ def _links_for_path_graphs(placements, links):
 
 def select_q0_paths(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
                     path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
-                    progress: Callable[[str], None] = _quiet, screen_threads: int = 1) -> PathSelection:
+                    progress: Callable[[str], None] = _quiet, screen_threads: int = 1, review=None) -> PathSelection:
     """Select and check source geometry without reconstructing sequences or building a report."""
-    return _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, first_request=False)
+    return _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, first_request=False, review=review)
 
 
 def select_request_paths(data: EvidenceInput, *, progress: Callable[[str], None] = _quiet,
-                         screen_threads: int = 1, checkpoint=None) -> FirstRequestSelection:
+                         screen_threads: int = 1, checkpoint=None, review=None) -> FirstRequestSelection:
     """Initial threshold routing only; never publish this selection as ordinary Q0."""
-    return _select_paths(data, AdmissionPolicy(), PathPolicy(), None, progress, screen_threads, first_request=True, checkpoint=checkpoint)
+    return _select_paths(data, AdmissionPolicy(), PathPolicy(), None, progress, screen_threads, first_request=True, checkpoint=checkpoint, review=review)
 
 
-def _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, *, first_request, checkpoint=None):
+def _select_paths(data, admission_policy, path_policy, quality_pass, progress, screen_threads, *, first_request, checkpoint=None, review=None):
+    if checkpoint is not None and review is not None:
+        raise Q0EvidenceError("winner-only checkpoints cannot restore junction review evidence")
     progress(f"placing candidate segments · pair links={len(data.pair_links)}")
     if first_request:
         admission = checkpoint.load_admission() if checkpoint is not None else None
@@ -1039,6 +1041,11 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
                 progress(f"chromosome {chromosome} graph ready: placements={len(graph.placements)} "
                          f"coverage_atoms={len(graph.coverage.atoms)} graph_s={monotonic()-started:.2f}")
                 search = search_request_path(graph, progress=report) if first_request else search_paths(graph, progress=report)
+                if review is not None:
+                    # The result owns the pruning log of the original search. Extra
+                    # edge lookups for routing must not alter that diagnostic.
+                    graph.edge_pruning = []
+                    review.observe(graph, search.path)
                 del graph  # do not keep the previous chromosome graph while building the next
         searches[chromosome] = search
         if search.path is None:

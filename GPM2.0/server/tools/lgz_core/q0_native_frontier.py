@@ -49,7 +49,8 @@ class FallbackGate:
             if pafs != self.last_pafs:
                 print(f'LGZ q0 native fallback: phase={phase} refreshing draft from {len(pafs)} completed PAFs before {len(cold)} cold matrices',flush=True)
                 need, have_path = self.refresh(tasks)
-                self.need, self.last_pafs = need if have_path else None, pafs
+                self.need = need if have_path else None
+                self.last_pafs = tuple(dict.fromkeys(t['paf'] for t in tasks))
         for i,row in cold:
             reason = ('final_selection_reopened' if row['id'] in self.forced else 'no_bounded_demand' if self.need is None
                       else first_contact(row,self.parts,self.need))

@@ -244,6 +244,7 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
             if not {row["query_fasta"], row["target_fasta"], row["paf"]} <= inputs:
                 raise Q0EvidenceError("q0 base alignment is not bound to its inputs")
         regional_members = None
+        junction_ids = set(report.get('junction_review_task_ids', ())) if scope == threshold_scope else set()
         for task in catalog["supplementary_alignments"]:
             if task.get("kind") == "regional_discovery":
                 from .q0_regional_mapping import verify_regional_task
@@ -251,6 +252,9 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
                     regional_members = {row["segment_id"]: (row["interval"]["end"]-row["interval"]["start"], row["sequence_sha256"])
                                         for row in catalog["segments"]}
                 receipt = verify_regional_task(root, task, members=regional_members)
+                if task['task_id'] in junction_ids:
+                    from .q0_junction_review import verify_windows
+                    verify_windows(receipt['spec'])
                 if (task["receipt"] not in outputs or any(outputs.get(row["path"]) != row for row in receipt["outputs"])):
                     raise Q0EvidenceError("regional evidence dependencies are not bound to the ready manifest")
                 expected_outputs.update({task["receipt"]} | {row["path"] for row in receipt["outputs"]})
@@ -912,10 +916,17 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
         if scope_report is not None:
             catalog.payload["supplement_scope"] = scope_report
         native_gate = None
+        junction_tasks = []
         if supplement_scope == 'positive_threshold' and regional_frontier:
             from .q0_native_frontier import FallbackGate
             from .q0_threshold_prepare import initial_questions
             def refresh_native(tasks):
+                from .q0_junction_review import dispatch
+                def local_review(review, selection):
+                    extra = dispatch(review,selection,root,catalog,tasks,tool,options.get('minimap_preset','asm10'),
+                                     threads,sum(lengths.values()))
+                    junction_tasks.extend(extra); tasks.extend(extra)
+                    return extra
                 repair_inputs.verify()
                 def record_residual(need, have_path, counts, issues):
                     # A diagnostic, never an input, success marker or proof of completed mapping.
@@ -928,7 +939,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                     except OSError as exc: print(f'LGZ q0 native fallback: optional demand log unavailable: {exc}',flush=True)
                     else: print(f'LGZ q0 native fallback: updated_demand={rel} questions={len(issues)}',flush=True)
                 result = initial_questions(root,sources,lengths,assignments,base_alignments,threads=threads,
-                                           existing_catalog=catalog,supplementary=tasks,on_updated_questions=record_residual)
+                                           existing_catalog=catalog,supplementary=tasks,on_updated_questions=record_residual,
+                                           junction_dispatch=local_review)
                 repair_inputs.verify()
                 return result
             native_gate = FallbackGate(catalog.parts,regional_frontier,refresh_native,forced_native)
@@ -937,7 +949,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 return _supplement(root,catalog,request,tool,options.get('minimap_preset','asm10'),threads,
                                    skip_self=options.get('skip_self')=='true',cache_only=cache_only)
             if native_gate is None: return [run(r,False) for r in requests]
-            return native_gate.dispatch(phase,requests,available,run)
+            return native_gate.dispatch(phase,requests,[*available,*junction_tasks],run)
         tasks = []
         # Each productive round adds at least one segment to the anchor set. The
         # monotone loop terminates after at most the number of source segments.
@@ -1043,6 +1055,9 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             catalog.payload["regional_candidate_discovery"] = report
             if native_requests:
                 tasks.extend(native_fallbacks('regional_candidate_discovery',native_requests,tasks))
+        if junction_tasks:
+            from .q0_junction_review import append_new_tasks
+            append_new_tasks(tasks, scope_report, junction_tasks)
         if native_gate is not None:
             if native_gate.omissions:
                 scope_report['deferred_native_matrices'] = native_gate.omissions
