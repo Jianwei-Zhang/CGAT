@@ -2,7 +2,8 @@
 
 The source packet binds the previous installed transition and the exact new
 files. The native origin stays unchanged. Policy changes are rejected except
-for explicitly bound positive-threshold routing/budget deltas.
+for explicitly bound positive-threshold routing/budget deltas and the separately
+authorized, byte-pinned 2064cb4c continuous Q0 engine.
 A real read-only 25-checkpoint preflight and allocation-ready gate follow this
 metadata-only step. Never rerun it over an existing candidate/journal.
 """
@@ -29,8 +30,41 @@ THRESHOLD_PROFILE = 'positive_threshold'
 # These are the already-approved local-only routing/budget changes, not a
 # permission to relax alignment scores or placement acceptance. Exact old/new
 # policy AST identities must be declared in the source packet.
-THRESHOLD_POLICY_CHANGES = {'q0_regional_discovery.py', 'q0_regional_candidates.py', 'q0_paths.py'}
+THRESHOLD_POLICY_CHANGES = {'q0_regional_discovery.py', 'q0_regional_candidates.py', 'q0_paths.py', 'q0_admission.py'}
 SELECTOR_POLICIES = {'q0_admission.py': 'AdmissionPolicy', 'q0_paths.py': 'PathPolicy'}
+
+
+# This is a separate explicit scientific authorization, NOT an expansion of the
+# generic positive-threshold budget permission. Bind the reviewed production
+# engine bytes, including the new nested ContinuousAdmissionPolicy defaults.
+CONTINUITY_CHANGE = {
+    'schema': 'q0_continuity_2064cb4c_v1',
+    'engine_revision': '2064cb4cfd51b5c886f60af19f020caf0b18950f',
+    'admission_policy_version': 2, 'path_policy_version': 3,
+    'reference_locus_padding_bp': 100000,
+}
+CONTINUITY_FILES = {'q0_admission.py': 'd5058d6669c44d027e93312c423d74a5e8a8a7a39261e0382b26e1e3a1b8d5c3',
+ 'q0_backbone.py': '22731fd25c1c7cb415a7785872572c0eb9462ba6f09562425f378505dd78aa7c',
+ 'q0_collinear.py': 'fdfb10586b3077be8584e4c9e6e8d191280918d5f08c6d5a35da92030002b52e',
+ 'q0_coverage.py': '8b3a5917b7a4418f69354fb32476fdd156bf999baa13d2aa51b190f8155eb77a',
+ 'q0_interval_index.py': 'f5c5d7d3b49e71edc637535fda0a6d66f8ac50f718dbd454ea08557efa462e18',
+ 'q0_junction_review.py': 'fd723eb0d598c11ce3a25372c7b61f771b16a96c1a115bd9f7133cc2c467e27b',
+ 'q0_paths.py': 'e2f196a09b29d9f16377a6732cb58678e994f79fddbef2b52921ab77d84120ff',
+ 'q0_reference_locus.py': '0b0444a3352cf4175af507406758560d6cb5d9f23305251392aa61f358c99aa9',
+ 'q0_threshold_questions.py': '4a098e8f5af9f64b0951a05d690a9475defdccb1dc23a89e8e5028ea36da3066'}
+
+
+def validate_continuity_change(bundle, manifest):
+    declaration = manifest.get('continuous_q0_policy_change')
+    if declaration is None:
+        return None
+    if (declaration != CONTINUITY_CHANGE or manifest.get('q0_supplement_scope') != THRESHOLD_PROFILE
+            or manifest.get('git_revision') != CONTINUITY_CHANGE['engine_revision']):
+        raise ValueError('invalid explicit continuous Q0 policy authorization')
+    for name, expected in CONTINUITY_FILES.items():
+        if digest(child(bundle, 'runtime/' + name)) != expected:
+            raise ValueError('continuous Q0 engine differs from reviewed 2064cb4c: ' + name)
+    return declaration
 
 
 def child(root, relative):
@@ -155,6 +189,9 @@ def prepare(bundle):
     if (not isinstance(declared_changes, dict) or not set(declared_changes) <= THRESHOLD_POLICY_CHANGES
             or supplement != THRESHOLD_PROFILE and 'positive_threshold_policy_changes' in manifest):
         raise ValueError('invalid positive-threshold policy change declaration')
+    continuity_change = validate_continuity_change(bundle, manifest)
+    if 'q0_admission.py' in declared_changes and continuity_change is None:
+        raise ValueError('AdmissionPolicy change requires explicit continuous Q0 policy authorization')
     previous_path = checked(manifest['previous_transition'])
     previous = json.loads(previous_path.read_text())
     work = Path(previous['workspace']).resolve(strict=True)
@@ -275,6 +312,8 @@ def prepare(bundle):
         checked(repair_package)
     if supplement == THRESHOLD_PROFILE:
         transition['positive_threshold_policy_changes'] = declared_changes
+    if continuity_change is not None:
+        transition['continuous_q0_policy_change'] = continuity_change
     write_new(transition_path, transition)
     checked(manifest_before); checked(journal_before); checked(manifest['previous_transition'])
     for relative, expected in installed.items():
@@ -295,6 +334,8 @@ def prepare(bundle):
     if supplement is not None:
         checked(repair_package)
         report['q0_supplement_scope'] = supplement
+    if continuity_change is not None:
+        report['continuous_q0_policy_change'] = continuity_change
     write_new(bundle/'candidate-prepared.json', report)
     return report
 

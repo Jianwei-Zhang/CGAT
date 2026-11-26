@@ -188,6 +188,57 @@ class CandidatePreparationTests(unittest.TestCase):
         self.assertEqual(transition['positive_threshold_policy_changes'],self.manifest['positive_threshold_policy_changes'])
         self.assertEqual(self.snapshot(),self.before)
 
+    def test_admission_change_is_not_a_generic_budget_permission(self):
+        self.bind_threshold_candidate()
+        path = self.bundle/'runtime/q0_admission.py'
+        before = prep.selector_policy_ast(path, 'AdmissionPolicy')
+        path.write_text(path.read_text().replace('minimum_bp=100', 'minimum_bp=200'))
+        self.manifest['positive_threshold_policy_changes']['q0_admission.py'] = prep.policy_change(
+            before, prep.selector_policy_ast(path, 'AdmissionPolicy'))
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, 'requires explicit continuous'):
+            prep.prepare(self.bundle)
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_reviewed_continuity_files_and_declaration_are_exact(self):
+        import shutil
+        core = Path(__file__).resolve().parents[3]/'server/tools/lgz_core'
+        for name in prep.CONTINUITY_FILES:
+            shutil.copyfile(core/name, self.bundle/'runtime'/name)
+        manifest = {'git_revision': prep.CONTINUITY_CHANGE['engine_revision'],
+                    'q0_supplement_scope': prep.THRESHOLD_PROFILE,
+                    'continuous_q0_policy_change': dict(prep.CONTINUITY_CHANGE)}
+        self.assertEqual(prep.validate_continuity_change(self.bundle, manifest), prep.CONTINUITY_CHANGE)
+        manifest['continuous_q0_policy_change']['reference_locus_padding_bp'] = 1000000
+        with self.assertRaisesRegex(ValueError, 'authorization'):
+            prep.validate_continuity_change(self.bundle, manifest)
+        manifest['continuous_q0_policy_change'] = dict(prep.CONTINUITY_CHANGE)
+        path = self.bundle/'runtime/q0_collinear.py'
+        path.write_text(path.read_text() + '\n# changed nested policy source\n')
+        with self.assertRaisesRegex(ValueError, 'differs from reviewed'):
+            prep.validate_continuity_change(self.bundle, manifest)
+
+    def test_explicit_continuity_declaration_survives_preparation(self):
+        from unittest.mock import patch
+        self.bind_threshold_candidate()
+        self.manifest['git_revision'] = prep.CONTINUITY_CHANGE['engine_revision']
+        self.manifest['continuous_q0_policy_change'] = dict(prep.CONTINUITY_CHANGE)
+        path = self.bundle/'runtime/q0_admission.py'
+        before = prep.selector_policy_ast(path, 'AdmissionPolicy')
+        path.write_text(path.read_text().replace('minimum_bp=100', 'minimum_bp=200'))
+        self.manifest['positive_threshold_policy_changes']['q0_admission.py'] = prep.policy_change(
+            before, prep.selector_policy_ast(path, 'AdmissionPolicy'))
+        self.save_manifest()
+        # Synthetic fixture pins exercise full preparation; the separate test
+        # above checks every real 2064cb4c byte pin and rejects even rehashed drift.
+        pins = {p.name: prep.digest(p) for p in (self.bundle/'runtime').glob('*.py')}
+        with patch.object(prep, 'CONTINUITY_FILES', pins):
+            report = prep.prepare(self.bundle)
+        transition = json.loads((self.bundle/'transition.json').read_text())
+        self.assertEqual(report['continuous_q0_policy_change'], prep.CONTINUITY_CHANGE)
+        self.assertEqual(transition['continuous_q0_policy_change'], prep.CONTINUITY_CHANGE)
+        self.assertEqual(self.snapshot(), self.before)
+
     def test_threshold_reuses_only_journal_bound_identical_legacy_support(self):
         self.bind_threshold_candidate()
         relative = '.prepare_lib/tools/workspace_layout.py'
