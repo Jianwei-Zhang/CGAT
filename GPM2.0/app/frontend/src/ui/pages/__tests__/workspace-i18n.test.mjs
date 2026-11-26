@@ -991,7 +991,9 @@ test("selected-project table and paths use compact visible divider headings", ()
     const before = JSON.stringify(value), html = renderWorkspacePage(value);
     assert.doesNotMatch(html, /项目信息|路径概览|Project Information|Path Overview/);
     assert.match(html, /id="project-data-catalog" aria-labelledby="project-data-catalog-title"/);
-    assert.match(html, locale === "en" ? /class="project-section-divider"><h3 id="project-data-catalog-title">Datasets<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/ : /class="project-section-divider"><h3 id="project-data-catalog-title">数据集<\/h3><span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/);
+    assert.match(html, locale === "en"
+      ? /class="project-section-divider project-section-collapsible">\s*<h3 id="project-data-catalog-title"><button[^>]*data-overview-section-toggle="datasets"[^>]*>[\s\S]*?<span>Datasets<\/span><\/button><\/h3>\s*<span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/
+      : /class="project-section-divider project-section-collapsible">\s*<h3 id="project-data-catalog-title"><button[^>]*data-overview-section-toggle="datasets"[^>]*>[\s\S]*?<span>数据集<\/span><\/button><\/h3>\s*<span class="project-section-count"><span aria-hidden="true">·<\/span>0<\/span>/);
     assert.match(html, /class="project-export-page project-integrated-overview"/);
     assert.match(html, /class="project-header-actions"[\s\S]*data-project-export-toggle="true"[\s\S]*id="initializer-enter-assembly-button"/);
     assert.equal((html.match(/data-project-export-toggle="true"/g) || []).length, 1);

@@ -11,3 +11,12 @@ export function toggleProjectPreviewChromosome(key, chrName) {
   else session.expanded.add(chrName);
   return session.expanded.has(chrName);
 }
+export function setProjectPreviewExpandedAll(key, chrNames, expanded) {
+  const session = projectPreviewSession(key);
+  if (expanded) {
+    for (const chrName of chrNames || []) session.expanded.add(chrName);
+  } else {
+    for (const chrName of chrNames || []) session.expanded.delete(chrName);
+  }
+  return session.expanded.size;
+}

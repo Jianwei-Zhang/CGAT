@@ -24,6 +24,9 @@ import {
 import { normalizeGrtProjectView } from "./assembly/grt-state.js";
 import { flushAssemblyProjectState } from "./assembly-page.js";
 import { reloadProjectOverviewData } from "./project-export-page.js";
+import { isOverviewSectionExpanded, toggleOverviewSection } from "./project-overview-sections.js";
+
+const AUTO_COLLAPSE_REFINEMENT_THRESHOLD = 4;
 
 const PROJECT_REFINEMENT_BOUND = Symbol("projectRefinementBound");
 
@@ -1076,6 +1079,42 @@ async function toggleVersionPreview(host, store, button, rerender, deps) {
   rerender?.(host, store);
 }
 
+function summarizeRefinementGroups(groups, copy, locale) {
+  const isEn = locale === "en";
+  if (!groups.length) return isEn ? "No records" : "暂无记录";
+  const parts = [];
+  const autoGroup = groups.find(group => group.kind === "auto");
+  if (autoGroup) {
+    if (autoGroup.rows.length === 1) {
+      const row = autoGroup.rows[0];
+      const ratio = row.filled != null && row.total != null ? `${row.filled}/${row.total}` : row.total != null ? `—/${row.total}` : "";
+      const chrCount = row.chromosomes?.length || 0;
+      const chrText = chrCount ? (isEn ? `${chrCount} ${chrCount === 1 ? "chr" : "chrs"}` : `${chrCount} 条染色体`) : "";
+      parts.push([row.tool, ratio, chrText].filter(Boolean).join(" "));
+    } else {
+      const tools = autoGroup.rows.map(row => row.tool).filter(Boolean);
+      const best = autoGroup.rows.reduce((acc, row) => {
+        if (row.filled != null) acc.filled = Math.max(acc.filled, row.filled);
+        if (row.total != null) acc.total = Math.max(acc.total, row.total);
+        return acc;
+      }, { filled: -1, total: -1 });
+      const ratio = best.filled >= 0 && best.total >= 0 ? ` ${best.filled}/${best.total}` : "";
+      parts.push(`${copy.autoTitle}${ratio} (${tools.join(", ")})`);
+    }
+  }
+  const importedCount = groups.filter(group => group.kind === "manual-imported").length;
+  const pendingCount = groups.filter(group => group.kind === "manual-pending").length;
+  if (importedCount > 0) {
+    parts.push(isEn
+      ? `${copy.manualTitle} ${importedCount} ${importedCount === 1 ? "batch" : "batches"}`
+      : `${copy.manualTitle} ${importedCount} 批次`);
+  }
+  if (pendingCount > 0) {
+    parts.push(isEn ? `${pendingCount} pending` : `${pendingCount} 待导回`);
+  }
+  return parts.join(" · ");
+}
+
 export function renderProjectRefinementCard(state) {
   const copy = COPY[state?.locale === "en" ? "en" : "zh"];
   const model = buildProjectRefinementModel(state);
@@ -1088,6 +1127,12 @@ export function renderProjectRefinementCard(state) {
   const rowCount = groups.reduce((sum, group) => sum + group.rows.length, 0);
   const formattedRowCount = rowCount.toLocaleString(state?.locale === "en" ? "en-US" : "zh-CN");
   const importLabel = inFlightForCurrentProject ? (ui.busyLabel || copy.importingAction) : copy.importAction;
+  const defaultExpanded = rowCount > 0 && rowCount <= AUTO_COLLAPSE_REFINEMENT_THRESHOLD;
+  const expanded = isOverviewSectionExpanded(state, "refinement", {
+    defaultExpanded,
+    forceExpanded: Boolean(ui.error || ui.notice || ui.copyFeedback || expandedBatchKey || ui.previewId),
+  });
+  const summary = !expanded ? summarizeRefinementGroups(groups, copy, state?.locale) : "";
 
   const feedbackBanner = ui.error
     ? `<div class="project-refinement-notice is-error" role="alert" data-project-refinement-notice>
@@ -1158,10 +1203,11 @@ export function renderProjectRefinementCard(state) {
     return `${toolRowsHtml}${detailRowHtml}${group.rows.map((row) => toolPreviewDetails(row.version, ui, copy, state?.locale)).join("")}`;
   }).join("");
 
-  return `<section id="project-refinement" class="project-refinement" aria-labelledby="project-refinement-title" aria-busy="${inFlightForCurrentProject}">
-    <header class="project-section-divider project-refinement-divider">
-      <h3 id="project-refinement-title">${escapeHtml(copy.sectionTitle)}</h3>
+  return `<section id="project-refinement" class="project-refinement project-collapsible-section" data-section-expanded="${expanded}" aria-labelledby="project-refinement-title" aria-busy="${inFlightForCurrentProject}">
+    <header class="project-section-divider project-refinement-divider project-section-collapsible">
+      <h3 id="project-refinement-title"><button type="button" class="project-section-toggle" data-overview-section-toggle="refinement" data-overview-section-default="${defaultExpanded}" aria-expanded="${expanded}" aria-controls="project-refinement-body"><span class="project-section-chevron" aria-hidden="true">${expanded ? "▾" : "▸"}</span><span>${escapeHtml(copy.sectionTitle)}</span></button></h3>
       <span class="project-section-count"><span aria-hidden="true">·</span>${escapeHtml(formattedRowCount)}</span>
+      ${summary ? `<span class="project-section-summary" data-app-tooltip="${escapeAttr(summary)}" data-app-tooltip-overflow>${escapeHtml(summary)}</span>` : ""}
       <button
         type="button"
         class="button project-icon-button project-refinement-import-btn"
@@ -1170,14 +1216,16 @@ export function renderProjectRefinementCard(state) {
         ${busy ? "disabled" : ""}
       >${projectIcon("import")}</button>
     </header>
-    ${feedbackBanner}
-    ${copyFeedbackMarkup}
-    ${groups.length
-      ? `<div class="project-refinement-table-scroll" tabindex="0" role="region" aria-label="${escapeAttr(copy.sectionTitle)}"><table class="project-refinement-table" aria-labelledby="project-refinement-title">
-          <thead><tr>${copy.tableColumns.map((col) => `<th scope="col">${escapeHtml(col)}</th>`).join("")}</tr></thead>
-          <tbody>${tbodyMarkup}</tbody>
-        </table></div>`
-      : `<p class="muted project-refinement-note">${escapeHtml(copy.emptyNote)}</p>`}
+    <div id="project-refinement-body" class="project-section-body"${expanded ? "" : " hidden"}>
+      ${feedbackBanner}
+      ${copyFeedbackMarkup}
+      ${groups.length
+        ? `<div class="project-refinement-table-scroll" tabindex="0" role="region" aria-label="${escapeAttr(copy.sectionTitle)}"><table class="project-refinement-table" aria-labelledby="project-refinement-title">
+            <thead><tr>${copy.tableColumns.map((col) => `<th scope="col">${escapeHtml(col)}</th>`).join("")}</tr></thead>
+            <tbody>${tbodyMarkup}</tbody>
+          </table></div>`
+        : `<p class="muted project-refinement-note">${escapeHtml(copy.emptyNote)}</p>`}
+    </div>
   </section>`;
 }
 
@@ -1186,6 +1234,14 @@ export function bindProjectRefinementCard(host, store, rerender, deps = {}) {
     return;
   }
   host.addEventListener("click", (event) => {
+    const toggleSectionBtn = event.target?.closest?.('[data-overview-section-toggle="refinement"]');
+    if (toggleSectionBtn) {
+      const defaultExpanded = toggleSectionBtn.dataset?.overviewSectionDefault !== "false";
+      toggleOverviewSection(store.getState(), "refinement", { defaultExpanded });
+      rerender?.(host, store);
+      host.querySelector?.('[data-overview-section-toggle="refinement"]')?.focus?.();
+      return;
+    }
     const preview = event.target?.closest?.("[data-preview-version]");
     if (preview) { void toggleVersionPreview(host, store, preview, rerender, deps); return; }
     const toggleBatchBtn = event.target?.closest?.("[data-project-refinement-toggle-batch]");

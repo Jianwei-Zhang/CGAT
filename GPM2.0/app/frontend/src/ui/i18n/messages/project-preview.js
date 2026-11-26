@@ -6,6 +6,7 @@ export const zh = {
   noPath: "暂无 Final Path", unpositioned: "未定位", unresolved: "部分片段来源暂无法定位",
   hint: "每个数据集使用自身配色；上方完整来源 Contig 内的已采用区间以边框标记。以卡片内 Final Path 的显示位置为准对齐采用区间，保留完整来源与未采用部分；示意宽度不代表真实长度比例，短片段与 Gap 保证可见。鼠标悬停卡片时显示采用区间高亮，真实长度见提示。",
   length: "长度", referenceHint: "参考染色体", used: "采用区间", source: "来源", gap: "Gap", fragments: "片段",
+  filterPlaceholder: "筛选染色体…", gapsOnly: "仅含 Gap", expandAll: "全部展开", collapseAll: "全部收起", noMatches: "没有匹配的染色体", clearFilter: "清除筛选",
 };
 export const en = {
   title: "Preview", sectionTitle: "Pseudomolecule Preview", subtitle: "Final Path sources · Click a chromosome to open Assembly", legend: "Show Legend",
@@ -15,4 +16,5 @@ export const en = {
   noPath: "No Final Path", unpositioned: "Unpositioned", unresolved: "Some fragment sources cannot be located",
   hint: "Each dataset keeps its own color. Complete source contigs include unused context; outlined intervals identify adopted sources. Adopted intervals align to the displayed Final Path, not a strict length scale. Complete source context is preserved and short fragments and gaps remain visible. Hover over a card to highlight adopted intervals; tooltips retain true lengths.",
   length: "Length", referenceHint: "Reference chromosome", used: "Used interval", source: "Source", gap: "Gap", fragments: "fragments",
+  filterPlaceholder: "Filter chromosomes…", gapsOnly: "With gaps", expandAll: "Expand all", collapseAll: "Collapse all", noMatches: "No matching chromosomes", clearFilter: "Clear filter",
 };

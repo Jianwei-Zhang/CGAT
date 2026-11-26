@@ -358,7 +358,7 @@ test("one refinement table compares both automatic tools alongside a manual batc
   assert.doesNotMatch(expanded, /data-project-refinement-switch/);
   assert.doesNotMatch(table[0], /data-app-tooltip="Chr01"/);
   assert.doesNotMatch(html, /部分填补|未填补|拒绝/);
-  assert.match(html, /<h3 id="project-refinement-title">精修<\/h3>\s*<span class="project-section-count"><span aria-hidden="true">·<\/span>4<\/span>/);
+  assert.match(html, /<h3 id="project-refinement-title"><button[^>]*data-overview-section-toggle="refinement"[^>]*>[\s\S]*?<span>精修<\/span><\/button><\/h3>\s*<span class="project-section-count"><span aria-hidden="true">·<\/span>4<\/span>/);
   assert.match(html, /<header[^>]*>[\s\S]*?aria-label="导入精修补丁" data-app-tooltip="导入精修补丁"[\s\S]*?<svg[^>]*aria-hidden="true"[\s\S]*?<\/button>[\s\S]*?<\/header>/);
   assert.doesNotMatch(html, /project-refinement-(grid|pane)|<select/);
 });

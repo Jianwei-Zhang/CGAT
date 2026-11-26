@@ -318,8 +318,8 @@ test("folded paths remove negative-domain blank space by translation without cha
 
 test("both states use one compact label column with no compensating right-side reservation", () => {
   const css = readFileSync(new URL("../../../styles/project-export.css", import.meta.url), "utf8");
-  assert.match(css, /--preview-label-width: 72px/);
-  assert.match(css, /--preview-label-width: 64px/);
+  assert.match(css, /--preview-label-width: 132px/);
+  assert.match(css, /--preview-label-width: 96px/);
   assert.match(css, /\.project-preview-row \{ grid-template-columns: var\(--preview-label-width\) minmax\(0, 1fr\)/);
   assert.doesNotMatch(css, /--preview-folded-label-width/);
 });

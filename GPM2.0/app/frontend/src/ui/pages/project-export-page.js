@@ -3,7 +3,8 @@ import { groupProjectOverviewSources } from "./project-overview-sources.js";
 import { previewMutationStamp } from "../../services/preview-content-events.js";
 import { exportJobScope, currentProjectExportJob, beginProjectExportJob, ownsCurrentProjectExport,
   updateProjectExportJob, syncCurrentProjectExportJob, finishProjectExportJob } from "../../services/project-export-jobs.js";
-import { renderProjectPreviewCount, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "./project-preview-page.js";
+import { renderProjectPreviewCount, renderProjectPreviewControls, applyProjectPreviewFilter, toggleAllProjectPreviewChromosomes, renderProjectPreviewPage, bindProjectPreviewPage, unbindProjectPreviewPage, restoreProjectPreviewScroll } from "./project-preview-page.js";
+import { getPreviewFilterState } from "./project-overview-sections.js";
 import { rememberProjectPreviewDom, restoreProjectPreviewDom } from "./project-preview-cache.js";
 import {
   canExportPreviewImage, captureProjectPreviewImage, exportProjectPreviewImage,
@@ -1475,7 +1476,7 @@ export function renderProjectExportPage(state, { includeExportMenu = true } = {}
   if (!getCurrentProject(state)) return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}"><p class="muted">${escapeHtml(labels.noProject)}</p></section>`;
   return `<section class="project-export-page project-integrated-overview" aria-label="${escapeAttr(labels.title)}" data-overview-project="${escapeAttr(previewProjectKey(state))}" data-project-path-overview="${escapeAttr(previewProjectKey(state))}">
     ${renderProjectOverviewSummary(state)}
-    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3><span data-preview-count>${renderProjectPreviewCount(state)}</span>${renderProjectOverviewActions(state, { includeExportMenu })}</header>
+    <header class="project-section-divider project-preview-toolbar"><h3 id="overview-preview-title">${escapeHtml(labels.pathOverviewTitle)}</h3><span data-preview-count>${renderProjectPreviewCount(state)}</span><div class="project-preview-controls" data-preview-controls>${renderProjectPreviewControls(state)}</div>${renderProjectOverviewActions(state, { includeExportMenu })}</header>
     <div data-overview-preview>${renderProjectPreviewPage(state, { embedded: true, hideHeading: true })}</div>
   </section>`;
 }
@@ -2311,6 +2312,20 @@ export function bindProjectExportPage(host, store, deps = {}) {
   };
   host.addEventListener("click", async (event) => {
     if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
+    const gapsFilterBtn = event.target?.closest?.("[data-preview-filter-gaps]");
+    if (gapsFilterBtn) {
+      const previewHost = host.querySelector?.("[data-overview-preview]");
+      const key = previewProjectKey(store.getState());
+      const current = getPreviewFilterState(key);
+      applyProjectPreviewFilter(previewHost, store, { gapsOnly: !current.gapsOnly });
+      return;
+    }
+    const toggleAllBtn = event.target?.closest?.("[data-preview-toggle-all]");
+    if (toggleAllBtn) {
+      const previewHost = host.querySelector?.("[data-overview-preview]");
+      toggleAllProjectPreviewChromosomes(previewHost, store);
+      return;
+    }
     const formatNode = event.target?.closest?.("[data-preview-format]");
     if (formatNode) {
       setExportMenuOpen(formatNode.closest?.("[data-project-export]"), false, true);
@@ -2417,6 +2432,13 @@ export function bindProjectExportPage(host, store, deps = {}) {
     rootSelector: "[data-project-export]",
     timerKey: PROJECT_EXPORT_MENU_CLOSE_TIMER,
     close: (exportRoot) => setExportMenuOpen(exportRoot, false),
+  });
+  host.addEventListener("input", (event) => {
+    if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;
+    const filterInput = event.target?.closest?.("[data-preview-filter-input]");
+    if (!filterInput) return;
+    const previewHost = host.querySelector?.("[data-overview-preview]");
+    applyProjectPreviewFilter(previewHost, store, { query: filterInput.value });
   });
   host.addEventListener("change", (event) => {
     if (store.getState().activeRoute && !["importer", "projectExport"].includes(store.getState().activeRoute)) return;

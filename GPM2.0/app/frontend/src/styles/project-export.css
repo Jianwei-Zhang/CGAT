@@ -2,7 +2,7 @@
 
 .project-export-page {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   font-size: var(--font-body);
 }
 
@@ -31,9 +31,13 @@
 /* Expanded cards emphasize content, not the whole clickable surface.
    Keep the shared folded-card ring and the controls' keyboard focus outlines. */
 [data-overview-preview] .project-preview-card[data-preview-expanded="true"] {
+  margin: 8px 0;
+  border-radius: var(--card-radius);
   border-color: var(--border-subtle, #dbe3ec);
   box-shadow: var(--shadow-xs);
 }
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:first-child { margin-top: 0; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"]:last-child { margin-bottom: 0; }
 [data-overview-preview] .project-preview-card[data-preview-expanded="true"] .project-preview-card-header {
   border-bottom-color: var(--border-subtle, #dbe3ec);
   box-shadow: none;
@@ -709,12 +713,12 @@
 [data-overview-preview] { min-width: 0; }
 
 /* One compact statistics surface, not two competing cards. */
-.project-integrated-overview { min-width: 0; margin-top: 18px; }
+.project-integrated-overview { min-width: 0; margin-top: 14px; }
 .project-assembly-statistics { min-width: 0; }
 .project-assembly-statistics .project-export-grid { border: 1px solid var(--border-subtle, #dbe3ec); border-radius: var(--card-radius); background: var(--surface-panel, #fff); gap: 0; }
 .project-assembly-statistics .project-export-panel { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .project-assembly-statistics .project-export-panel + .project-export-panel { border-left: 1px solid var(--border-subtle, #dbe3ec); }
-.project-preview-toolbar { display: flex; align-items: center; gap: 12px; }
+.project-preview-toolbar { display: flex; align-items: center; gap: 10px; }
 .project-preview-toolbar .project-export-actions { margin-left: auto; }
 @media (max-width: 900px) {
   .project-assembly-statistics .project-export-grid { grid-template-columns: minmax(0, 1fr); }
@@ -722,7 +726,49 @@
 }
 
 .project-preview-toolbar::after { order: 1; }
-.project-preview-toolbar .project-export-actions { order: 2; }
+.project-preview-controls { order: 2; display: inline-flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: 0; }
+.project-preview-controls:empty { display: none; }
+.project-preview-toolbar .project-export-actions { order: 3; }
+.project-preview-filter-input {
+  width: 148px;
+  min-width: 0;
+  height: 26px;
+  min-height: 26px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: 5px;
+  background: var(--surface-panel, #fff);
+  color: var(--text-primary, #1e293b);
+  font-size: var(--font-small);
+}
+.project-preview-filter-input::placeholder { color: var(--text-muted, #64748b); }
+.project-preview-filter-input:focus { border-color: var(--focus-ring, #4f82b5); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring, #4f82b5) 18%, transparent); }
+.projects-page .button.project-preview-control-btn,
+.project-export-page .button.project-preview-control-btn {
+  min-height: 26px;
+  height: 26px;
+  padding: 2px 9px;
+  font-size: var(--font-small);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.projects-page .button.project-preview-control-btn.is-active,
+.project-export-page .button.project-preview-control-btn.is-active {
+  border-color: var(--theme-line, #7da2c8);
+  background: var(--theme-blue-surface, #eff6ff);
+  color: var(--theme-blue-ink, #234b76);
+}
+.project-preview-filter-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 16px;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--card-radius);
+  background: var(--surface-subtle, #f8fafc);
+}
+.project-preview-filter-empty p { margin: 0; }
 
 /* Expanding the first group can introduce the document scrollbar. Reserve its
    gutter on Project so that this cannot shrink or shift every Final Path. */
@@ -733,16 +779,37 @@
 .project-integrated-overview > [data-overview-summary] > .notice[hidden] { display: none; }
 .project-integrated-overview > [data-overview-summary]:not(:has(> :not([hidden]))) { display: none; }
 .project-preview-toolbar > [data-preview-count] { display: contents; }
-/* One compact label column in both states; no compensating right gutter. */
-[data-overview-preview] .project-preview-card { --preview-label-width: 72px; }
+/* One shared label column in both states, sized to fit standard chromosome/accession IDs without clipping. */
+[data-overview-preview] .project-preview-cards { gap: 0; }
+[data-overview-preview] .project-preview-card { --preview-label-width: 132px; }
 [data-overview-preview] .project-preview-row { grid-template-columns: var(--preview-label-width) minmax(0, 1fr); }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] {
-  display: grid; grid-template-columns: var(--preview-label-width) minmax(0, 1fr); column-gap: 10px; align-items: center; padding-top: 8px; padding-bottom: 8px;
+  display: grid; grid-template-columns: var(--preview-label-width) minmax(0, 1fr); column-gap: 10px; align-items: center;
+  padding: 5px 14px; border-top: 0; border-radius: 0; box-shadow: none;
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"]:first-child,
+[data-overview-preview] .project-preview-card[data-preview-expanded="true"] + .project-preview-card[data-preview-expanded="false"] {
+  border-top: 1px solid var(--border-subtle, #dbe3ec);
+  border-top-left-radius: var(--card-radius);
+  border-top-right-radius: var(--card-radius);
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"]:last-child,
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"]:has(+ .project-preview-card[data-preview-expanded="true"]) {
+  border-bottom-left-radius: var(--card-radius);
+  border-bottom-right-radius: var(--card-radius);
+}
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"]:hover,
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"]:has(.project-preview-card-header:focus-visible) {
+  position: relative;
+  z-index: 1;
+  border-color: var(--border-strong, #94a3b8);
+  background: var(--theme-blue-surface, #f1f6fc);
+  box-shadow: inset 2px 0 0 var(--preview-card-ring, #3f6fa3);
 }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-card-heading {
   grid-column: 1; grid-row: 1; min-width: 0; margin: 0; background: transparent;
 }
-[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-card-header { padding: 0; border: 0; box-shadow: none; background: transparent; }
+[data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-card-header { gap: 6px; padding: 0; border: 0; box-shadow: none; background: transparent; }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-chr-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] :is(.project-preview-card-summary, .project-preview-open, .project-preview-final-label) { display: none; }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-paths { grid-column: 2; grid-row: 1; min-width: 0; margin: 0; gap: 2px; }
@@ -751,8 +818,9 @@
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"] .project-preview-final-part { top: 0; height: 100%; }
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"]:not([data-preview-path-count="1"]) .project-preview-final-part > span { display: none; }
 @media (max-width: 560px) {
-  [data-overview-preview] .project-preview-card { --preview-label-width: 64px; }
-  [data-overview-preview] .project-preview-card[data-preview-expanded="false"] { column-gap: 6px; }
+  [data-overview-preview] .project-preview-card { --preview-label-width: 96px; }
+  [data-overview-preview] .project-preview-card[data-preview-expanded="false"] { column-gap: 6px; padding-left: 10px; padding-right: 10px; }
+  .project-preview-filter-input { width: 112px; }
 }
 
 [data-overview-preview] .project-preview-card[data-preview-expanded="false"][data-preview-path-count="1"] .project-preview-final-part { top: 4px; height: 16px; }

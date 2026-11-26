@@ -2,6 +2,9 @@ import { listProjectCatalog, updateProjectCatalog, revealCatalogLocation } from 
 import { projectIcon } from "./project-icons.js";
 import { clearAssemblySessionCache } from "../shell/assembly-session-cache.js";
 import { isInternalRefinementPatchDataset } from "./assembly/support-dataset-options.js";
+import { isOverviewSectionExpanded, toggleOverviewSection } from "./project-overview-sections.js";
+
+const AUTO_COLLAPSE_DATASET_THRESHOLD = 4;
 
 const messages = {
   zh: {
@@ -45,11 +48,35 @@ function number(value, state) {
   return value == null ? "—" : Number(value).toLocaleString(state.locale === "en" ? "en-US" : "zh-CN");
 }
 
-function length(value, state) {
+function formatLengthText(value, state) {
   if (value == null) return "—";
   const [unit, divisor] = value >= 1e9 ? ["Gb", 1e9] : value >= 1e6 ? ["Mb", 1e6] : value >= 1e3 ? ["kb", 1e3] : ["bp", 1];
-  const display = `${Number(value / divisor).toLocaleString(state.locale === "en" ? "en-US" : "zh-CN", { maximumFractionDigits: divisor === 1 ? 0 : 2 })} ${unit}`;
-  return divisor === 1 ? display : `<span data-app-tooltip="${number(value, state)} bp">${display}</span>`;
+  return `${Number(value / divisor).toLocaleString(state.locale === "en" ? "en-US" : "zh-CN", { maximumFractionDigits: divisor === 1 ? 0 : 2 })} ${unit}`;
+}
+
+function length(value, state) {
+  if (value == null) return "—";
+  const display = formatLengthText(value, state);
+  return value < 1e3 ? display : `<span data-app-tooltip="${number(value, state)} bp">${display}</span>`;
+}
+
+function summarizeCatalogRows(rows, state, l) {
+  if (!rows.length) return l.empty;
+  const parts = [];
+  const refRow = rows.find(row => row.role === "reference");
+  const primaryRow = rows.find(row => row.role === "primary");
+  const auxCount = rows.filter(row => row.role !== "reference" && row.role !== "primary").length;
+  if (refRow?.statistics?.totalLengthBp != null) {
+    parts.push(`${l.reference} ${formatLengthText(refRow.statistics.totalLengthBp, state)}`);
+  }
+  if (primaryRow?.statistics?.totalLengthBp != null) {
+    const n50 = primaryRow.statistics.n50 != null ? ` (N50 ${formatLengthText(primaryRow.statistics.n50, state)})` : "";
+    parts.push(`${l.primary} ${formatLengthText(primaryRow.statistics.totalLengthBp, state)}${n50}`);
+  }
+  if (auxCount > 0) {
+    parts.push(state.locale === "en" ? `+${auxCount} auxiliary` : `+${auxCount} 辅助组装`);
+  }
+  return parts.join(" · ");
 }
 
 function renderDetails(row, catalog, state) {
@@ -85,21 +112,34 @@ function renderDetails(row, catalog, state) {
 
 function renderTable(rows, title, catalog, state) {
   const l = labels(state);
+  const columns = [
+    { label: l.role, numeric: false },
+    { label: l.name, numeric: false },
+    { label: l.count, numeric: true },
+    { label: l.total, numeric: true },
+    { label: "N50", numeric: true },
+    { label: "N90", numeric: true },
+    { label: l.note, numeric: false },
+    { label: l.actions, numeric: false },
+  ];
   return `<div class="project-dataset-section">
     <div class="project-dataset-scroll" tabindex="0" role="region" aria-label="${title}"><table class="project-dataset-table" aria-label="${title}">
       <colgroup><col span="7"><col class="project-dataset-actions-column"></colgroup>
-      <thead><tr>${[l.role, l.name, l.count, l.total, "N50", "N90", l.note, l.actions].map(label => `<th scope="col">${label}</th>`).join("")}</tr></thead>
+      <thead><tr>${columns.map(col => `<th scope="col"${col.numeric ? ' class="numeric"' : ""}>${col.label}</th>`).join("")}</tr></thead>
       <tbody>${rows.map(row => {
         const key = objectKey(row);
         const editing = catalog.editor?.key === key;
         const disabled = catalog.saving || state.importer?.inFlight || state.initializer?.autoPipelineRunning || (catalog.editor && !editing) ? "disabled" : "";
         const stats = row.statistics || {};
+        const noteMarkup = row.note
+          ? escape(row.note)
+          : `<span class="project-dataset-note-dash" aria-hidden="true">—</span><span class="project-dataset-note-placeholder">${escape(l.emptyNote)}</span>`;
         return `<tr data-catalog-object="${escape(key)}">
           <td><span class="project-dataset-role" data-dataset-role="${escape(row.role)}">${l[row.role] || escape(row.role)}</span></td>
           <th scope="row"><span class="project-dataset-name">${escape(row.displayName)}</span>${row.derived && row.role !== "derived" ? `<small class="muted">${l.includesDerived}</small>` : ""}</th>
           <td class="numeric">${number(stats.sequenceCount, state)}</td><td class="numeric">${length(stats.totalLengthBp, state)}</td>
           <td class="numeric">${length(stats.n50, state)}</td><td class="numeric">${length(stats.n90, state)}</td>
-          <td><button type="button" class="project-dataset-note" data-catalog-edit="${escape(key)}" data-catalog-focus="note" ${row.note ? `data-app-tooltip="${escape(row.note)}" data-app-tooltip-overflow` : ""} ${disabled}>${escape(row.note || l.emptyNote)}</button></td>
+          <td><button type="button" class="project-dataset-note"${row.note ? "" : ' data-empty="true"'} data-catalog-edit="${escape(key)}" data-catalog-focus="note" ${row.note ? `data-app-tooltip="${escape(row.note)}" data-app-tooltip-overflow` : `aria-label="${escape(l.emptyNote)}"`} ${disabled}>${noteMarkup}</button></td>
           <td><button type="button" class="button project-icon-button" data-catalog-edit="${escape(key)}" data-app-tooltip="${l.edit}" aria-label="${l.edit}: ${escape(row.displayName)}" aria-expanded="${editing}" ${disabled}>${projectIcon("rename")}</button></td>
         </tr>`;
       }).join("") || `<tr><td colspan="8" class="muted">${l.empty}</td></tr>`}</tbody></table></div>
@@ -123,11 +163,23 @@ export function renderProjectCatalog(state) {
   );
   const rows = [...(catalog.data?.references || []), ...datasets];
   const selected = rows.find(row => objectKey(row) === catalog.editor?.key);
-  return `<section id="project-data-catalog" aria-labelledby="project-data-catalog-title" aria-busy="${Boolean(catalog.loading)}">
-    <header class="project-section-divider"><h3 id="project-data-catalog-title">${l.datasets}</h3>${catalog.data ? `<span class="project-section-count"><span aria-hidden="true">·</span>${number(rows.length, state)}</span>` : ""}</header>
-    ${catalog.data ? renderTable(rows, l.datasets, catalog, state) : `<p role="status" class="muted">${catalog.error ? l.failure : l.loading}</p>`}
-    ${catalog.error && !catalog.editor ? `<p class="error-text" role="alert">${escape(catalog.error)}</p>` : ""}
-    ${catalog.error && !catalog.editor ? `<button type="button" class="button ghost" data-catalog-retry ${catalog.loading || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : ""}>${l.retry}</button>` : ""}
+  const defaultExpanded = !catalog.data || rows.length <= AUTO_COLLAPSE_DATASET_THRESHOLD;
+  const expanded = isOverviewSectionExpanded(state, "datasets", {
+    defaultExpanded,
+    forceExpanded: Boolean(catalog.error || catalog.editor),
+  });
+  const summary = !expanded && catalog.data ? summarizeCatalogRows(rows, state, l) : "";
+  return `<section id="project-data-catalog" aria-labelledby="project-data-catalog-title" class="project-collapsible-section" data-section-expanded="${expanded}" aria-busy="${Boolean(catalog.loading)}">
+    <header class="project-section-divider project-section-collapsible">
+      <h3 id="project-data-catalog-title"><button type="button" class="project-section-toggle" data-overview-section-toggle="datasets" data-overview-section-default="${defaultExpanded}" aria-expanded="${expanded}" aria-controls="project-data-catalog-body"><span class="project-section-chevron" aria-hidden="true">${expanded ? "▾" : "▸"}</span><span>${l.datasets}</span></button></h3>
+      ${catalog.data ? `<span class="project-section-count"><span aria-hidden="true">·</span>${number(rows.length, state)}</span>` : ""}
+      ${summary ? `<span class="project-section-summary" data-app-tooltip="${escape(summary)}" data-app-tooltip-overflow>${escape(summary)}</span>` : ""}
+    </header>
+    <div id="project-data-catalog-body" class="project-section-body"${expanded ? "" : " hidden"}>
+      ${catalog.data ? renderTable(rows, l.datasets, catalog, state) : `<p role="status" class="muted">${catalog.error ? l.failure : l.loading}</p>`}
+      ${catalog.error && !catalog.editor ? `<p class="error-text" role="alert">${escape(catalog.error)}</p>` : ""}
+      ${catalog.error && !catalog.editor ? `<button type="button" class="button ghost" data-catalog-retry ${catalog.loading || state.importer?.inFlight || state.initializer?.autoPipelineRunning ? "disabled" : ""}>${l.retry}</button>` : ""}
+    </div>
   </section>${selected ? renderDetails(selected, catalog, state) : ""}`;
 }
 
@@ -164,6 +216,13 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
   };
   const catalog = currentCatalog(store.getState());
   if (!catalog.loading && !catalog.data && !catalog.error) void load();
+  const toggleBtn = host.querySelector?.('[data-overview-section-toggle="datasets"]');
+  toggleBtn?.addEventListener("click", () => {
+    const defaultExpanded = toggleBtn.dataset?.overviewSectionDefault !== "false";
+    toggleOverviewSection(store.getState(), "datasets", { defaultExpanded });
+    refresh();
+    host.querySelector?.('[data-overview-section-toggle="datasets"]')?.focus?.();
+  });
   host.querySelector("[data-catalog-retry]")?.addEventListener("click", () => { void load(); refresh(); });
   host.querySelectorAll("[data-catalog-edit]").forEach(button => button.addEventListener("click", () => {
     const latest = currentCatalog(store.getState());
