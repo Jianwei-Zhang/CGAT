@@ -1,0 +1,303 @@
+{
+  "cross_group_source_conflicts": [],
+  "formal_q0_lgz": "HOLD",
+  "incident_sources": {
+    "ptg000447l": {
+      "group": "3B",
+      "local_flip_remaining": false,
+      "new_admission": [],
+      "not_selected": true,
+      "selected": []
+    },
+    "ptg000449l": {
+      "group": "3B",
+      "local_flip_remaining": false,
+      "new_admission": [
+        {
+          "interval": [
+            0,
+            18267482
+          ],
+          "orientation": "+"
+        }
+      ],
+      "not_selected": false,
+      "selected": [
+        {
+          "interval": [
+            0,
+            18267482
+          ],
+          "orientation": "+"
+        }
+      ]
+    },
+    "ptg000508l": {
+      "group": "3B",
+      "local_flip_remaining": false,
+      "new_admission": [
+        {
+          "interval": [
+            0,
+            12141523
+          ],
+          "orientation": "-"
+        }
+      ],
+      "not_selected": false,
+      "selected": [
+        {
+          "interval": [
+            0,
+            12141523
+          ],
+          "orientation": "-"
+        }
+      ]
+    },
+    "ptg000664l": {
+      "group": "3D",
+      "local_flip_remaining": false,
+      "new_admission": [
+        {
+          "interval": [
+            0,
+            6127475
+          ],
+          "orientation": "-"
+        }
+      ],
+      "not_selected": false,
+      "selected": [
+        {
+          "interval": [
+            0,
+            6127475
+          ],
+          "orientation": "-"
+        }
+      ]
+    }
+  },
+  "mapper_calls": 0,
+  "new_admission_conflicts": {
+    "1A": [],
+    "3B": [],
+    "3D": []
+  },
+  "original_all_candidate_zero_gate": false,
+  "production_integration_eligible": true,
+  "schema": "wheat_inversion_preservation_user_gate_v1",
+  "scope": "Reopened sealed paths/new candidates and verified all original 22-group checkpoint records. Does not change the original result or equate old-Q0 direction with biological truth.",
+  "trial_report_sha256": "0a56fd27fb04995b5da723ced002d08f0edb87fa6c2e425024c6eef32eb92e57",
+  "unchanged_unselected_frozen_candidate_warnings": {
+    "1A": [],
+    "3B": [
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "41d769ba55f22fa5b3a9bc605eb5f2e2be0ed3e9cfc412f3eebc5d4d4d7f8bd8",
+        "placement_id": "q0-placement-1b0b587a9feae52842c48495",
+        "source": [
+          "JM19_hifiasm",
+          "ptg002023l"
+        ],
+        "source_bp": 29517
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "41d769ba55f22fa5b3a9bc605eb5f2e2be0ed3e9cfc412f3eebc5d4d4d7f8bd8",
+        "placement_id": "q0-placement-1b0b587a9feae52842c48495",
+        "source": [
+          "JM19_hifiasm",
+          "ptg002023l"
+        ],
+        "source_bp": 29517
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "a3bb4f42bc6964b861b548c26e35fa911011bcf6a9d5c23227bbac5ef92b1fc1",
+        "placement_id": "q0-placement-1ee60499dd1bfb34075b1723",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001817l"
+        ],
+        "source_bp": 300
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "a3bb4f42bc6964b861b548c26e35fa911011bcf6a9d5c23227bbac5ef92b1fc1",
+        "placement_id": "q0-placement-1ee60499dd1bfb34075b1723",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001817l"
+        ],
+        "source_bp": 300
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "acc5dd1885c60f218fe3962c0013d9e6aed1499b9f0c0b26b7ec626846bd6ec5",
+        "placement_id": "q0-placement-20db25bda4fc5dec13857cf6",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001751l"
+        ],
+        "source_bp": 20585
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "acc5dd1885c60f218fe3962c0013d9e6aed1499b9f0c0b26b7ec626846bd6ec5",
+        "placement_id": "q0-placement-20db25bda4fc5dec13857cf6",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001751l"
+        ],
+        "source_bp": 20585
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "1052b6de85c74b94faf6eb87099b1e59c9b054fb338c3cde243cced2cf7a507d",
+        "placement_id": "q0-placement-35de58639f75602e19cefd3b",
+        "source": [
+          "JM19_hifiasm",
+          "ptg000496l"
+        ],
+        "source_bp": 30338
+      },
+      {
+        "category": "same_group_opposite_orientation",
+        "frozen_placement_record_sha256": "e3d33f890f4d5ca681249bd50b3b9fa8bbfead26c272b6f6a446c6137a8f839b",
+        "placement_id": "q0-placement-5eddcd050306d2148ef88406",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001078l"
+        ],
+        "source_bp": 6143
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "8054ee46d9150d15dbda95918a0d889fecf5f4a5a95c14d0786ddf4359ba996f",
+        "placement_id": "q0-placement-7a70e64343ef16930b963e25",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001556l"
+        ],
+        "source_bp": 15732
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "8054ee46d9150d15dbda95918a0d889fecf5f4a5a95c14d0786ddf4359ba996f",
+        "placement_id": "q0-placement-7a70e64343ef16930b963e25",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001556l"
+        ],
+        "source_bp": 15732
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "b92c6af0fe1c8e411c5ea8c9d424945b435ba9409f6993c59c4c4096d3e24157",
+        "placement_id": "q0-placement-c2aab4e1713c8f713457fdb6",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001753l"
+        ],
+        "source_bp": 222
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "b92c6af0fe1c8e411c5ea8c9d424945b435ba9409f6993c59c4c4096d3e24157",
+        "placement_id": "q0-placement-c2aab4e1713c8f713457fdb6",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001753l"
+        ],
+        "source_bp": 222
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "022704e9fa4a678b1806baa8e6332dd34e420f0ecc836dbc6acf4dde58dfe49c",
+        "placement_id": "q0-placement-df3a9ba09aa74e0bc2ad3426",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001970l"
+        ],
+        "source_bp": 29785
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "022704e9fa4a678b1806baa8e6332dd34e420f0ecc836dbc6acf4dde58dfe49c",
+        "placement_id": "q0-placement-df3a9ba09aa74e0bc2ad3426",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001970l"
+        ],
+        "source_bp": 29785
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "e572c57d97868e06620be5f9ead25d06795f55e2ee31cb6f9c888aff23fcfe7a",
+        "placement_id": "q0-placement-f7fcf09e0826211b7c01154f",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001572l"
+        ],
+        "source_bp": 20157
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "e572c57d97868e06620be5f9ead25d06795f55e2ee31cb6f9c888aff23fcfe7a",
+        "placement_id": "q0-placement-f7fcf09e0826211b7c01154f",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001572l"
+        ],
+        "source_bp": 20157
+      }
+    ],
+    "3D": [
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "cba71fceace80baa458945174387ec252a62aa80ad8eedcb7082ef9f08d1a743",
+        "placement_id": "q0-placement-2b389190f49e9bb4df81173a",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001206l"
+        ],
+        "source_bp": 236
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "cba71fceace80baa458945174387ec252a62aa80ad8eedcb7082ef9f08d1a743",
+        "placement_id": "q0-placement-2b389190f49e9bb4df81173a",
+        "source": [
+          "JM19_hifiasm",
+          "ptg001206l"
+        ],
+        "source_bp": 236
+      },
+      {
+        "category": "other_chromosome",
+        "frozen_placement_record_sha256": "4ab6cccaf4c927ad7255eab6d6bbbb99ba86ca020ecfcff429ced5289cde52bd",
+        "placement_id": "q0-placement-494481d87b7181c7fa877dbc",
+        "source": [
+          "JM19_hifiasm",
+          "ptg000798l"
+        ],
+        "source_bp": 236
+      },
+      {
+        "category": "other_subgenome",
+        "frozen_placement_record_sha256": "4ab6cccaf4c927ad7255eab6d6bbbb99ba86ca020ecfcff429ced5289cde52bd",
+        "placement_id": "q0-placement-494481d87b7181c7fa877dbc",
+        "source": [
+          "JM19_hifiasm",
+          "ptg000798l"
+        ],
+        "source_bp": 236
+      }
+    ]
+  },
+  "user_gate": "no_new_admission_conflicts_and_no_selected_conflicts_and_no_cross_group_source_reuse",
+  "user_requested_checks_passed": true,
+  "whole_wheat_22_group_acceptance": false
+}
