@@ -1,6 +1,7 @@
 """Lossless threshold short-circuits: compare with the exhaustive definitions."""
 from collections import Counter
 from dataclasses import replace
+from itertools import permutations
 import math
 import random
 from types import SimpleNamespace
@@ -52,6 +53,21 @@ class AdmissionScreenTests(unittest.TestCase):
                                      minimum_base_entropy=h, minimum_anchor_bp=n)
                     span = Interval(0, n)
                     self.assertEqual(a._complex_intervals(seq, span, policy), exhaustive(seq, span, policy))
+
+    def test_native_histogram_preserves_first_occurrence_order_and_invalid_bases(self):
+        for n in (63, 64, 100, 256, 257):
+            counts = (1, 3, n//4, n - 4 - n//4)
+            for order in permutations(range(4)):
+                seq = ''.join('ACGT'[i] * counts[i] for i in order)
+                entropy = -sum((v/n)*math.log2(v/n) for v in Counter(seq).values())
+                for bound in (math.nextafter(entropy, 0), entropy, math.nextafter(entropy, 2)):
+                    p = replace(a.AdmissionPolicy(), minimum_base_entropy=bound,
+                                kmer_size=1, minimum_distinct_kmer_fraction=.001)
+                    self.assertEqual(a._passes_complexity(seq, p), entropy >= bound)
+            for text in ('A'*n, ('CA'*n)[:n], 'G'*(n-1)+'N', 'G'*(n-1)+'Ω'):
+                p = replace(a.AdmissionPolicy(), minimum_base_entropy=0, kmer_size=1,
+                            minimum_distinct_kmer_fraction=.001)
+                self.assertEqual(a._passes_complexity(text,p), set(text)<=set('ACGT'))
 
     def test_sorted_mask_matches_full_subtraction(self):
         rng = random.Random(7)

@@ -1,0 +1,38 @@
+{
+  "candidate": "da9590693b34946ec4f217c9d9e647e095adb15189c5926a184f969fd8a6a369",
+  "fasta": "52fb38724a2a02e2edbba878ff3fee4becd69eaeb6ca060580c2bc325e307577",
+  "grid_offsets": [
+    0,
+    37
+  ],
+  "grids": 300,
+  "interval_sha256": "6c154635bfced9fe5d25a12b18879ad7a8eaffa215a38a98432075beb44e036a",
+  "median_s": {
+    "new": 3.111402,
+    "old": 4.0310745
+  },
+  "node": "agent-X86-04",
+  "old_predicate": "6c47f623cf1bc344f678d77941dd1a09896c26891798a553b88d07fe6eb786a5",
+  "passing_intervals": 2077,
+  "python": "3.10.12",
+  "receipt": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e",
+  "schema": "wheat_complexity_histogram_control_v1",
+  "scope": "Single-core local complexity kernel only; unchanged default grid and thresholds. Two overlapping grids of 150 real query sources, not independent samples or whole-run timing.",
+  "sequences": 150,
+  "source_bp": 14974672,
+  "timings_s": {
+    "new": [
+      3.112499,
+      3.110305,
+      3.118303,
+      3.107366
+    ],
+    "old": [
+      4.050072,
+      4.040049,
+      4.021472,
+      4.0221
+    ]
+  },
+  "windows": 299585
+}

@@ -231,21 +231,29 @@ def _window_plan(n, k, fraction):
 
 
 def _passes_complexity(text, policy):
-    counts = Counter(text)
-    if not counts.keys() <= _DNA:
-        return False
     n = len(text)
+    if 64 <= n <= 256:
+        # Four native string scans are cheaper than building a per-character Counter.
+        # Keep its first-occurrence order for the identical entropy sum, even at a one-ULP tie.
+        counts = [c for base in sorted("ACGT", key=text.find) if (c := text.count(base))]
+        if sum(counts) != n:
+            return False
+    else:
+        histogram = Counter(text)
+        if not histogram.keys() <= _DNA:
+            return False
+        counts = histogram.values()
     k = min(policy.kmer_size, n)
     if n <= 256:
         terms, wanted, first, rest = _window_plan(n, k, policy.minimum_distinct_kmer_fraction)
-        if -sum(terms[v] for v in counts.values()) < policy.minimum_base_entropy:
+        if -sum(terms[v] for v in counts) < policy.minimum_base_entropy:
             return False
         distinct = set(map(text.__getitem__, first))
         if len(distinct) < wanted:
             distinct.update(map(text.__getitem__, rest))
         return len(distinct) >= wanted
     # A custom large window must not leave O(window size) slicing plans in memory.
-    if -sum((v/n) * math.log2(v/n) for v in counts.values()) < policy.minimum_base_entropy:
+    if -sum((v/n) * math.log2(v/n) for v in counts) < policy.minimum_base_entropy:
         return False
     total = n - k + 1
     return len({text[i:i+k] for i in range(total)}) / total >= policy.minimum_distinct_kmer_fraction
