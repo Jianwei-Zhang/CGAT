@@ -42,7 +42,7 @@ def counts(issues,support):
         if a & b:both_window.add(i)
     return dict(issues_with_any_100bp_shoulder=dict(by_kind),joins_hit_on_both_ends_by_same_parent=len(both_parent),joins_hit_on_both_ends_in_same_query_window=len(both_window))
 
-def run(base,owner):
+def run(base,owner,*,on_support=None):
     result=owner/'result.json';pin=sha256_file(result); logs=list(owner.glob('regionals_*.out'))
     need(any(pin+'  result.json' in p.read_text().splitlines() for p in logs),'result not in completed job output')
     report=checked(result,pin);need(report['plan']==PLAN and report['updated_questions']==QUESTIONS and report['batches']==len(report['receipts'])==15 and report['windows']==13 and report['native_mapper_starts']==0,'incomplete execution')
@@ -66,6 +66,8 @@ def run(base,owner):
         need(n==batch['projected_rows'] and sha256_file(file)==fingerprint,'PAF changed during analysis');rows+=n
         print('REGIONAL_EVIDENCE_READ',ordinal,'rows',n,'issues_so_far',len(support),flush=True)
     need(len(windows)==13 and rows==report['projected_rows'] and sha256_file(result)==pin,'incomplete panel readback')
+    if on_support is not None:
+        on_support([(issues[i],sorted(sides)) for i,sides in sorted(support.items())])
     return dict(mapping=pin,questions=QUESTIONS,geometric_contacts_before=98,projected_rows=rows,projected_by_relation=dict(stats),distinct_query_target_strand=len(pairs),paf_rows_supporting_any_shoulder=dict(cases),any_relationship=counts(issues,support),cross_assembly_only=counts(issues,cross),native_mapper_starts=0,scope='Fixed old question shoulders and real paired CIGAR runs; contacts are candidate evidence, not orientation-compatible bridging, gap closure, placement acceptance or the next Q0 path.')
 
 if __name__=='__main__':
