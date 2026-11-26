@@ -112,20 +112,19 @@ class WeakSeedTests(unittest.TestCase):
         with patch.object(prep,'_supplement',side_effect=[None,{'task_id':'fast'}]) as run:
             prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000)
         self.assertTrue(run.call_args.kwargs['weak_seed_fast'])
+        self.assertTrue(all(c.kwargs['cache_only'] for c in run.call_args_list))
         request['query_ids']=['short']
         with patch.object(prep,'_supplement',side_effect=[None,{'task_id':'native'}]) as run:
             prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000)
         self.assertFalse(run.call_args.kwargs['weak_seed_fast'])
 
 
-    def test_short_side_native_completion_caps_threads_independently_of_run_all_budget(self):
+    def test_short_side_cold_completion_never_relanches_native_search(self):
         request={'kind':'candidate_unroutable_seed','query_ids':['tiny_target'],'target_ids':['long'],
                  'native_short_targets_as_queries':True}
-        with patch.object(prep,'_supplement',side_effect=[None,{'task_id':'native'}]) as run:
-            prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000)
-        self.assertEqual(run.call_args.args[5],8)
-        self.assertFalse(run.call_args.kwargs['weak_seed_fast'])
-
+        with patch.object(prep,'_supplement',return_value=None) as run:
+            self.assertIsNone(prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000))
+        self.assertEqual(run.call_count,1);self.assertTrue(run.call_args.kwargs['cache_only'])
 
     def complete_cohort(self):
         tasks=[]

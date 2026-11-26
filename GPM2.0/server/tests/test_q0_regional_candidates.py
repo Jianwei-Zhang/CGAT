@@ -60,6 +60,15 @@ class RegionalCandidatesTests(unittest.TestCase):
         self.assertEqual((native,reason),(0,None)); batches=list(target_batches(row[1]))
         self.assertEqual(len(batches),2); self.assertEqual({t.segment_id for b in batches for t in b},{'t1','t2'})
 
+    def test_one_unanchored_candidate_window_does_not_discard_local_siblings(self):
+        from server.tools.lgz_core.q0_regional_execution import plan_request
+        index=mock.Mock(); index.parts={'t':SimpleNamespace(interval=Interval(0,3000))}
+        index.regions.side_effect=[{'chr':(Interval(0,1000),)}, {}, {'chr':(Interval(2000,3000),)}]
+        index.targets.return_value={'t':(Interval(0,1000),)}
+        windows=tuple(QueryWindow('q',3000,i,i+1000,((i,i+1000),)) for i in (0,1000,2000))
+        rows,native,reason=plan_request(ParentRequest('candidate','q',windows,('chr',),1,0,1),index)
+        self.assertEqual(([q.start for q,_ in rows],native,reason),([0,2000],1,'query_window_without_qualified_reference'))
+
     def test_known_sources_are_excluded_before_paf_decode_and_no_local_targets_is_not_failure(self):
         known={(SourceKey('ds','a'),SourceKey('ds','b'))};plan=self.plan(known)
         _,eligible=plan.eligible(self.ids['a']);original=self.index._hit

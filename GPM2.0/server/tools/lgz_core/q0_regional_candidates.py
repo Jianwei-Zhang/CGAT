@@ -26,7 +26,7 @@ CANDIDATE_POLICY = {
     "targets": "unobserved_reference_local_candidate_parts",
     "reuse": "observed_unsplit_source_pairs_and_complete_native_part_matrices",
     "native_matrix_direction": "completed_unordered_relationship_not_both_direction_exhaustiveness",
-    "missing_reference_target": "batch_small_unroutable_sources_as_native_queries_once",
+    "missing_reference_target": "whole_source_cache_only_keep_routable_siblings",
     "native_seed_reuse": "complete_matrices_before_regional_planning_not_per_large_parent",
     "whole_source_equivalence": False,
 }

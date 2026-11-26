@@ -614,17 +614,16 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
 
 
 
-def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference_bases, skip_self=False, prepared_target=None, on_cache_hit=None):
-    task=_supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,cache_only=True,on_cache_hit=on_cache_hit)
-    if task is not None:return task
+def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference_bases, skip_self=False, on_cache_hit=None):
+    """Look up both historical profiles; a cold seed is never a native mapper invocation."""
+    def probe(fast):
+        return _supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,cache_only=True,
+                           weak_seed_fast=fast,reference_bases=reference_bases,on_cache_hit=on_cache_hit)
+    task=probe(False)
+    if task is not None: return task
     queries,targets=weak_global_seed_scope(catalog.parts,catalog.reference_routable_parts,
         request['query_ids'],request['target_ids'],reference_bases=reference_bases,preset=preset)
-    fast=bool(queries and targets)
-    # Dense native repeats can exhaust memory even with a tiny target. The
-    # short-side completion uses a separate bounded worker budget, not 32 by default.
-    if request.get('native_short_targets_as_queries'):threads=min(threads,8)
-    return _supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,
-                       prepared_target=prepared_target,weak_seed_fast=fast,reference_bases=reference_bases,on_cache_hit=on_cache_hit)
+    return probe(True) if queries and targets else None
 
 
 def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,known_pairs,tool,preset,threads,*,reference_bases,skip_self):
@@ -633,9 +632,6 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
     while True:
         request=scopes.next_missing_seed(query_ids,target_ids)
         if request is None:break
-        template_task=next((task for task in tasks if task['kind']!='regional_discovery'
-                            and task['target_ids']==request['target_ids']),None)
-        template=({'root':str(root),'receipt':identity(root,template_task['receipt'])} if template_task else None)
         consumed = False
         def consume_seed(seed,hits):
             nonlocal consumed
@@ -645,7 +641,10 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
                                     include_placed=True,known_pairs=known_pairs)
             consumed = True
         seed=_unroutable_seed(root,catalog,request,tool,preset,threads,reference_bases=reference_bases,
-                             skip_self=skip_self,prepared_target=template,on_cache_hit=consume_seed)
+                             skip_self=skip_self,on_cache_hit=consume_seed)
+        if seed is None:
+            print("LGZ q0 unroutable seed: not searched; no verified matrix in cache",flush=True)
+            break  # Leave missing relationships eligible for regional planning.
         if not consumed:
             hits=read_paf(artifact_path(root, seed['paf']),query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
                           target_lengths={key:catalog.parts[key].interval.length for key in seed['target_ids']},artifact=seed['paf'])
@@ -838,7 +837,7 @@ def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2"
 def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                            requested_scope=None, scope_decision=None,
                            draft=False, frontier_override=None, repair_round=0, fallback_reason=None,
-                           expected_input=None, repair_inputs=None, forced_native=()):
+                           expected_input=None, repair_inputs=None):
     root = root.resolve()
     if threads < 1:
         raise Q0EvidenceError("q0 evidence threads must be positive")
@@ -915,41 +914,17 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             scope_report.update(acceptance=SEMANTICS, threshold_request=record(regional_frontier))
         if scope_report is not None:
             catalog.payload["supplement_scope"] = scope_report
-        native_gate = None
-        junction_tasks = []
-        if supplement_scope == 'positive_threshold' and regional_frontier:
-            from .q0_native_frontier import FallbackGate
-            from .q0_threshold_prepare import initial_questions
-            def refresh_native(tasks):
-                from .q0_junction_review import dispatch
-                def local_review(review, selection):
-                    extra = dispatch(review,selection,root,catalog,tasks,tool,options.get('minimap_preset','asm10'),
-                                     threads,sum(lengths.values()))
-                    junction_tasks.extend(extra); tasks.extend(extra)
-                    return extra
-                repair_inputs.verify()
-                def record_residual(need, have_path, counts, issues):
-                    # A diagnostic, never an input, success marker or proof of completed mapping.
-                    report = dict(schema='q0_updated_native_fallback_demand_v1',decision_only=True,
-                                  input_fingerprint=request_identity,has_path=have_path,counts=counts,
-                                  questions=issues,source_intervals=record(need),completed_tasks=len(tasks),
-                                  task_inventory_id=stable_id('q0-fallback-evidence',[(t['task_id'],t['paf']) for t in tasks]))
-                    rel = f"grt/evidence/q0_prepare/native_decisions/{stable_id('q0-fallback-demand',report)}.json"
-                    try: atomic_write_json(workspace_artifact_path(root,rel),report)
-                    except OSError as exc: print(f'LGZ q0 native fallback: optional demand log unavailable: {exc}',flush=True)
-                    else: print(f'LGZ q0 native fallback: updated_demand={rel} questions={len(issues)}',flush=True)
-                result = initial_questions(root,sources,lengths,assignments,base_alignments,threads=threads,
-                                           existing_catalog=catalog,supplementary=tasks,on_updated_questions=record_residual,
-                                           junction_dispatch=local_review)
-                repair_inputs.verify()
-                return result
-            native_gate = FallbackGate(catalog.parts,regional_frontier,refresh_native,forced_native)
-        def native_fallbacks(phase, requests, available):
-            def run(request, cache_only):
+        from .q0_native_frontier import CACHE_ONLY, RegionalFallbackCache, prefer_cached_whole
+        bounded_native = supplement_scope == 'positive_threshold' and bool(regional_frontier)
+        native_gate = RegionalFallbackCache(bounded=bounded_native)
+        if bounded_native:
+            scope_report['native_fallback_policy'] = CACHE_ONLY
+
+        def native_fallbacks(phase, requests):
+            def probe(request):
                 return _supplement(root,catalog,request,tool,options.get('minimap_preset','asm10'),threads,
-                                   skip_self=options.get('skip_self')=='true',cache_only=cache_only)
-            if native_gate is None: return [run(r,False) for r in requests]
-            return native_gate.dispatch(phase,requests,[*available,*junction_tasks],run)
+                                   skip_self=options.get('skip_self')=='true',cache_only=True)
+            return native_gate.dispatch(phase,requests,probe)
         tasks = []
         # Each productive round adds at least one segment to the anchor set. The
         # monotone loop terminates after at most the number of source segments.
@@ -1014,7 +989,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 catalog.payload["regional_partial_discovery"] = report
                 if fallback_ids:
                     fallback_request = {**request, "query_ids": fallback_ids}
-                    partial_tasks.extend(native_fallbacks('regional_partial_discovery',[fallback_request],[*tasks,*partial_tasks]))
+                    whole = native_fallbacks('regional_partial_discovery',[fallback_request])
+                    partial_tasks = prefer_cached_whole(partial_tasks,whole,report)
             if not partial_consumed:tasks.extend(partial_tasks)
             # One discovery round, not one full catalog rebuild per window.
             # Keep each PAF's own declared geometry/artifact while accumulating
@@ -1045,20 +1021,21 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 while (seed_request := planner.next_unroutable_seed()) is not None:
                     seed = _unroutable_seed(root,catalog,seed_request,tool,preset,threads,
                         reference_bases=sum(lengths.values()),skip_self=options.get("skip_self") == "true")
+                    if seed is None:
+                        print("LGZ q0 candidate seed: not searched; no verified matrix in cache",flush=True)
+                        break
                     tasks.append(seed);seed_ids.append(seed["task_id"]);planner.add_complete_tasks([seed])
                 regional_tasks, native_requests, report = prepare_candidates(
                     root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,
                     preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner,
                     regional_frontier=regional_frontier, unsearched=unsearched)
                 report["unroutable_seed_task_ids"] = seed_ids
-            tasks.extend(regional_tasks)
             catalog.payload["regional_candidate_discovery"] = report
             if native_requests:
-                tasks.extend(native_fallbacks('regional_candidate_discovery',native_requests,tasks))
-        if junction_tasks:
-            from .q0_junction_review import append_new_tasks
-            append_new_tasks(tasks, scope_report, junction_tasks)
-        if native_gate is not None:
+                whole = native_fallbacks('regional_candidate_discovery',native_requests)
+                regional_tasks = prefer_cached_whole(regional_tasks,whole,report)
+            tasks.extend(regional_tasks)
+        if bounded_native:
             if native_gate.omissions:
                 scope_report['deferred_native_matrices'] = native_gate.omissions
             for phase, matrix_ids in native_gate.planned.items():

@@ -1,0 +1,130 @@
+{
+  "cold_gate_control": "cache_only_unsearched",
+  "historical_comparison": "d03288f586c6ac4c6dccfb86a39c78f4e371c2ef232f776e6aac53a8f5a7fa0a",
+  "native_mapper_starts": 0,
+  "parents": [
+    {
+      "parent": "JM19flyeA_contig_4549",
+      "rows": [
+        {
+          "batches": [
+            89970971
+          ],
+          "query": "q0-query-window-a2aec779e98dcc29b79b59cf",
+          "target_bp": 89970971,
+          "targets": 1594
+        },
+        {
+          "batches": [
+            99940890,
+            1082663
+          ],
+          "query": "q0-query-window-91b19531b6b06fe8a1a52692",
+          "target_bp": 101023553,
+          "targets": 1719
+        },
+        {
+          "batches": [
+            94057775
+          ],
+          "query": "q0-query-window-29b8ceec0c8d43f896ebef10",
+          "target_bp": 94057775,
+          "targets": 1559
+        },
+        {
+          "batches": [
+            84288742
+          ],
+          "query": "q0-query-window-2cf4a9df554ffd308a84f4a9",
+          "target_bp": 84288742,
+          "targets": 1406
+        },
+        {
+          "batches": [
+            87291348
+          ],
+          "query": "q0-query-window-083d06ded545e255a2ff4fa2",
+          "target_bp": 87291348,
+          "targets": 1527
+        }
+      ],
+      "whole_native_fallback": false
+    },
+    {
+      "parent": "ptg000010l",
+      "rows": [
+        {
+          "batches": [
+            9255256
+          ],
+          "query": "q0-query-window-4237a24d62a0d9d260e38d0a",
+          "target_bp": 9255256,
+          "targets": 351
+        },
+        {
+          "batches": [
+            99803628,
+            5183200
+          ],
+          "query": "q0-query-window-d5061acaaeff86bed61305ae",
+          "target_bp": 104986828,
+          "targets": 2051
+        },
+        {
+          "batches": [
+            97669900
+          ],
+          "query": "q0-query-window-ea753044d551bd50825daaae",
+          "target_bp": 97669900,
+          "targets": 1608
+        },
+        {
+          "batches": [
+            96855918
+          ],
+          "query": "q0-query-window-6e800cba7c98ef611d24882b",
+          "target_bp": 96855918,
+          "targets": 1682
+        },
+        {
+          "batches": [
+            95873693
+          ],
+          "query": "q0-query-window-41a462a08f39bc53552d89e1",
+          "target_bp": 95873693,
+          "targets": 1626
+        },
+        {
+          "batches": [
+            99695326
+          ],
+          "query": "q0-query-window-ac9c6360de5a0403b8e4722c",
+          "target_bp": 99695326,
+          "targets": 1779
+        },
+        {
+          "batches": [
+            92604700
+          ],
+          "query": "q0-query-window-acd9db6abda94231107e18aa",
+          "target_bp": 92604700,
+          "targets": 1674
+        },
+        {
+          "batches": [
+            23265347
+          ],
+          "query": "q0-query-window-771948f3abee69b43101565b",
+          "target_bp": 23265347,
+          "targets": 938
+        }
+      ],
+      "whole_native_fallback": false
+    }
+  ],
+  "regional_batches": 15,
+  "regional_mapper_starts": 0,
+  "schema": "wheat_13_native_fallback_windows_production_planning_v1",
+  "scope": "Real sealed reference index and actual 13 query/target frames; no alignment, PAF equivalence or final Q0 claim. Cold-miss gate is a separate control.",
+  "windows": 13
+}

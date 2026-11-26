@@ -10,7 +10,7 @@ from .q0_frontier_scope import UnsearchedQ0Context, _unsearched_axes
 from .q0_sources import Interval, Q0EvidenceError, SourceKey, merged_intervals, subtract_intervals
 
 SCOPE = 'positive_threshold'
-SEMANTICS = 'supported_backbone_not_exhaustive_alternatives_v1'
+SEMANTICS = 'supported_backbone_not_exhaustive_alternatives_v2'
 MAX_REPAIRS = 1
 
 
@@ -112,7 +112,7 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
         raise Q0EvidenceError('threshold acceptance contract differs from catalog')
     frontier=decode(report['threshold_request'],{s:len(seq) for s,seq in data.sources.items()})
     axes=_unsearched_axes(report,data.parts)
-    from .q0_native_frontier import omitted, touches
+    from .q0_native_frontier import CACHE_ONLY, omitted, touches
     pending = omitted(report,data.parts)
     if mode=='full':
         if axes or frontier is not None: raise Q0EvidenceError('full threshold fallback contains omissions or a scoped request')
@@ -120,12 +120,26 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
     if mode not in ('base_only','decision_frontier') or frontier is None or (mode=='base_only' and (frontier or axes)):
         raise Q0EvidenceError('invalid threshold search mode')
     assignments=({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in binding.assignments)
-    need,counts=questions(data,selection,assignments)
+    # Only unresolved gaps/weak placements may abstain from a global search. A
+    # missing required chromosome never becomes accepted through this rule.
+    bounded_cold = bool(pending) and report.get('native_fallback_policy') == CACHE_ONLY
+    issues = [] if bounded_cold else None
+    need,counts=questions(data,selection,assignments,issue_sink=issues.append if bounded_cold else None)
     if need is None: raise ThresholdRepairRequired('threshold selector needs full supplemental evidence', need)
     affected = [row['id'] for row in pending if touches(row,data.parts,need)]
     if affected:
-        raise ThresholdRepairRequired('updated Q0 needs a deferred native fallback matrix', need, affected)
-    enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog) and not pending
+        if not bounded_cold:
+            raise Q0EvidenceError('unbound deferred native fallback policy; cannot certify the selected path')
+        missing = {}
+        for issue in issues:
+            if issue['kind'] not in ('weak_placement','unproven_join'):
+                for d,s,a,b in issue['spans']:
+                    missing.setdefault(SourceKey(d,s),[]).append(Interval(a,b))
+        if any(touches(row,data.parts,missing) for row in pending):
+            raise Q0EvidenceError('required Q0 chromosome remains unproven; automatic whole-source fallback is disabled')
+        counts['unsearched_whole_source_matrices'] = len(affected)
+
+    enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog) and (not pending or bounded_cold)
     covered_without_repair = 0
     for s,spans in need.items():
         for span in spans:
@@ -156,6 +170,11 @@ def validate_catalog(root, manifest, catalog):
     from .q0_native_frontier import validate_inventory
     from .q0_junction_review import extra_count
     extra_count(catalog)
+    from .q0_native_frontier import CACHE_ONLY
+    if scope.get('deferred_native_matrices') and scope.get('native_fallback_policy') != CACHE_ONLY:
+        raise Q0EvidenceError('unbound deferred native fallback policy')
+    if 'native_fallback_policy' in scope and (scope['native_fallback_policy'] != CACHE_ONLY or mode != 'decision_frontier'):
+        raise Q0EvidenceError('unknown or misplaced native fallback policy')
     validate_inventory(catalog)
     if mode=='base_only':
         if q!={} or scope['unsearched_part_intervals'] or catalog['supplementary_alignments'] or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery')):

@@ -19,7 +19,11 @@ from lgz_core.common import sha256_file,stable_id
 from lgz_core.q0_catalog import CandidateCatalog
 from lgz_core.q0_query_windows import TargetWindow
 from lgz_core.q0_sources import Interval,split_source
-from lgz_core.q0_native_frontier import FallbackGate,PHASES
+from lgz_core.q0_native_frontier import PHASES
+try:
+    from lgz_core.q0_native_frontier import FallbackGate  # Frozen pre-cache-only incident bundle.
+except ImportError:
+    from wheat_legacy_fallback_gate import FallbackGate
 from lgz_core.q0_threshold_acceptance import decode,record
 
 LOC='c5ff44e8b0686d31381cc309483cdff0adfd2f401218b65aef6ccbf5cbfb4289'

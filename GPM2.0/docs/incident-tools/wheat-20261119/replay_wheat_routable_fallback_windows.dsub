@@ -1,0 +1,19 @@
+#!/bin/bash
+#DSUB -n jm19_q0_local_only_replay
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-46
+#DSUB -R "cpu=1,mem=16384MB"
+#DSUB -o local_plan_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c kit.sha256
+exec 9>replay.lock; flock -n 9
+b=$(dirname "$PWD"); h="$b/q0-bound-first-demand.8xpsAJ"
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-routable-code.XXXXXXXX); trap 'rm -rf -- "$w"' EXIT
+mkdir "$w/helpers"; printf '%s  %s\n' 9d0971e43033a2be9124a7956cfa41a9832c3c9d760f2768701e5090c5f7300d "$h/controls.sha256" | sha256sum --quiet -c -
+while read -r pin f; do case "$f" in *.py) cp "$h/$f" "$w/helpers/$f";printf '%s  %s\n' "$pin" "$w/helpers/$f" |sha256sum --quiet -c -;; esac; done < "$h/controls.sha256"
+tar -xzf tools.tgz -C "$w"; export PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$w/tools:$w/helpers"
+python3 -Bu replay_wheat_routable_fallback_windows.py "$b"
+sha256sum result.json

@@ -68,15 +68,14 @@ class RegionalDiscoveryTests(unittest.TestCase):
         self.assertEqual(observed[0][1], [0]); self.assertEqual(sorted(x[1][0] for x in observed[1:]), [0, 200])
         self.assertEqual((report['target_batch_splits'], report['frontier_omitted_windows']), (1, 0))
 
-    def test_native_fallback_subsumes_parent_without_launching_earlier_window(self):
-        index=mock.Mock();index.parts=self.parts;index.regions.return_value={'chr':(Interval(0,100),)}
-        index.targets.side_effect=[{self.ids['t']:(Interval(0,1000),)},{}]
+    def test_missing_target_window_preserves_routable_siblings(self):
+        index=mock.Mock(); index.parts=self.parts; index.regions.return_value={'chr':(Interval(0,100),)}
+        index.targets.side_effect=[{self.ids['t']:(Interval(0,1000),)}, {}, {self.ids['t']:(Interval(1000,2000),)}]
         holes={self.ids['q']:(Interval(0,300000),)}
         with mock.patch.object(regional,'partial_source_intervals',return_value=holes), \
-             mock.patch.object(regional,'prepare_regional_mapping',side_effect=AssertionError('parent fallback must not map windows')):
-            tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},reference_lengths={'chr':5_000_000_000},preset='asm10',threads=8)
-        self.assertEqual(tasks,[]);self.assertEqual(fallback,[self.ids['q']])
-        self.assertEqual(report['fallback_sources'][0]['reason'],'no_reference_targets')
+             mock.patch.object(regional,'prepare_regional_mapping',side_effect=lambda r,c,q,t,*args,**kwargs:q.cores[0][0]):
+            tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},reference_lengths={'chr':5_000_000_000},preset='asm10',threads=1)
+        self.assertEqual(tasks,[0,200000]);self.assertEqual(fallback,[self.ids['q']]);self.assertEqual(report['fallback_sources'][0]['reason'],'no_reference_targets')
         index.verify_inputs.assert_called_once()
 
     def test_pool_never_multiplies_run_thread_budget_and_keeps_order(self):

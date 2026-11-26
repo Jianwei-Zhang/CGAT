@@ -260,12 +260,11 @@ def prepare(root, threads, mapper):
     full = wanted is None and receipt is None
     from .q0_junction_review import Review, dispatch, extend_draft, extra_count
     prior_local = []
-    forced_native = frozenset()
     for n in range(MAX_REPAIRS+3):
         if receipt is None:
             receipt,_,_ = prep._prepare_evidence_pass(root,threads=threads,minimap2=mapper,supplement_scope=SCOPE,
                 draft=True,frontier_override=None if full else wanted,fallback_reason='threshold_full_fallback' if full else None,
-                expected_input=request,repair_inputs=snapshot,forced_native=forced_native)
+                expected_input=request,repair_inputs=snapshot)
         if prior_local:
             base = prep.json_file(prep.artifact_path(root,receipt['catalog']))
             receipt = extend_draft(root,receipt,base,prior_local)
@@ -302,8 +301,6 @@ def prepare(root, threads, mapper):
         except ThresholdRepairRequired as stopped:
             if full: raise
             need = stopped.demand
-            newly_forced = set(stopped.native_ids) - forced_native
-            forced_native = forced_native.union(newly_forced)
         else:
             if not any(r.path is not None for r in selection.paths.values()):
                 raise Q0EvidenceError('no chromosome has a trustworthy q0 path')
@@ -322,7 +319,7 @@ def prepare(root, threads, mapper):
             full = True
         else:
             widened = {**wanted, **{s:merged_intervals((*wanted.get(s,()),*v)) for s,v in need.items()}}
-            full = widened == wanted and not newly_forced
+            full = widened == wanted
             wanted = widened
         receipt, cached = None, False
     raise Q0EvidenceError('threshold preparation ended without a verified Q0')

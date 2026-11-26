@@ -31,7 +31,7 @@ REGIONAL_POLICY = {
     "reference_context_bases": 10_000, "target_context_bases": 10_000,
     "target_batching": TARGET_BATCH_POLICY,
     "covered_cross_bases": "subtract_complete_identity_ge_0.95_paired_ge_100",
-    "unroutable": "native_full_source_all_anchors",
+    "unroutable": "whole_source_cache_only_keep_routable_siblings",
     "later_candidate_chr": "regional_execution_with_exact_legacy_query_selection",
     "whole_source_equivalence": False,
 }
@@ -126,17 +126,18 @@ def observe_part_hits(catalog, hits, observed):
 
 def plan_parent(catalog, index, windows):
     """Plan a parent's exact targets before selecting native fallback."""
-    planned = []
+    planned = []; reason = None
     for query in windows:
         regions = index.regions(query.segment_id, Interval(query.start,query.end),
                                 anchor_context=1_000_000, reference_context=10_000)
         rows = index.targets(regions, context=10_000, exclude=[query.segment_id])
         if not rows:
-            return [], "no_reference_targets"
+            reason = "no_reference_targets"
+            continue
         targets = [TargetWindow(key,catalog.parts[key].interval.length,i.start,i.end)
                    for key,values in rows.items() for i in values]
         planned.append((query, targets))
-    return planned, None
+    return planned, reason
 
 
 def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None, regional_frontier=None, unsearched=None):
@@ -192,7 +193,6 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
             parent_order[segment_id] = parent_number
             if reason is not None:
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})
-                continue
             for window_number, (query, targets) in enumerate(planned):
                 work.add("candidates")
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):

@@ -15,7 +15,11 @@ from wheat_selection_checkpoint import Store
 import replay_wheat_partial_queries as replay
 from lgz_core import q0_admission as adm,q0_preparation as prep,q0_regional_mapping as mapping,q0_threshold_prepare as threshold
 from lgz_core.q0_catalog import CandidateCatalog
-from lgz_core.q0_native_frontier import FallbackGate,PHASES
+from lgz_core.q0_native_frontier import PHASES
+try:
+    from lgz_core.q0_native_frontier import FallbackGate  # Frozen pre-cache-only incident bundle.
+except ImportError:
+    from wheat_legacy_fallback_gate import FallbackGate
 from lgz_core.q0_query_windows import QueryWindow,TargetWindow
 from lgz_core.q0_sources import SourceKey,split_source
 from lgz_core.q0_threshold_acceptance import decode,record

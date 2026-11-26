@@ -1,0 +1,206 @@
+{
+  "cases": [
+    {
+      "chromosome": "7B",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": true,
+      "stratum": "inside+"
+    },
+    {
+      "chromosome": "6D",
+      "fixed_offers_old_full": false,
+      "fixed_offers_old_reduced": false,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": true,
+      "stratum": "inside-"
+    },
+    {
+      "chromosome": "5B",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": true,
+      "stratum": "repeat+"
+    },
+    {
+      "chromosome": "2A",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": true,
+      "stratum": "repeat-"
+    },
+    {
+      "chromosome": "1A",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": false,
+      "fixed_same_available_cuts": false,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": false,
+      "query_has_direct_demand": true,
+      "stratum": "outside+"
+    },
+    {
+      "chromosome": "2D",
+      "fixed_offers_old_full": false,
+      "fixed_offers_old_reduced": false,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 2000,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 2000,
+        "reduced_only_in_frozen_demand_bp": 2000,
+        "same": false
+      },
+      "fresh_same_paths": false,
+      "fresh_same_placements": false,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": true,
+      "partner_retained": false,
+      "query_has_direct_demand": true,
+      "stratum": "outside-"
+    },
+    {
+      "chromosome": "2A",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "reference_unknown",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": true,
+      "stratum": "gap+"
+    },
+    {
+      "chromosome": "7D",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 4000,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 4000,
+        "reduced_only_in_frozen_demand_bp": 4000,
+        "same": false
+      },
+      "fresh_same_paths": false,
+      "fresh_same_placements": false,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "reference_unknown",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": true,
+      "stratum": "gap-"
+    }
+  ],
+  "decision": "no_unconditional_replacement_observed_local_decision_changed",
+  "evidence": {
+    "common": "b5d5a06289ee8f6602724bb5cc97e65358eebc6805ed00305b18bd6c01616f49",
+    "fixed_readout": "3b4174576f57877f403f9902c317ea9954c03c3bf99944a9db71a30723fb5a62",
+    "fresh_readmission": "f5e773cba2ed82a1460ca8d72666e41d39d01fe9d7687ca3ed6e19c3dbbafb81",
+    "mapping": "a286d106ff57c2e0a00aebe9cabf7bc5c7ec0b9db5b0ecc57445a900b9fb8cdf",
+    "neighborhoods": "bcf5a6370946d0e2dff0557511143eba9cd5a06c196a4a800ae4252e001f4ccd"
+  },
+  "full_over_reduced_mapper_time": 5.288,
+  "geometry": {
+    "full_rows_to_excluded": 377420,
+    "retained_only_full": 6870,
+    "retained_only_reduced": 85844,
+    "retained_shared": 19384
+  },
+  "heldout_old_pair_rows": 44,
+  "included_target_selection_s": null,
+  "limits": "Preregistered short queries, not the retired parents. Timings are single serial-arm measurements on one node, not whole-workflow speedup. Request deltas are per local cohort and must not be summed as whole-wheat totals. A missing frozen junction in both arms is not a successful positive control.",
+  "mapper_s": {
+    "full": 3576.338,
+    "reduced": 676.315
+  },
+  "panel": "8ecec1cd21d0240dad8fe6e9fe8f3cd2d45e0d690f2e3931f404d88bfbc1985c",
+  "questions": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "schema": "wheat_paired_native_control_summary_v1",
+  "shared_prepare_verify_extract_s": 140.127
+}

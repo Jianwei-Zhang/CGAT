@@ -1,6 +1,5 @@
 """Late native fallback: real decision PAFs, whole-matrix provenance and independent repair."""
 from dataclasses import replace
-import pickle
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -13,9 +12,9 @@ from server.tools.lgz_core import q0_admission as adm, q0_preparation as prep
 from server.tools.lgz_core import q0_threshold_prepare as threshold
 from server.tools.lgz_core.common import stable_id
 from server.tools.lgz_core.q0_catalog import CandidateCatalog
-from server.tools.lgz_core.q0_native_frontier import FallbackGate, PHASES, descriptor, omitted, touches, validate_inventory
+from server.tools.lgz_core.q0_native_frontier import CACHE_ONLY, RegionalFallbackCache, prefer_cached_whole, PHASES, descriptor, omitted, touches, validate_inventory
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey, merged_intervals
-from server.tools.lgz_core.q0_threshold_acceptance import ThresholdRepairRequired, audit
+from server.tools.lgz_core.q0_threshold_acceptance import audit
 from server.tools.lgz_core.q0_threshold_questions import questions
 
 
@@ -26,33 +25,21 @@ class NativeFrontierTests(unittest.TestCase):
         self.req={'kind':'partial_source_discovery','query_ids':[self.c.segment_id], 'target_ids':[self.b.segment_id,self.a.segment_id]}
         self.row=descriptor(PHASES[0],self.req['query_ids'],self.req['target_ids'])
 
-    def test_completed_reverse_strand_bridges_refresh_real_selector_then_no_native(self):
-        with TemporaryDirectory() as d:
-            root=Path(d);f=self.f; parts=self.parts; seqs=self.data.sources
-            for source in seqs:
-                name=f'runs/{source.dataset}_vs_ref/result.paf'; p=root/name; p.parent.mkdir(parents=True,exist_ok=True)
-                p.write_text('\n'.join(f.raw.get(name,[]))+'\n')
-            byname={p.source:p.segment_id for p in parts.values()};tasks=[]
-            for i,link in enumerate(f.links):
-                # A completed projected part PAF, not raw window coordinates or chaining.
-                q,t=byname[link.query_source],byname[link.target_source];paf=f'grt/evidence/t{i}/result.paf';p=root/paf;p.parent.mkdir(parents=True)
-                cols=f.raw[link.hit.artifact][link.hit.line_number-1].split('\t');cols[0]=q;cols[5]=t;p.write_text('\t'.join(cols)+'\n')
-                tasks.append({'paf':paf,'query_ids':[q],'target_ids':[t]})
-            initial,have=threshold.initial_questions(root,seqs,f.reference_lengths,[],[])
-            self.assertTrue(initial and have); self.assertTrue(touches(self.row,parts,initial))
-            catalog=CandidateCatalog({'original_connections':[]},seqs,parts)
-            def refresh(completed):
-                with patch.object(threshold,'split_source',side_effect=AssertionError('must reuse indexed sources')):
-                    result=threshold.initial_questions(root,seqs,f.reference_lengths,[],[],existing_catalog=catalog,supplementary=completed)
-                self.assertEqual(result,({},True)); return result
-            gate=FallbackGate(parts,initial,Mock(side_effect=refresh));calls=[]
-            def no_mapper(req,cache_only):
-                calls.append((req,cache_only));self.assertTrue(cache_only);return None
-            self.assertEqual(gate.dispatch(PHASES[0],[self.req],tasks,no_mapper),[])
-            # Same artifact set in the following phase: do not redo graph selection.
-            self.assertEqual(gate.dispatch(PHASES[1],[self.req],tasks,no_mapper),[])
-            self.assertEqual(len(calls),2);gate.refresh.assert_called_once_with(tasks)
-            self.assertEqual(gate.omissions[0],self.row)
+    def test_cache_only_dispatch_keeps_verified_hits_never_executes_a_miss(self):
+        other={**self.req,'query_ids':[self.b.segment_id]}; hit={'paf':'existing'}
+        for phase in PHASES:
+            gate=RegionalFallbackCache(bounded=True); probe=Mock(side_effect=[None,hit])
+            self.assertEqual(gate.dispatch(phase,[self.req,other],probe),[hit]);self.assertEqual(probe.call_count,2)
+            self.assertEqual(gate.omissions,[descriptor(phase,self.req['query_ids'],self.req['target_ids'])])
+            strict=RegionalFallbackCache(bounded=False)
+            with self.assertRaisesRegex(Q0EvidenceError,'automatic whole-source regional fallback is disabled'):
+                strict.dispatch(phase,[self.req],Mock(return_value=None))
+
+    def test_routable_siblings_are_only_superseded_by_complete_matching_native_scope(self):
+        rows=[dict(query_ids=['a'],target_ids=[t]) for t in ('t','u')]; report={}
+        whole=[dict(query_ids=['a','b'],target_ids=['t'])]
+        self.assertEqual(prefer_cached_whole(rows,whole,report),[rows[1],*whole]);self.assertEqual(report['completed_regional_tasks'],1)
+        self.assertIs(prefer_cached_whole(rows,[],{}),rows)
 
     @unittest.skipUnless(shutil.which('minimap2'), 'requires minimap2')
     def test_verified_regional_cache_repairs_draft_before_native_and_ready_reloads(self):
@@ -92,50 +79,56 @@ class NativeFrontierTests(unittest.TestCase):
             self.assertEqual(result.records['chr1'],truth)
             out=prep.json_file(root/receipt['catalog']);self.assertEqual(out['supplementary_alignments'],cached)
             self.assertEqual(out['supplement_scope']['deferred_native_matrices'],[descriptor(PHASES[0],[self.a.segment_id],all_targets)])
-            log,=(root/'grt/evidence/q0_prepare/native_decisions').glob('*.json'); note=prep.json_file(log)
-            self.assertTrue(note['decision_only'] and note['has_path']);self.assertEqual(note['questions'],[])
-            self.assertEqual(note['source_intervals'],[]);self.assertEqual(note['completed_tasks'],2)
-            self.assertEqual(note['input_fingerprint'],receipt['input_fingerprint']);self.assertNotIn(log.relative_to(root).as_posix(),{row['path'] for row in receipt['outputs']})
+            self.assertEqual(out['supplement_scope']['native_fallback_policy'],CACHE_ONLY)
+            self.assertFalse((root/'grt/evidence/q0_prepare/native_decisions').exists())  # No second draft just to decide whether to search.
             with patch.object(prep,'_prepare_evidence_pass',side_effect=AssertionError('valid new ready must be reusable')):
                 self.assertEqual(prep.prepare_evidence(root,threads=1,minimap2=mapper,supplement_scope='positive_threshold'),receipt)
 
-            # Counterfactual control: full mode does execute this unchanged native matrix.
-            # Compare delivered geometry/sequence, not file IDs from different inventories.
+            # A strict request may not publish a false full result or launch the mapper.
             with patch.object(prep,'regional_enabled',return_value=True), patch.object(prep,'partial_source_request',return_value=whole), \
-                 patch.object(prep,'prepare_partial',side_effect=partial), patch.object(prep,'supplemental_groups',return_value=[]):
-                full=prep.prepare_evidence(root,threads=1,minimap2=mapper,supplement_scope='full')
-            fullcat=prep.json_file(root/full['catalog']);self.assertNotIn('supplement_scope',fullcat)
-            natives=[t for t in fullcat['supplementary_alignments'] if t['kind']=='partial_source_discovery']
-            self.assertEqual([(t['query_ids'],t['target_ids']) for t in natives],[([self.a.segment_id],all_targets)])
-            control=adm.construct_q0(adm.load_evidence_input(root));self.assertEqual(control.records,result.records)
-            geom=lambda x:[(v.source,v.interval,v.orientation) for v in x.paths['chr1'].path.slices]
-            self.assertEqual(geom(control),geom(result))
+                 patch.object(prep,'prepare_partial',side_effect=partial), patch.object(prep,'supplemental_groups',return_value=[]), \
+                 patch.object(prep,'_supplement',side_effect=intercept), self.assertRaisesRegex(Q0EvidenceError,'whole-source regional fallback is disabled'):
+                prep.prepare_evidence(root,threads=1,minimap2=mapper,supplement_scope='full')
+            self.assertEqual(prep.load_verified_evidence(root),receipt)
 
-    def test_target_only_full_matrix_and_forced_repair_never_shortlist(self):
-        for need,have in (({self.a.source:(self.a.interval,)},True), (None,True), ({},False)):
-            with self.subTest(need=need,have=have):
-                gate=FallbackGate(self.parts,{},lambda _: (need,have)); call=Mock(side_effect=[None,{'paf':'completed'}])
-                result=gate.dispatch(PHASES[0],[self.req],[{'paf':'real/project'}],call)
-                self.assertEqual(result,[{'paf':'completed'}]); self.assertIs(call.call_args.args[0],self.req)
-                self.assertFalse(call.call_args.args[1]); self.assertFalse(gate.omissions)
-        forced=FallbackGate(self.parts,{},Mock(side_effect=AssertionError('forced original requires no draft')),forced=[self.row['id']]); call=Mock(side_effect=[None,{'paf':'fresh'}]);self.assertTrue(forced.dispatch(PHASES[0],[self.req],[],call))
+    def test_cold_whole_matrix_can_publish_a_bounded_q0_with_its_real_gap_left_open(self):
+        from server.tools.run_outer_checkpoints import OuterCheckpointManager
+        f,_=bridge_fixture(reverse=True);f.links.clear();f.raw={k:v for k,v in f.raw.items() if '_vs_ref/' in k}
+        with TemporaryDirectory() as d:
+            root=f.workspace(d);(root/'metadata/package.tsv').write_text('reads_qc_enabled\nfalse\n')
+            outer=OuterCheckpointManager(root);outer.commit(outer.prepare('q0_chr:chr1','runs/chr_chr1/q0_command.sh'))
+            all_ids=sorted(self.parts); request=dict(kind='partial_source_discovery',query_ids=all_ids,target_ids=all_ids,minimum_uncovered_bp=100)
+            def partial(*args,**kwargs):
+                return [],[self.a.segment_id],dict(frontier_scope=kwargs['regional_frontier'] is not None,
+                    frontier_omitted_windows=0,completed_regional_tasks=0,fallback_sources=[{'segment_id':self.a.segment_id,'reason':'no_reference_targets'}])
+            actual=prep._supplement
+            def only_cache(*args,**kwargs):
+                self.assertTrue(kwargs.get('cache_only'), 'attempted cold native alignment')
+                return actual(*args,**kwargs)
+            tool=str(Path(d)/'q0-fixture-bin/minimap2')
+            with patch.object(prep,'regional_enabled',return_value=True),patch.object(prep,'partial_source_request',return_value=request), \
+                 patch.object(prep,'prepare_partial',side_effect=partial),patch.object(prep,'supplemental_groups',return_value=[]), \
+                 patch.object(prep,'_supplement',side_effect=only_cache):
+                receipt=prep.prepare_evidence(root,threads=1,minimap2=tool,supplement_scope='positive_threshold')
+            self.assertEqual(prep.load_verified_evidence(root),receipt)
+            result=adm.construct_q0(adm.load_evidence_input(root)); acceptance=result.decisions['supplement_acceptance']
+            self.assertFalse(acceptance['alternatives_exhaustive']);self.assertGreater(acceptance['decision_counts']['unproven_join'],0)
+            self.assertEqual(acceptance['decision_counts']['unsearched_whole_source_matrices'],1)
+            self.assertIn('N',result.records['chr1']);self.assertEqual(prep.json_file(root/receipt['catalog'])['supplementary_alignments'],[])
 
-    def test_cache_hits_precede_refresh_original_output_order_preserved(self):
-        other={**self.req,'query_ids':[self.b.segment_id]}; hit={'paf':'warm'};fresh={'paf':'fresh'}
-        refresh=Mock(return_value=(None,True));gate=FallbackGate(self.parts,{},refresh);fn=Mock(side_effect=[None,hit,fresh])
-        self.assertEqual(gate.dispatch(PHASES[1],[self.req,other],[{'paf':'prior'}],fn),[fresh,hit]);refresh.assert_called_once_with([{'paf':'prior'},hit]);self.assertEqual([c.args[1] for c in fn.call_args_list],[True,True,False])
-        refresh.reset_mock();self.assertEqual(gate.dispatch(PHASES[0],[self.req],[],Mock(return_value=hit)),[hit]);refresh.assert_not_called()
-
-    def test_final_consumer_requires_only_newly_exposed_matrix_without_looping(self):
-        data=replace(self.data,pair_links=()); need,_=questions(data,adm.select_q0_paths(data),[]);self.assertTrue(need)
-        exposed=with_scope(data,need); report=exposed.catalog['supplement_scope'];report['deferred_native_matrices']=[self.row]
+    def test_remaining_gaps_stay_unproven_without_forcing_a_native_matrix(self):
+        data=replace(self.data,pair_links=()); selection=adm.select_q0_paths(data); need,expected=questions(data,selection,[])
+        exposed=with_scope(data,need); report=exposed.catalog['supplement_scope'];report.update(deferred_native_matrices=[self.row],native_fallback_policy=CACHE_ONLY)
         exposed=replace(exposed,threshold_scope=replace(exposed.threshold_scope,report_identity=stable_id('threshold-search',report)))
-        with self.assertRaisesRegex(ThresholdRepairRequired,'deferred native') as raised:audit(exposed,adm.select_q0_paths(exposed))
-        self.assertEqual(pickle.loads(pickle.dumps(raised.exception)).native_ids,(self.row['id'],))
-        class StopAfterRepair(Exception):pass
-        with TemporaryDirectory() as d, patch.object(prep,'_readless_package'), patch.object(threshold,'initial_generation',return_value=('id',None,False,need)), patch.object(prep,'_prepare_evidence_pass',side_effect=[({'outputs':[]},None,None),StopAfterRepair]) as dispatch, patch.object(adm,'load_evidence_input',return_value=exposed), self.assertRaises(StopAfterRepair):
-            threshold.prepare(Path(d),1,'unused')
-        self.assertEqual(dispatch.call_args.kwargs['forced_native'],{self.row['id']});self.assertEqual(dispatch.call_args.kwargs['frontier_override'],need);self.assertIsNone(dispatch.call_args.kwargs['fallback_reason'])
+        counts=audit(exposed,selection);self.assertEqual(counts['unproven_join'],expected['unproven_join']);self.assertGreater(counts['unproven_join'],0)
+        self.assertEqual(counts['unsearched_whole_source_matrices'],1)
+        def missing(*args,issue_sink,**kwargs):
+            issue_sink({'kind':'missing_chromosome_part','spans':[[self.a.source.dataset,self.a.source.contig,0,3]]})
+            return {self.a.source:(self.a.interval,)},{}
+        with patch('server.tools.lgz_core.q0_threshold_questions.questions',side_effect=missing),self.assertRaisesRegex(Q0EvidenceError,'required Q0 chromosome'):
+            audit(exposed,selection)
+        del report['native_fallback_policy'];bare=replace(exposed,threshold_scope=replace(exposed.threshold_scope,report_identity=stable_id('threshold-search',report)))
+        with self.assertRaisesRegex(Q0EvidenceError,'unbound deferred'):audit(bare,selection)
 
     def test_optional_issue_list_reproduces_unresolved_intervals_without_changing_decisions(self):
         data=replace(self.data,pair_links=()); chosen=adm.select_q0_paths(data); original=questions(data,chosen,[])
