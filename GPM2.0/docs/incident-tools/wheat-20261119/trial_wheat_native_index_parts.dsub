@@ -1,0 +1,16 @@
+#!/bin/bash
+#DSUB -n jm19_native_part_control
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-46
+#DSUB -R "cpu=32,mem=245760MB"
+#DSUB -o native_parts_%J.out
+set -eo pipefail
+umask 077
+exec 9>control.lock; flock -n 9
+sha256sum --quiet -c kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+# Limit each process to 52 GiB virtual memory (four mappers, 240 GiB allocation).
+ulimit -v $((52 * 1024 * 1024))
+export PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1
+python3 -Bu trial_wheat_native_index_parts.py "$(dirname "$PWD")"
