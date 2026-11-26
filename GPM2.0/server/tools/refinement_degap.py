@@ -21,6 +21,7 @@ try:
     from refinement_path import identity, source_blocks, PathError
     from refinement_sources import FastaCatalog
     from refinement_admission import degap_proposal, degap_family_proposal, exclude_conflicts, preserve_joint_sources
+    from refinement_native_trace import CLOSED_GAP_POLICY, closed_gap_edits
     from refinement_publication import prepare_publication, verify_baseline
     from refinement_tools import validate_runtime, load_lock, verify_directory_links
     from refinement_recipes import make_invocation
@@ -33,6 +34,7 @@ except ModuleNotFoundError:
     from .refinement_path import identity, source_blocks, PathError
     from .refinement_sources import FastaCatalog
     from .refinement_admission import degap_proposal, degap_family_proposal, exclude_conflicts, preserve_joint_sources
+    from .refinement_native_trace import CLOSED_GAP_POLICY, closed_gap_edits
     from .refinement_publication import prepare_publication, verify_baseline
     from .refinement_tools import validate_runtime, load_lock, verify_directory_links
     from .refinement_recipes import make_invocation
@@ -282,6 +284,7 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     rejected += conflicting
     edits, ambiguous = preserve_joint_sources(edits, fasta, catalog, gaps)
     rejected += ambiguous
+    edits, withheld = closed_gap_edits(edits, gaps, catalog, tool="degap")
     edits = materialize_patches(edits, catalog, paths["04_accepted"])
     verify_directory_links(runtime)
     if any(stat_key(path) != expected for path, expected in identities.items()):
@@ -292,6 +295,7 @@ def _stage_degap(root: Path, groups: dict, threads: int, *, run_id: str) -> dict
     execution = {**invocation, "status": "success", "baseline_sha256": recipe["baseline_sha256"],
                  "native_executed": bool(gaps) and not completion["reused"], "native_outcome": "completed" if gaps else "no_remaining_gaps",
                  "skip_reason": None if gaps else "no_remaining_gaps",
+                 "gap_policy": CLOSED_GAP_POLICY, "withheld_candidates": withheld,
                  "recipe": recipe, "native_assembly": native_summary,
                  "artifacts": {native_report.relative_to(root).as_posix(): native_digest, **native_artifacts, **candidate_artifacts}}
     atomic_json(paths["02_jobs"] / "execution.json", execution)

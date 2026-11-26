@@ -4,11 +4,15 @@ from collections import Counter, defaultdict
 import json
 import re
 
+from report_repair_story import repair_stage, output_layout
+from report_structural_story import structural_stage
+from report_terminal_story import terminal_scene
+from report_q0_tracks import bound_tracks, references, snapshot_tracks
 from report_inventory import file_href, obj, physical
 from server_report_io import SCHEMA, timing_summary
 from render_server_report import REPORT_PREVIEW_ROWS
 
-STATS = ("length_bp", "sequence_count", "n50_bp", "n_bp", "gap_bp", "gap_count")
+STATS = ("length_bp", "sequence_count", "n50_bp", "n90_bp", "n_bp", "gap_bp", "gap_count")
 
 
 def _extract_version_tracks(facts, stage_id):
@@ -97,7 +101,214 @@ def safe_name(s):
 
 
 def stats(value):
-    return counts(value, STATS) if isinstance(value, dict) else {}
+    if not isinstance(value, dict):
+        return {}
+    out = counts(value, STATS)
+    if "n90_bp" not in out:
+        seqs = value.get("sequences")
+        if isinstance(seqs, list) and seqs:
+            lens = [
+                r["length_bp"]
+                for r in seqs
+                if isinstance(r, dict) and type(r.get("length_bp")) is int and r["length_bp"] >= 0
+            ]
+            if len(lens) == len(seqs):
+                total = sum(lens)
+                cum = 0
+                n90 = 0
+                for length in sorted(lens, reverse=True):
+                    cum += length
+                    if cum * 10 >= total * 9:
+                        n90 = length
+                        break
+                out["n90_bp"] = n90
+    return out
+
+
+def _parse_provenance_entry(raw):
+    if isinstance(raw, list):
+        return raw[0] if raw and isinstance(raw[0], dict) else {}
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+        except ValueError:
+            return {}
+        if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+            return parsed[0]
+        if isinstance(parsed, dict):
+            return parsed
+    return {}
+
+
+def extract_input_annotations(facts):
+    """Allow-listed telomere rule & centromere reference details; never forwards raw paths."""
+    snap = facts.get("annotation_library_snapshot") or {}
+    snap_tel = {r.get("rule_id"): r for r in (snap.get("tel") or []) if isinstance(r, dict) and r.get("rule_id")}
+    snap_cen = {r.get("cen_id"): r for r in (snap.get("cen") or []) if isinstance(r, dict) and r.get("cen_id")}
+
+    tel_raw = facts.get("telomere_rules") or {}
+    tel_rows = tel_raw.get("rows") if isinstance(tel_raw.get("rows"), list) else []
+    tel_items = []
+    for row in tel_rows:
+        if not isinstance(row, dict):
+            continue
+        rid = str(row.get("rule_id") or "")
+        prov = _parse_provenance_entry(row.get("provenance"))
+        if not prov and rid in snap_tel:
+            entries = snap_tel[rid].get("entries") or []
+            if entries and isinstance(entries[0], dict):
+                prov = entries[0]
+        motif = str(row.get("motif") or (snap_tel.get(rid) or {}).get("motif") or "").strip().upper()
+        try:
+            min_rep = int(row.get("min_repeat"))
+        except (TypeError, ValueError):
+            raw_rep = (snap_tel.get(rid) or {}).get("min_repeat")
+            min_rep = int(raw_rep) if isinstance(raw_rep, int) else None
+        rc_val = str(row.get("reverse_complement", "true")).strip().lower()
+        tel_items.append({
+            "rule_id": rid,
+            "id": str(prov.get("id") or rid or motif),
+            "source": str(prov.get("source") or ""),
+            "motif": motif,
+            "min_repeat": min_rep,
+            "reverse_complement": rc_val not in ("false", "0", "no"),
+            "note": str(prov.get("note") or ""),
+        })
+
+    cen_raw = facts.get("centromere_reference") or {}
+    cen_rows = cen_raw.get("rows") if isinstance(cen_raw.get("rows"), list) else []
+    cen_items = []
+    for row in cen_rows:
+        if not isinstance(row, dict):
+            continue
+        cid = str(row.get("cen_id") or "")
+        prov = _parse_provenance_entry(row.get("provenance"))
+        snap_item = snap_cen.get(cid) or {}
+        if not prov:
+            entries = snap_item.get("entries") or []
+            if entries and isinstance(entries[0], dict):
+                prov = entries[0]
+        raw_len = snap_item.get("length")
+        length_bp = int(raw_len) if isinstance(raw_len, int) and raw_len > 0 else None
+        try:
+            min_len = int(row.get("min_len"))
+        except (TypeError, ValueError):
+            min_len = None
+        min_id = str(row.get("min_identity") or "").strip()
+        cen_items.append({
+            "id": str(prov.get("id") or row.get("sequence_name") or cid),
+            "source": str(prov.get("source") or ""),
+            "chr_name": str(row.get("chr_name") or "*"),
+            "length_bp": length_bp,
+            "min_len": min_len,
+            "min_identity": min_id,
+            "note": str(prov.get("note") or ""),
+        })
+
+    return {
+        "telomere_rules": dict(
+            configured=tel_raw.get("available"),
+            row_count=tel_raw.get("row_count", len(tel_rows)),
+            items=tel_items,
+        ),
+        "centromere_reference": dict(
+            configured=cen_raw.get("available"),
+            row_count=cen_raw.get("row_count", len(cen_rows)),
+            items=cen_items,
+        ),
+    }
+
+
+def assignment_groups(table, reference_order, complete=None):
+    """Preserve the complete run-bound membership; a ctg name is scoped to its assembly."""
+    if not isinstance(table, dict) or table.get("available") is not True or not isinstance(table.get("rows"), list):
+        return None
+    preview = table["rows"]
+    count = table.get("row_count", len(preview))
+    if table.get("preview_only") or count != len(preview):
+        if not isinstance(complete, dict):
+            return None
+        members = ((ds, ctg, chrom) for chrom, datasets in complete.items() for ds, names in datasets.items() for ctg in names)
+    else:
+        members = ((r["dataset_name"], r["seq_name"], r["assigned_chr_name"]) for r in preview)
+    meta = {}
+    for r in preview:
+        if not isinstance(r, dict):
+            continue
+        key = (r.get("dataset_name"), r.get("seq_name"), r.get("assigned_chr_name"))
+        info = {}
+        try:
+            length_val = int(r["seq_length_bp"])
+            if length_val >= 0:
+                info["length_bp"] = length_val
+        except (KeyError, TypeError, ValueError):
+            pass
+        orient = str(r.get("source_orientation") or "").strip()
+        if orient in ("+", "-"):
+            info["orientation"] = orient
+        try:
+            cov = float(r["support_percent"])
+            if 0 <= cov <= 100:
+                info["coverage_percent"] = round(cov, 2)
+        except (KeyError, TypeError, ValueError):
+            pass
+        if info:
+            meta[key] = info
+    groups = {chrom: {} for chrom in reference_order}
+    owners = defaultdict(set)
+    seen = 0
+    for dataset, ctg, chrom in members:
+        seen += 1
+        if not all(safe_name(name) for name in (dataset, ctg, chrom)):
+            raise ValueError("invalid assignment identifier")
+        targets = owners[dataset, ctg]
+        if chrom in targets:
+            raise ValueError("duplicate chromosome assignment")
+        targets.add(chrom)
+        groups.setdefault(chrom, {}).setdefault(dataset, []).append(ctg)
+    if seen != count or any(r["assigned_chr_name"] not in owners.get((r["dataset_name"], r["seq_name"]), ()) for r in preview):
+        raise ValueError("assignment membership does not match the snapshot")
+    return [{"chr": chrom, "member_count": sum(map(len, sources.values())),
+             "sources": [{"dataset": ds, "members": [{"name": ctg, "multi": len(owners[ds, ctg]) > 1, **meta.get((ds, ctg, chrom), {})}
+                                                       for ctg in names]} for ds, names in sources.items()]}
+            for chrom, sources in groups.items()]
+
+
+def extract_unassigned(table):
+    """Allow-listed summary of contigs not assigned to any reference chromosome."""
+    if not isinstance(table, dict) or table.get("available") is not True or not isinstance(table.get("rows"), list):
+        return None
+    rows = table["rows"]
+    count = table.get("row_count", len(rows))
+    if type(count) is not int or count < 0:
+        count = len(rows)
+    items = []
+    for r in rows[:REPORT_PREVIEW_ROWS]:
+        if not isinstance(r, dict):
+            continue
+        ds = r.get("dataset_name")
+        seq = r.get("sequence") or r.get("seq_name")
+        if not safe_name(ds) or not safe_name(seq):
+            continue
+        entry = {"dataset": ds, "name": seq}
+        if type(r.get("length_bp")) is int and r["length_bp"] >= 0:
+            entry["length_bp"] = r["length_bp"]
+        if isinstance(r.get("reason"), str) and r["reason"].strip():
+            entry["reason"] = r["reason"].strip()
+        items.append(entry)
+    return {"count": count, "truncated": count > len(items), "items": items}
+
+
+def recorded_coverage(package):
+    rows = package.get("rows", []) if isinstance(package, dict) else []
+    if len(rows) == 1 and isinstance(rows[0], dict):
+        try:
+            value = float(rows[0]["chr_assignment_min_coverage_percent"])
+        except (KeyError, ValueError, TypeError):
+            return None
+        if 0 <= value <= 100:
+            return value
+    return None
 
 
 def chromosome_rows(final):
@@ -160,6 +371,8 @@ def collect(layout):
     base = layout.relative("report")
     root = layout.root
     errors = []
+    reference_order = []
+    ref_tracks = {}
     out = dict(
         status=None,
         run_id=None,
@@ -167,8 +380,14 @@ def collect(layout):
         href=file_href(root, base + "/report.html"),
         diagnostics=errors,
         inputs={"reference": [], "assemblies": [], "typed_reads": [], "annotations": {}},
+        assignment={"min_coverage_percent": None, "groups": None},
         funnel={},
         q0={},
+        q0_scene=None,
+        step1_scene=None,
+        step2_scene=None,
+        terminal_scene=None,
+        stage_paths={},
         sequence_versions={},
         version_tracks={},
         stage_events={},
@@ -202,12 +421,26 @@ def collect(layout):
         inp = load("inputs.json", run)
         f = inp["facts"]
         datasets = f.get("datasets", [])
+        primary_ds = str((f.get("parameters") or {}).get("grt_primary_dataset") or "").strip()
         for d in datasets:
             if not safe_name(d["name"]) or not safe_name(d["role"]):
                 raise ValueError("invalid dataset")
-            out["inputs"]["reference" if d["role"] == "reference" else "assemblies"].append(
-                dict(name=d["name"], role=d["role"], stats=stats(d.get("stats")))
-            )
+            role = d["role"]
+            if role == "reference":
+                out["inputs"]["reference"].append(dict(name=d["name"], role="reference", stats=stats(d.get("stats"))))
+            else:
+                if role == "assembly_candidate":
+                    is_primary = (d["name"] == primary_ds) if primary_ds else (len(out["inputs"]["assemblies"]) == 0)
+                    role = "primary" if is_primary else "support"
+                out["inputs"]["assemblies"].append(dict(name=d["name"], role=role, stats=stats(d.get("stats"))))
+            if d["role"] == "reference":
+                try:
+                    ref_tracks.update(references(d.get("stats") or {}))
+                except failures:
+                    errors.append("reference: invalid_track_statistics")
+                reference_order.extend(row["sequence"] for row in (d.get("stats") or {}).get("sequences", [])
+                                       if isinstance(row, dict) and safe_name(row.get("sequence")))
+        out["assignment"]["min_coverage_percent"] = recorded_coverage(f.get("package"))
         typed = f.get("typed_reads")
         if typed is None:
             groups = Counter(
@@ -221,11 +454,7 @@ def collect(layout):
             for r in typed
             if r.get("technology") in ("ont", "hifi", "reads") and type(r.get("file_count")) is int
         ]
-        for k in ("telomere_rules", "centromere_reference"):
-            t = f.get(k, {})
-            out["inputs"]["annotations"][k] = dict(
-                configured=t.get("available"), row_count=t.get("row_count", len(t.get("rows", [])))
-            )
+        out["inputs"]["annotations"] = extract_input_annotations(f)
         assemblies = out["inputs"]["assemblies"]
         ns = [a["stats"].get("sequence_count") for a in assemblies]
         out["funnel"]["input_contigs"] = sum(ns) if ns and None not in ns else None
@@ -235,11 +464,16 @@ def collect(layout):
     aligned = {}
     q0 = {}
     donor_summary = {}
+    q0_stats = {}
+    q0_table = None
 
     def versions(facts):
+        nonlocal q0_stats
         for k, v in facts.get("sequence_versions", {}).items():
             if re.fullmatch(r"q[0-4]", k) and v:
                 out["sequence_versions"][k] = stats(v)
+                if k == "q0":
+                    q0_stats = v
 
     try:
         units = m["steps"]
@@ -281,6 +515,30 @@ def collect(layout):
             if rec.get("status") != "success":
                 continue
             versions(facts)
+            if unit in ("step1", "step2", "step3") and rel in stages:
+                version = {"step1":"q1", "step2":"q2", "step3":"q3"}[unit]
+                try:
+                    path = output_layout(facts, version)
+                    if path:
+                        out["stage_paths"][version] = path
+                except failures:
+                    errors.append(f"{unit}: incomplete_output_path")
+            if unit == "step3" and rel in stages:
+                try:
+                    tel_rules = (out["inputs"].get("annotations") or {}).get("telomere_rules", {}).get("items") or []
+                    out["terminal_scene"] = terminal_scene(facts, tel_rules=tel_rules)
+                except failures:
+                    errors.append("step3: invalid_terminal_evidence")
+            if unit == "step2" and rel in stages:
+                try:
+                    out["step2_scene"] = structural_stage(facts)
+                except failures:
+                    errors.append("step2: invalid_structural_evidence")
+            if unit == "step1" and rel in stages:
+                try:
+                    out["step1_scene"] = repair_stage(facts)
+                except failures:
+                    errors.append("step1: invalid_event_coordinates")
             extracted_tracks = _extract_version_tracks(facts, unit)
             if extracted_tracks:
                 out["version_tracks"].update(extracted_tracks)
@@ -288,6 +546,13 @@ def collect(layout):
                 aligned[unit[4:]] = summ["aligned_query_count"]
             if unit == "assign" and facts.get("tables", {}).get("assignments", {}).get("available") is not False:
                 out["funnel"].update(counts(summ, ("assigned_unique_contigs", "unassigned_contigs")))
+                out["assignment"]["groups"] = assignment_groups(
+                    facts.get("tables", {}).get("assignments"), reference_order, facts.get("assignment_members"))
+                unassigned_info = extract_unassigned(facts.get("tables", {}).get("unassigned"))
+                if unassigned_info is not None:
+                    out["assignment"]["unassigned"] = unassigned_info
+            if q0_table is None and unit in ("grt_prepare", "lgz_prepare"):
+                q0_table = facts.get("tables", {}).get("q_segments")
             q0 = facts.get("q0_construction") or q0
             for key in ("donor_sets", "donor_members"):
                 tab = facts.get("tables", {}).get(key, {})
@@ -318,6 +583,7 @@ def collect(layout):
     try:
         final = load("final_summary.json", run)
         versions(final)
+        out["final_fasta_sha256"] = (final.get("sequence_versions", {}).get(final.get("final_q_version")) or {}).get("sha256")
         q0 = final.get("q0_construction") or q0
         out["chromosomes"] = chromosome_rows(final)
         out["outcome"] = counts(final.get("outcome_summary"))
@@ -343,4 +609,13 @@ def collect(layout):
         )
     except failures:
         errors.append("q0: invalid_summary")
+    try:
+        out["q0_scene"] = bound_tracks(layout, q0, ref_tracks, q0_stats)
+        if out["q0_scene"] is None:
+            out["q0_scene"] = snapshot_tracks(q0_table, ref_tracks, q0_stats)
+        if out["q0_scene"] is not None:
+            out["q0_scene_sha256"] = q0_stats.get("sha256")
+    except failures:
+        errors.append("q0 selection: missing_or_invalid_tracks")
+    out["reference_tracks"] = ref_tracks
     return out

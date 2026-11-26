@@ -55,6 +55,31 @@ def _populate_initial(root, layout):
         write_table(path, fields, rows)
 
 
+def replay_frozen_partial(staging, baseline, fasta, catalog, edits, execution):
+    """Rehydrate the ONE pre-closed-only App compatibility fixture, never admit a new partial.
+
+    Public run/paths differ between job layouts and tools. Rebuild local path
+    bindings but require byte-identical delivered bases and original gap ownership.
+    The live admission writer must still reject these edits.
+    """
+    from refinement_publication import write_json, write_table as table
+    from refinement_path import build_final_path,write_assembly
+    frozen=FIXTURE.parents[1]/'refinement_app_v5/controlled_partial.json'
+    expected=json.loads(json.loads(frozen.read_text())['files']['metadata/refinement/provenance.json'])
+    final=build_final_path(baseline,catalog,edits,tool=execution['tool'],recipe_sha256=execution['recipe_sha256'],baseline_artifact_sha256=digest(fasta))
+    if final['baseline']!=expected['baseline'] or [g['gap_id'] for g in final['original_gaps']]!=[g['gap_id'] for g in expected['gap_outcomes']]:
+        raise AssertionError('historical App fixture baseline or original gaps changed')
+    staging.mkdir(parents=True);remaining=[];write_assembly(final,catalog,staging/'assembly.fa',remaining=remaining)
+    if digest(staging/'assembly.fa')!=expected['artifacts']['assembly.fa']:raise AssertionError('not the frozen historical assembly')
+    write_json(staging/'final_path.json',final)
+    table(staging/'sources.tsv',['dataset','contig','length','fasta_path','path_scope','origin','fasta_sha256'],catalog.manifest_rows(final))
+    table(staging/'remaining_gaps.tsv',['chromosome','start','end','original_gap_ids','attribution'],[dict(r,original_gap_ids=json.dumps(r['original_gap_ids'],separators=(',',':'))) for r in remaining])
+    expected.update(tool=execution['tool'],run_id=execution['run_id'],execution=execution,
+        trace_sources=[dict(row,availability='server_audit_artifact') for row in catalog.source_rows({('controlled_native','candidate')})],
+        artifacts={name:digest(staging/name) for name in expected['artifacts']})
+    write_json(staging/'provenance.json',expected);return expected
+
+
 def create(root, *, with_source_evidence=False, with_source_annotations=False, native_diagnostics=None, job_outputs=False,
            tool="degap", reuse_workspace=False, sequence="GTNNAC", project_delivery=False):
     layout = WorkspaceLayout.detect(root) if reuse_workspace else initialize_workspace(root, job_outputs=job_outputs, project_delivery=project_delivery)
@@ -90,7 +115,8 @@ def create(root, *, with_source_evidence=False, with_source_annotations=False, n
                  "recipe": recipe, "recipe_sha256": fingerprint(recipe), "threads": 1, "native_executed": False,
                  "artifacts": {log.relative_to(root).as_posix(): digest(log)}}
     staging = private / "final"
-    provenance = prepare_publication(staging, baseline, fasta, catalog, edits, execution, [])
+    provenance = (replay_frozen_partial(staging, baseline, fasta, catalog, edits, execution) if sequence == "GTNNAC"
+                  else prepare_publication(staging, baseline, fasta, catalog, edits, execution, []))
     atomic_json(jobs / "invocation.json", {"status": "staged", "tool": tool, "run_id": run_id,
                                          "provenance_sha256": digest(staging / "provenance.json")})
     result = {"tool": tool, "run_id": run_id, "staging": str(staging), "provenance": provenance}

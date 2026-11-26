@@ -19,6 +19,14 @@ class RefinedBundleTests(unittest.TestCase):
         cls.root = Path(cls.temporary.name) / "workspace"
         cls.result, cls.full, cls.light = create(cls.root)
 
+    def test_current_publication_rejects_new_partial_even_when_an_adapter_passes_it_through(self):
+        from refinement_path import PathError
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'fresh'
+            with self.assertRaisesRegex(PathError,'incomplete gap'):
+                create(root, sequence='AANC')
+            self.assertFalse(list(root.glob('.runtime/refinement/*/*/final/provenance.json')))
+
     def test_both_modes_keep_the_refined_path_and_real_bridge_sources(self):
         full = validate_payload(self.full, full=True)
         light = validate_payload(self.light, full=False)

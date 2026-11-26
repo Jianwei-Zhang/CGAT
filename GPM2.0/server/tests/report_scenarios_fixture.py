@@ -107,7 +107,9 @@ def workspace(root, scenario):
     )
     records = [
         ("ref:A", {"summary": {"aligned_query_count": n}}),
-        ("assign", {"summary": {"assigned_unique_contigs": n, "unassigned_contigs": 0}}),
+        ("assign", {"summary": {"assigned_unique_contigs": n, "unassigned_contigs": 0},
+                    "tables": {"assignments": {"available": True,
+                               "rows": [{"dataset_name": "A", "seq_name": c, "assigned_chr_name": c} for c in names]}}}),
         (
             "lgz_prepare",
             {
@@ -183,6 +185,7 @@ def workspace(root, scenario):
             head,
             status="success",
             facts={
+                "package": {"rows": [{"chr_assignment_min_coverage_percent": "12.5"}]},
                 "datasets": [dict(name=v, role=r, stats=st) for v, r in [("ref", "reference"), ("A", "primary")]],
                 "typed_reads": [dict(technology="hifi", file_count=1)] if tools else [],
             },

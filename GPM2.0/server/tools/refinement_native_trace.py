@@ -364,7 +364,10 @@ def normalized_edits(tool, traces, baseline, native, gaps, *, native_dataset, na
     return merged, rejected
 
 
-def closed_lr_edits(edits, gaps, catalog):
+CLOSED_GAP_POLICY = "closed_original_gaps_only"
+
+
+def closed_gap_edits(edits, gaps, catalog, *, tool):
     """Decide on original N runs, not individual reads, native rounds or replacement lengths.
 
     Edits are already trace-validated, projected onto the LGZ baseline and normalized.
@@ -380,8 +383,8 @@ def closed_lr_edits(edits, gaps, catalog):
     covered, previous_end = defaultdict(int), {}
     for i, edit in sorted(enumerate(edits), key=lambda pair: (pair[1].chromosome, pair[1].start)):
         chrom = edit.chromosome
-        if edit.tool != "lrgapcloser" or edit.start < previous_end.get(chrom, 0) or edit.end <= edit.start:
-            raise TraceError("invalid or overlapping normalized LR edits")
+        if edit.tool != tool or edit.start < previous_end.get(chrom, 0) or edit.end <= edit.start:
+            raise TraceError("invalid or overlapping normalized gap edits")
         previous_end[chrom] = edit.end
         rows = by_chr[chrom]
         pos = bisect_right(ends.get(chrom, []), edit.start)
@@ -393,7 +396,7 @@ def closed_lr_edits(edits, gaps, catalog):
             links[gap.gap_id].append(i)
             pos += 1
         if not affected or sorted(affected) != sorted(edit.gap_ids):
-            raise TraceError("LR candidate does not identify its original gaps")
+            raise TraceError("gap candidate does not identify its original gaps")
 
     kept, withheld, seen = set(), [], set()
     for gid in links:

@@ -52,13 +52,20 @@ class RefinementOverviewTests(unittest.TestCase):
             with patch.object(overview, "current_publication", return_value={"run_id": run_id, "transaction": "old"}):
                 rendered = overview.render_overview(root, batch, {"degap": result})
             html = Path(rendered["report"]).read_text()
-            self.assertIn("Staged (not published)", html)
-            self.assertIn("等待中", html)
-            self.assertIn("Pending", html)
-            self.assertIn("Not available (pending)", html)
+            # The compact card now shows outcome icons; execution states live
+            # in the inspector payload rather than the old status table.
+            payload = json.loads(html.split('id="auto-gap-data">', 1)[1].split('</script>', 1)[0])
+            self.assertEqual([row[1] for row in payload["tools"]], ["staged", "pending"])
+            self.assertTrue(payload["chr"])
+            for _name, _length, gaps in payload["chr"]:
+                for gap in gaps:
+                    self.assertEqual(gap[3], [["unknown"], ["unknown"]])
+            self.assertIn("Result staged, not published.", html)
+            self.assertIn("Tool has not run.", html)
+            self.assertIn("No verified refined version", html)
             self.assertNotIn("Final FASTA", html)
             self.assertNotIn("Full App package", html)
-            self.assertIn("Attempt diagnostics (workspace)", html)
+            self.assertNotIn('data-version-panel=', html)
             self.assertNotIn('href="02_refinement/01_degap/report.html"', html)
 
     def test_failed_report_retains_logs_without_fabricating_final_files(self):

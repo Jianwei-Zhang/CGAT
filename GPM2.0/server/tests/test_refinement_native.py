@@ -40,6 +40,11 @@ def workspace(root, *, gap=100, name="chr1"):
 @unittest.skipUnless(shutil.which("samtools"), "real samtools indexing required")
 class NativeStageTests(unittest.TestCase):
     def setUp(self):
+        # These fixtures simulate the producer, not subprocess resource collection.
+        self.enterContext(mock.patch(
+            "refinement_native_checkpoint._run_native",
+            side_effect=lambda *args, **kwargs: (subprocess.run(*args, **kwargs).returncode, None),
+        ))
         launcher = mock.patch("refinement_native_checkpoint.launch", side_effect=lambda root, invocation, *args: (invocation.command, None))
         launcher.start()
         self.addCleanup(launcher.stop)

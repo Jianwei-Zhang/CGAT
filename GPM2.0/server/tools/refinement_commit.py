@@ -321,6 +321,7 @@ def publish_result(root, lock, result, report, delivery, validate_delivery):
     ensure_directory(private / "prepared")
     ensure_directory(private / "previous")
     journal = {"schema": SCHEMA, "schema_version": 1, "transaction": transaction, "tool": tool, "run_id": run_id,
+               "server_final_directory": str(layout.path("05_final")),
                "state": "preparing", "previous_pointer": prior_pointer, "delivery_validation": proof, "areas": {}}
     for area in AREAS:
         expected = inventory(source[area])
@@ -331,6 +332,9 @@ def publish_result(root, lock, result, report, delivery, validate_delivery):
             if not matches(private / "prepared" / area, expected) or not matches(source[area], expected):
                 raise PublicationError("publication staging changed during preparation")
             sync_tree(private / "prepared" / area)
+        if area=="final":
+            st=((current[area] if unchanged else private/"prepared"/area)/"assembly.fa").stat()
+            journal["fasta_stat"]=[st.st_size,st.st_mtime_ns]
         journal["areas"][area] = {"new": expected, "previous": old, "unchanged": unchanged}
         ensure_directory(current[area].parent)
     layout_and_lock(root, lock)

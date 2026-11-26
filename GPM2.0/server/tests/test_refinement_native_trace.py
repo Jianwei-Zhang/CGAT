@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from server.tools import refinement_path as paths
-from server.tools.refinement_native_trace import closed_lr_edits, retained, inserted, normalized_edits, verify_trace, trace_slice, TraceError
+from server.tools.refinement_native_trace import closed_gap_edits, retained, inserted, normalized_edits, verify_trace, trace_slice, TraceError
 from server.tools import refinement_native_formats as native_formats
 from server.tools.refinement_native_formats import ReadLookup, parse_lr_rows, apply_lr_round, parse_quartet
 from server.tools.refinement_reads import prepare_fasta
@@ -67,7 +67,7 @@ class NativeTraceTests(unittest.TestCase):
         edits = [edit("a1", 1, 2, 1, 1, 0), edit("a2", 2, 3, 2, 2, 0),
                  edit("b", 5, 7, 0, 0, 1), edit("c1", 9, 10, 2, 2, 2),
                  edit("c2", 10, 11, 4, 5, 2), edit("d", 13, 14, 1, 1, 3)]
-        applied, withheld = closed_lr_edits(edits, gaps, catalog)
+        applied, withheld = closed_gap_edits(edits, gaps, catalog, tool="lrgapcloser")
         self.assertEqual([e.edit_id for e in applied], ["a1", "a2", "b"])
         self.assertEqual([g["residual_n_bp"] for g in withheld], [1, 1])
         final = paths.build_final_path(payload, catalog, applied, tool="lrgapcloser",
@@ -76,14 +76,28 @@ class NativeTraceTests(unittest.TestCase):
                                  for v in paths.segment_blocks(seg, catalog)), b"AACAAAANNAANNAANNAA")
         # A joint edit covers one gap and part of another; neither it nor a
         # second edit connected through that gap may leak into the delivered path.
-        kept, held = closed_lr_edits([edit("joint", 1, 6, 1, 1, 0, 1), edit("c", 9, 11, 1, 1, 2)], gaps, catalog)
+        kept, held = closed_gap_edits([edit("joint", 1, 6, 1, 1, 0, 1), edit("c", 9, 11, 1, 1, 2)], gaps, catalog, tool="lrgapcloser")
         self.assertEqual([e.edit_id for e in kept], ["c"])
         self.assertEqual(set(held[0]["gap_ids"]), {g.gap_id for g in gaps[:2]})
-        kept, held = closed_lr_edits([edit("joint", 1, 6, 1, 1, 0, 1), edit("end", 6, 7, 5, 5, 1)], gaps, catalog)
+        kept, held = closed_gap_edits([edit("joint", 1, 6, 1, 1, 0, 1), edit("end", 6, 7, 5, 5, 1)], gaps, catalog, tool="lrgapcloser")
         self.assertEqual(kept, [])
         self.assertEqual(len(held[0]["edits"]), 2)
         with self.assertRaisesRegex(TraceError, "original gaps"):
-            closed_lr_edits([edit("undeclared", 1, 6, 1, 1, 0)], gaps, catalog)
+            closed_gap_edits([edit("undeclared", 1, 6, 1, 1, 0)], gaps, catalog, tool="lrgapcloser")
+
+    def test_closed_only_is_tool_independent_including_new_adapters(self):
+        catalog, _, gaps, _, _ = self.setup_case("AANNCCNNGG", "ANT")
+        for tool in ("degap", "quartet", "tgsgapcloser", "lrgapcloser", "future_adapter"):
+            with self.subTest(tool=tool):
+                def proposal(key, gap, replacement):
+                    return paths.Edit(key, tool, "chr1", gap.start, gap.end, replacement,
+                                      (gap.gap_id,), "job", {})
+                incomplete = proposal("partial", gaps[0], source("native", "chr1", 1, 2))
+                direct_join = proposal("overlap", gaps[1], None)
+                kept, held = closed_gap_edits([incomplete, direct_join], gaps, catalog, tool=tool)
+                self.assertEqual(kept, [direct_join])
+                self.assertEqual(held[0]["gap_ids"], [gaps[0].gap_id])
+                self.assertEqual(held[0]["residual_n_bp"], 1)
 
     def test_joint_native_edit_retains_a_unique_unchanged_internal_island(self):
         data = self.setup_case("AANNCCNNGG", "AATCCAGG")

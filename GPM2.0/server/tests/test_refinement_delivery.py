@@ -52,9 +52,9 @@ class RefinedDeliveryTests(unittest.TestCase):
                 self.assertIsNotNone(summary["tools"][0]["publication_transaction"])
                 overview = (root / "06_report/report.html").read_text()
                 for row in archives.values():
-                    self.assertIn("../07_delivery/01_degap/" + row["file"], overview)
-                self.assertIn("../05_final/01_degap/assembly.fa", overview)
-                self.assertIn('href="02_refinement/01_degap/report.html"', overview)
+                    self.assertNotIn('href="../07_delivery/01_degap/' + row["file"], overview)
+                self.assertIn(f'data-copy="{root}/05_final/01_degap/assembly.fa"', overview)
+                self.assertNotIn('href="02_refinement/01_degap/report.html"', overview)
                 self.assertNotIn('../04_refinement/01_degap', overview)
                 self.assertEqual(digest(root / "06_report/02_refinement/01_degap/report.html"),
                                  digest(Path(report["report"])))

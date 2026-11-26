@@ -30,6 +30,74 @@ class Q0ReportTests(unittest.TestCase):
         self.root = self.directory / "workspace"
         materialize(json.loads(FIXTURE.read_text()), self.root)
 
+    def test_assignment_capture_preserves_members_beyond_portable_audit_preview(self):
+        from server_report_collect import collect_assignment
+        from render_server_report import project_report_facts
+        from report_lgz_data import assignment_groups
+        names = [f"ctg{i}" for i in range(230)]
+        target = self.root / "metadata/chr_assignments.tsv"
+        target.write_text("dataset_name\tseq_name\tassigned_chr_name\n" +
+                          "".join(f"A\t{name}\tchr1\n" for name in names) + "A\tctg229\tchr2\n")
+        snap = project_report_facts(collect_assignment(self.root, {}))
+        tab = snap["tables"]["assignments"]
+        self.assertEqual(len(tab["rows"]), REPORT_PREVIEW_ROWS)
+        groups = assignment_groups(tab, ["chr1", "chr2"], snap["assignment_members"])
+        self.assertEqual(groups[0]["member_count"], 230)
+        self.assertTrue(groups[1]["sources"][0]["members"][0]["multi"])
+        self.assertIsNone(assignment_groups(tab, []))  # An unbound historical preview is not complete.
+
+    def test_overview_q0_scene_uses_bound_selection_and_shared_axis(self):
+        from report_lgz_data import collect
+        from render_path_story import q0_card
+        from workspace_layout import WorkspaceLayout
+        layout = WorkspaceLayout.detect(self.root)
+        session = ReportSession(self.root, [], "q0-story-contract")
+        rel = "steps/001.json"
+        from render_server_report import project_report_facts
+        write_json(session.report / rel, {"schema_version": SCHEMA, "run_id": session.run_id,
+                   "stage_id": "grt_prepare", "status": "success", "facts": project_report_facts(collect_lgz_inputs(self.root))})
+        session.manifest["steps"] = [rel]
+        session.save()
+        write_json(session.report / "final_summary.json", final_summary(self.root, session.report))
+        data = collect(layout)
+        first, second = data["q0_scene"]
+        self.assertEqual((first["length_bp"], second["length_bp"]), (5000, 3737))
+        self.assertEqual([(p["source_start"],p["source_end"],p["strand"]) for p in first["parts"]],
+                         [(0, 2000, "+"), (200, 1000, "-"), (200, 2400, "+")])
+        self.assertEqual(first["bands"][1], {"q": 2000, "ref": 2000, "bp": 800, "via": "reference"})
+        self.assertEqual(second["parts"][1], {"start": 1700, "end": 1837, "kind": "input_assembly_gap"})
+        self.assertEqual(len(second["bands"]), 1)  # input adjacency is not a ref match
+        page = q0_card(data)
+        self.assertIn('class="q0-mark input-gap" style="left:34%;width:2.74%"', page)
+        self.assertEqual(page.count('<polygon '), 4)
+        selection = self.root / "metadata/grt_q0_selection.json"
+        selection.write_text(selection.read_text() + "\n")
+        mismatch = collect(layout)
+        self.assertIsNone(mismatch["q0_scene"])
+        self.assertIn("q0 selection: missing_or_invalid_tracks", mismatch["diagnostics"])
+        selection.unlink()
+        old = collect(layout)["q0_scene"]
+        self.assertTrue(all(t["status"] == "layout_only" and not t["bands"] for t in old))
+        self.assertEqual(old[1]["parts"][1]["kind"], "unspecified_gap")
+
+    def test_reverse_partial_anchor_and_unknown_join(self):
+        from report_q0_tracks import project
+        doc = json.loads((self.root / "metadata/grt_q0_selection.json").read_text())["construction"]
+        path = doc["searches"]["chr1"]["path"]
+        placement = next(p for p in doc["placements"] if p["placement_id"] == path["slices"][1]["placement_id"])
+        # Clipping [0,600) to the retained [200,1000) on both negative-strand mappings.
+        block = placement["reference_blocks"][0]
+        block.update(source={"start":0,"end":600}, reference={"start":2400,"end":3000})
+        path["joins"][0].update(kind="reference_unknown", n_bp=100)
+        doc["searches"]["chr2"]["path"] = None
+        next(r for r in doc["chromosomes"] if r["chromosome"] == "chr2")["status"] = "not_constructed"
+        refs = {k:{"length_bp":5000,"gaps":[]} for k in ("chr1", "chr2")}
+        t, other = project(doc, refs)
+        self.assertEqual(t["bands"][1], {"ref":2400, "q":2500, "bp":400, "via":"reference"})
+        self.assertEqual(t["parts"][1], {"start":2000,"end":2100,"kind":"reference_unknown"})
+        self.assertIsNone(other["length_bp"])
+        self.assertEqual(other["status"], "not_constructed")
+
     def test_selected_sources_original_n_and_overlap_are_distinct(self):
         result = collect_q0_decisions(self.root)
         summary = result["summary"]

@@ -72,7 +72,7 @@ def local_path(root: Path, relative: str) -> Path:
     return path
 
 
-def fasta_stats(path: Path) -> dict | None:
+def fasta_stats(path: Path, *, gap_positions=False) -> dict | None:
     """Stream FASTA; N runs span physical lines. Never retain whole sequences."""
     if not path.is_file():
         return None
@@ -80,20 +80,24 @@ def fasta_stats(path: Path) -> dict | None:
     current = None
     n_run = 0
 
-    def finish_gap():
+    def finish_gap(end):
         nonlocal n_run
         if current is not None and n_run >= 100:
             current["gap_count"] += 1
             current["gap_bp"] += n_run
+            if gap_positions:
+                current["gap_intervals"].append([end - n_run, end])
         n_run = 0
 
     with path.open(encoding="ascii") as handle:
         for raw in handle:
             if raw.startswith(">"):
-                finish_gap()
+                finish_gap(current["length_bp"] if current else 0)
                 name = raw[1:].split()[0]
                 current = {"sequence": name, "length_bp": 0, "n_bp": 0,
                            "gap_count": 0, "gap_bp": 0}
+                if gap_positions:
+                    current["gap_intervals"] = []
                 records.append(current)
                 continue
             sequence = "".join(raw.split()).upper()
@@ -101,14 +105,15 @@ def fasta_stats(path: Path) -> dict | None:
                 continue
             if current is None:
                 raise ValueError(f"FASTA sequence has no header: {path}")
+            offset = current["length_bp"]
             current["length_bp"] += len(sequence)
             current["n_bp"] += sequence.count("N")
             for match in re.finditer(r"N+|[^N]+", sequence):
                 if match[0][0] == "N":
                     n_run += len(match[0])
                 else:
-                    finish_gap()
-    finish_gap()
+                    finish_gap(offset + match.start())
+    finish_gap(current["length_bp"] if current else 0)
     lengths = sorted((row["length_bp"] for row in records), reverse=True)
     total = sum(lengths)
     cumulative = 0
@@ -172,10 +177,17 @@ def timing_summary(layout, records):
                 secs = None
         except (ValueError, TypeError):
             secs = None
+        rss_mb = rt.get('peak_rss_mb')
+        try:
+            rss_mb = float(rss_mb) if rss_mb not in (None, '') else None
+            if rss_mb is not None and not 0 < rss_mb < float('inf'):
+                rss_mb = None
+        except (ValueError, TypeError):
+            rss_mb = None
         row = dict(unit=unit, stage=stage, output_directory=directory, status=status,
                    execution=('failed' if status in ('failed', 'interrupted') else execution if execution in
                               ('computed', 'cache_reused', 'frozen_original_lgz') else 'pending'),
-                   elapsed_seconds=secs, started_at=rt.get('started_at') or None,
+                   elapsed_seconds=secs, peak_rss_mb=rss_mb, started_at=rt.get('started_at') or None,
                    ended_at=rt.get('ended_at') or None, exit_code=rt.get('exit_code') or None,
                    parallel_group=group, reason=(record.get('not_executed_reason') or
                         (record.get('failure_reason')[:500] if isinstance(record.get('failure_reason'),str) and '/' not in record['failure_reason'] and '\\' not in record['failure_reason'] else None) or
@@ -188,12 +200,16 @@ def timing_summary(layout, records):
         starts = [r['started_at'] for r in rows if r['started_at']]
         ends = [r['ended_at'] for r in rows if r['ended_at']]
         seconds = [r['elapsed_seconds'] for r in rows if r['elapsed_seconds'] is not None]
+        rss_vals = [r['peak_rss_mb'] for r in rows if r['peak_rss_mb'] is not None]
         try:
             span = (max(map(datetime.fromisoformat, ends))-min(map(datetime.fromisoformat, starts))).total_seconds()
         except (ValueError, TypeError):
             span = None
         return dict(id=key, unit_count=len(rows), measured_unit_count=len(seconds), unit_seconds=sum(seconds) if seconds else None,
+                    peak_rss_mb=max(rss_vals) if rss_vals else None,
                     observed_span_seconds=span, statuses=dict(Counter(r['status'] for r in rows)),
                     executions=dict(Counter(r['execution'] for r in rows)))
-    return {'units': units, **{name: [aggregate(key, rows) for (kind,key),rows in groups.items() if kind == want]
-                              for name,want in [('stages','stage'), ('parallel_groups','parallel')]}}
+    all_rss = [r['peak_rss_mb'] for r in units if r['peak_rss_mb'] is not None]
+    return {'units': units, 'peak_rss_mb': max(all_rss) if all_rss else None,
+            **{name: [aggregate(key, rows) for (kind,key),rows in groups.items() if kind == want]
+               for name,want in [('stages','stage'), ('parallel_groups','parallel')]}}

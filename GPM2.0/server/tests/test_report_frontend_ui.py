@@ -90,37 +90,187 @@ class ReportFrontendUITests(unittest.TestCase):
                 self.assertIn('data-lang-btn="zh"', html)
                 self.assertIn('data-lang-btn="en"', html)
                 self.assertIn('data-theme-toggle="1"', html)
-                self.assertIn('class="wb-sidebar"', html)
-                self.assertIn('id="improvement-overview"', html)
-                self.assertIn('id="pseudomolecule-evolution"', html)
-                self.assertIn('id="inputs"', html)
-                self.assertIn('id="alignment-q0"', html)
-                self.assertIn('id="lgz-baseline"', html)
-                self.assertIn('id="refinement-comparison"', html)
-                self.assertIn('id="result-files"', html)
-                self.assertIn('id="diagnostics-fold"', html)
-                self.assertIn("LGZ 基线（非精修结果）", html)
-                self.assertIn('id="ws-tree"', html)
-                self.assertIn('data-tree-action="expand"', html)
+                self.assertNotIn('class="wb-sidebar"', html)
+                self.assertNotIn('id="improvement-overview"', html)
+                self.assertNotIn('id="pseudomolecule-evolution"', html)
+                self.assertEqual('id="inputs"' in html, scenario!='manual')
+                self.assertEqual('id="alignment-q0"' in html, scenario!='manual')
+                self.assertEqual('id="manual-refinement"' in html,scenario=='manual')
+                self.assertEqual('id="auto-refinement"' in html, bool(vm['refinement_summary']['tools']))
+                self.assertNotIn('id="result-files"', html)
+                self.assertNotIn('id="diagnostics-fold"', html)
+                self.assertNotIn('id="ws-tree"', html)
+                self.assertNotIn('data-tree-action="expand"', html)
                 self.assertNotIn(PRIVATE, html)
                 if scenario == "success":
-                    self.assertIn('class="ideo-seg ideo-gap-link', html)
-                    self.assertIn('class="gap-job-chip', html)
-                    self.assertIn('target="_blank"', html)
+                    self.assertIn('id="auto-gap-inspector"', html)
+                    self.assertNotIn('class="gap-job-chip', html)
                 # Ensure top-level directory tree nodes start collapsed (not <details class="tree-node" open>)
                 self.assertNotRegex(html, r'<details class="tree-node[^"]*"\s+open\b')
+
+    def test_input_and_assignment_cards_are_first_and_preserve_complete_membership(self):
+        from report_lgz_data import assignment_groups
+        from render_path_story import assignment_card
+        root = self.parent / "story"
+        vm = workspace(root, "success")
+        model = vm["lgz_summary"]["assignment"]
+        self.assertEqual(model["min_coverage_percent"], 12.5)
+        self.assertEqual([group["chr"] for group in model["groups"]], ["chr1", "chr2"])
+        html = render_overview(vm)
+        self.assertLess(html.index('id="inputs"'), html.index('id="chr-groups"'))
+        self.assertLess(html.index('id="chr-groups"'), html.index('id="auto-refinement"'))
+        self.assertIn('id="assembly-overview"', html)
+        self.assertLess(html.index('id="assembly-overview"'), html.index('id="inputs"'))
+        self.assertIn('id="ov-stage-data"', html)
+        self.assertIn('class="ov-track-frame" data-zoom-frame="1"', html)
+        self.assertIn('<details class="ov-chr-row"', html)
+        self.assertIn('aria-label="Gap trajectory"', html)
+        self.assertIn('aria-label="Contig continuity"', html)
+        self.assertIn('aria-label="Completeness gauges"', html)
+        self.assertIn('aria-label="Chromosome coverage"', html)
+        self.assertIn('--text-card:15px', html)
+        self.assertIn('--svg-label:9.5px', html)
+        # Verify clickable runtime detail modal renders duration, timeline and peak RSS charts when present
+        vm["lgz_summary"]["timing"] = {
+            "peak_rss_mb": 2048.0,
+            "units": [
+                {"unit": "ref:A", "stage": "alignment", "status": "success", "execution": "computed",
+                 "elapsed_seconds": 42.0, "peak_rss_mb": 1024.0,
+                 "started_at": "2026-11-26T10:00:00+08:00", "ended_at": "2026-11-26T10:00:42+08:00"},
+                {"unit": "refinement", "stage": "refinement", "status": "success", "execution": "computed",
+                 "elapsed_seconds": 120.0, "peak_rss_mb": 2048.0,
+                 "started_at": "2026-11-26T10:00:42+08:00", "ended_at": "2026-11-26T10:02:42+08:00"},
+            ],
+        }
+        vm["refinement_summary"]["tools"][0]["timing"] = {
+            "elapsed_seconds": 75.0, "native_seconds": 70.0, "peak_rss_mb": 2048.0,
+            "started_at": "2026-11-26T10:00:42+08:00", "ended_at": "2026-11-26T10:01:57+08:00",
+        }
+        vm["refinement_summary"]["tools"][1]["timing"] = {
+            "elapsed_seconds": 40.0, "native_seconds": 36.0, "peak_rss_mb": 1024.0,
+            "started_at": "2026-11-26T10:01:58+08:00", "ended_at": "2026-11-26T10:02:38+08:00",
+        }
+        vm["manual_summary"]["batches"] = [{
+            "batch_sha256": "a" * 64, "report_status": "no_patch", "result_counts": {},
+            "tool_timing": {"degap": {"elapsed_seconds": 30.0, "peak_rss_mb": 512.0}},
+        }]
+        html_rt = render_overview(vm)
+        self._assert_offline_safe(html_rt, expect_single_main=True)
+        self.assertIn('data-story-open="ov-runtime-modal"', html_rt)
+        self.assertIn('<template id="ov-runtime-modal"', html_rt)
+        self.assertIn('aria-label="Unit duration breakdown"', html_rt)
+        self.assertIn('aria-label="Peak memory breakdown"', html_rt)
+        self.assertIn('aria-label="Execution timeline"', html_rt)
+        self.assertIn('refine:DEGAP', html_rt)
+        self.assertIn('refine:TGS-GapCloser', html_rt)
+        self.assertIn('manual:DEGAP', html_rt)
+        self.assertIn('2.00 GB', html_rt)
+        self.assertEqual(html.count('id="inputs"'), 1)
+        self.assertIn("12.5%", html)
+        def row(ds, ctg, chrom):
+            return dict(dataset_name=ds, seq_name=ctg, assigned_chr_name=chrom)
+        rows = [row("A", f"ctg{i}", "chr1") for i in range(202)]
+        rows.extend([row("A", "ctg201", "chr2"), row("B", "ctg201", "chr1"), row("B", "<unsafe>", "chr2")])
+        groups = assignment_groups(dict(rows=rows, available=True), ["chr2", "chr1", "empty"])
+        self.assertEqual([g["member_count"] for g in groups], [2, 203, 0])
+        page = assignment_card({"groups": groups})
+        self.assertEqual(page.count('class="member multi"'), 2)
+        self.assertIn('for="multi-members-only"', page)
+        self.assertIn("&lt;unsafe&gt;", page)
+        self.assertIn("本次阈值未记录", page)
+        self.assertNotIn("<unsafe>", page)
+        for table in ({"available": False}, {"available": True, "rows": rows, "preview_only": True},
+                      {"available": True, "rows": [], "row_count": 1}):
+            self.assertIsNone(assignment_groups(table, ["chr1"]))
+
+    def test_first_repair_keeps_unchanged_chr_and_multiple_local_events_in_one_modal(self):
+        from copy import deepcopy
+        from render_repair_story import repair_card, DIALOG
+        from render_refinement_report import workbench_page
+        from report_repair_story import repair_stage
+        h0, h1 = "a" * 64, "b" * 64
+        def record(sha, size):
+            return {"sha256":sha,"sequences":[{"sequence":"chr1","length_bp":size},{"sequence":"chr2","length_bp":50}]}
+        def edit(eid, start):
+            return {"event_id":eid,"stage":"step1","chr":"chr1","status":"accepted","action":"patch","reason":"selected",
+                    "q_before":{"version":"q0","sha256":h0,"start":start,"end":start+9},
+                    "q_after":{"version":"q1","sha256":h1,"start":start,"end":start+9},
+                    "source":{"dataset":"A","contig":"ctg<1>","start":11,"end":20,"orientation":"-"}}
+        facts = {"result":{"stage":"step1","q_input_version":"q0","q_output_version":"q1","q_input_sha256":h0,"q_output_sha256":h1,
+                           "events":[edit("first",20),edit("later",50)]},
+                 "sequence_versions":{"q0":record(h0,100),"q1":record(h1,100)}}
+        scene = repair_stage(facts)
+        self.assertEqual([len(row["events"]) for row in scene], [2,0])
+        page = workbench_page("报告", "Report", repair_card({"inputs":{"assemblies":[]},"step1_scene":scene}) + DIALOG)
+        self._assert_offline_safe(page, expect_single_main=True)
+        self.assertEqual(page.count('<dialog id="path-event-dialog"'), 1)
+        self.assertEqual(page.count('<template id="step1-inspect-'), 2)
+        self.assertIn("未改动", page)
+        self.assertIn("ctg&lt;1&gt;", page)
+        self.assertNotIn("<polygon", page)  # no recorded anchors
+        incomplete = deepcopy(facts)
+        incomplete["result"]["report_array_counts"] = {"events":3}
+        self.assertIsNone(repair_stage(incomplete))
+        foreign = deepcopy(facts)
+        foreign["result"]["events"][1]["q_before"]["sha256"] = h1
+        with self.assertRaisesRegex(ValueError, "coordinate space"):
+            repair_stage(foreign)
+
+    def test_structural_outcomes_do_not_invent_inserted_patches(self):
+        from report_structural_story import _detail
+        from render_repair_story import structural_detail
+        base = {"event_id":"e","action":"replace","reason":"supported","q_before":{"start":1,"end":100},"status":"accepted"}
+        overlap = _detail({**base,"junction":{"direct_overlap_bp":19542,"support_sequence_inserted":False,
+                        "left_source":{"contig":"a"},"right_source":{"contig":"b"}}},{})
+        gap = _detail({**base,"edit":{"replacement_kind":"gap","replacement_length":100},
+                            "source":{"dataset":"guide","contig":"not-an-insert"}},{})
+        self.assertNotIn("source",gap);self.assertIn("100 N",structural_detail(gap))
+        self.assertIn("19,542 bp",structural_detail(overlap)); self.assertNotIn("source",overlap)
+        protected = _detail({**base,"action":"filter_component","status":"rejected","edit":{"operation":"retain_components",
+            "kept_intervals":[[1,600]],"removed_intervals":[[1,50]],"q0_protection":{"retained_components":[[300,400]]}}},{})
+        page=structural_detail(protected); self.assertIn("受保护",page);self.assertIn("未采用移除",page)
+        self.assertEqual(protected["protected"],[[299,400]])
+
+    def test_terminal_view_does_not_conflate_failed_hits_missing_or_empty_paf(self):
+        import hashlib, json
+        from report_terminal_story import _alignments
+        from render_terminal_story import _inspection
+        from workspace_layout import WorkspaceLayout
+        layout=WorkspaceLayout.detect(self.parent)
+        file=self.parent/"candidate.paf"
+        row={"candidate_id":"test","source_dataset":"A","source_contig":"ctg","chr":"Chr1","terminal":"3prime",
+             "extract_source_start":"1","extract_source_end":"5000"}
+        ev={"target_chr":"Chr1","source_dataset":"A","source_contig":"ctg","coordinate_system":"paf_0_based_half_open",
+            "raw_artifact_relpath":"candidate.paf","parameters_json":json.dumps({"min_identity":.99,"min_overlap":3000,"min_mapq":20})}
+        def measure(paf):
+            file.write_bytes(paf);sha=hashlib.sha256(paf).hexdigest();ev["raw_artifact_sha256"]=sha
+            return _alignments(layout,{"candidate.paf":sha},row,ev,15000,{"alignment_query_window":5000})
+        c={"status":"rejected","id":"test","name":"ctg","dataset":"A","strand":"+","source":[0,5000],"signals":[],"event":None,
+           "reason":"no_high_stringency_terminal_overlap"}
+        end={"count":1,"state":"unresolved","q2_signals":[],"q3_signals":[],"window":[13000,15000],"selected":None,"candidates":[c]}
+        c["alignment"]=measure(b"test\t5000\t0\t2400\t+\tChr1__3prime__q2\t5000\t100\t2500\t2400\t2400\t60\n"
+                               b"test\t5000\t0\t4000\t+\tChr1__3prime__q2\t5000\t0\t4000\t4000\t4000\t10\n")
+        self.assertEqual([x["failed"] for x in c["alignment"]["hits"]],[["overlap"],["mapq"]]);self.assertEqual(c["alignment"]["hits"][0]["q2"],[10100,12500])
+        html=_inspection(end,"3prime",15000)
+        self.assertIn("2,400 bp &lt; 3,000 bp",html);self.assertIn("MAPQ 10 &lt; 20",html)
+        c["alignment"]=measure(b"");self.assertIn("已核对的 PAF 无匹配记录",_inspection(end,"3prime",15000))
+        c["alignment"]=None;self.assertNotIn("PAF 无匹配记录",_inspection(end,"3prime",15000))
+        self.assertIn("本次未记录",_inspection(None,"3prime",15000))
+        present={**end,"state":"already_present","count":0,"candidates":[],"q2_signals":[[14700,15000]]}
+        view=_inspection(present,"3prime",15000)
+        self.assertIn("原已具备端粒",view);self.assertNotIn("候选 PAF",view);self.assertNotIn("<polygon",view)
 
     def test_large_scenario_stays_bounded_and_preserves_full_chromosome_heatmap(self):
         root = self.parent / "large"
         vm = workspace(root, "large")
         html = render_overview(vm)
         self._assert_offline_safe(html, expect_single_main=True)
-        # 21 chromosomes x 16 gaps = 336 original gaps; preview capped at 200 rows
-        self.assertEqual(html.count('data-states="'), 200)
-        self.assertIn("200", html)
-        self.assertIn("336", html)
-        self.assertIn("chr21", html)
-        self.assertIn("gap_comparison.tsv", html)
+        # All 336 loci, not a table/sample of 200; one shared inspector.
+        data = json.loads(re.search(r'<script type="application/json" id="auto-gap-data">(.*?)</script>', html).group(1))
+        self.assertEqual(sum(len(c[2]) for c in data['chr']), 336)
+        self.assertEqual(data['chr'][-1][0], 'chr21')
+        self.assertEqual(html.count('id="auto-gap-inspector"'), 1)
+        self.assertNotIn('data-states="', html)
         self.assertLess(len(html.encode("utf-8")), 350_000)
 
     def test_detached_regeneration_all_pages_pass_security_boundary(self):
@@ -130,9 +280,9 @@ class ReportFrontendUITests(unittest.TestCase):
         regenerate(root, out)
         overview_html = (out / "report.html").read_text(encoding="utf-8")
         self._assert_offline_safe(overview_html, expect_single_main=True)
-        self.assertIn("独立便携副本说明", overview_html)
+        self.assertIn("Workspace-relative path", overview_html)
         self.assertIn("data-copy=", overview_html)
-        self.assertIn("compact_refinement.py", overview_html)
+        self.assertNotIn("compact_refinement.py", overview_html)
         self.assertNotIn("../07_delivery", overview_html)
         for html_file in out.rglob("*.html"):
             if "native_visualization" in html_file.parts:

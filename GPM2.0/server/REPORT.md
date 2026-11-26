@@ -1,9 +1,6 @@
 # Server reports
 
-In the current numbered workspace, start at `06_report/report.html`. This page
-links the original LGZ process report (`06_report/01_lgz/`), per-tool refinement
-reports (`06_report/02_refinement/<tool>/`) and current-batch comparison
-(`06_report/03_comparison/<batch>/`). The directory contract below describes the
+In the current numbered workspace, start at `06_report/report.html`. This page explains how the delivered sequence was assembled. The original LGZ process report (`06_report/01_lgz/`), per-tool diagnostics (`06_report/02_refinement/<tool>/`) and frozen comparison (`06_report/03_comparison/<batch>/`) remain available separately. The directory contract below describes the
 LGZ process-report family, not the separate `cgat.refinement-report` schema.
 See the [refinement guide](REFINEMENT.md) ([中文](REFINEMENT_zh.md)) for the complete
 job/native/accepted-result and delivery path, pins, append and migration commands.
@@ -118,7 +115,13 @@ handling; prepare shell regressions verify the generated workspace.
 
 ## Workspace overview and offline regeneration
 
-`06_report/report.html` follows input → mapping/assignment → q0/donors → LGZ → automatic/manual refinement → result files. The machine contract and offline renderer interfaces are in `../docs/server-report-viewmodel-contract-20261124.md`. New `cgat_server_report_v1` snapshots additionally record `workspace_layout`, `stage_timing_summary` and `delivery_summary` (optional when reading older runs). `package_full` / `package_light` record staged payloads **before** final compression: final archive size and SHA are not known or guessed at this point. The workspace overview is refreshed under lock **after** project Full/Light and any cumulative auto patch commit. The embedded archive `report/` is still just the LGZ report. Failed/interrupted numbered launches can produce a diagnostic overview; preparation alone never creates it.
+`06_report/report.html` follows the sequence, not the list of files. Start with input and chromosome groups; compare the reference and q0 on a shared bp ruler, then open individual q0 → q1 repairs, q1 → q2 structural changes or either q2 → q3 end. The overlay explains the evidence without moving the chromosome tracks. A missing alignment is not a failed candidate.
+
+- **LGZ only:** 06 previews the committed Final Path. Copy the FASTA location; the offline report is not a download service. Each collapsed chromosome occupies one line. Expand it to inspect the reference and oriented source intervals.
+- **Automatic refinement:** 06 compares each original LGZ gap across tools; 07 switches between the independently published versions. A tool failure is not an unchanged gap, and multiple successful tools do not form a hybrid assembly. Only the DEGAP tab offers a verified native process view when one was captured.
+- **Manual jobs:** 08 compares the path exported by the App with that batch’s actual choices. Extra chromosomes and user edits already present at export are part of the baseline, not new Server edits. Switch the batch to switch its snapshot. Inclusion in the batch FASTA is not confirmation of import into the App. Old bundles without a complete snapshot show only recorded outcomes.
+
+ The machine contract and offline renderer interfaces are in `../docs/server-report-viewmodel-contract-20261124.md`. New `cgat_server_report_v1` snapshots additionally record `workspace_layout`, `stage_timing_summary` and `delivery_summary` (optional when reading older runs). `package_full` / `package_light` record staged payloads **before** final compression: final archive size and SHA are not known or guessed at this point. The workspace overview is refreshed under lock **after** project Full/Light and any cumulative auto patch commit. The embedded archive `report/` is still just the LGZ report. Failed/interrupted numbered launches can produce a diagnostic overview; preparation alone never creates it.
 
 Use a current Server tools checkout against a completed old workspace. Neither updating that workspace's runtime nor rerunning the pipeline is required:
 

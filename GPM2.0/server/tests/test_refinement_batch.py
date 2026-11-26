@@ -18,6 +18,11 @@ from server.tests import test_refinement_native as fixture
 
 class RefinementBatchTests(unittest.TestCase):
     def setUp(self):
+        # These fixtures simulate the producer, not subprocess resource collection.
+        self.enterContext(mock.patch(
+            "refinement_native_checkpoint._run_native",
+            side_effect=lambda *args, **kwargs: (subprocess.run(*args, **kwargs).returncode, None),
+        ))
         # This class isolates native/batch policy. Actual source measurement,
         # commands, receipts and serialization have their own focused tests.
         patch = mock.patch.object(batch, "build_source_evidence", return_value=None)

@@ -124,6 +124,9 @@ class ServerReportTests(unittest.TestCase):
             value = fasta_stats(fasta)
             self.assertEqual((value["sequence_count"], value["length_bp"], value["n50_bp"]), (2, 202, 103))
             self.assertEqual((value["n_bp"], value["gap_count"], value["gap_bp"]), (199, 1, 100))
+            positioned = fasta_stats(fasta, gap_positions=True)
+            self.assertEqual([r["gap_intervals"] for r in positioned["sequences"]], [[[2, 102]], []])
+            self.assertNotIn("gap_intervals", value["sequences"][0])
             paf = root / "x.paf"
             paf.write_text("a\t103\t0\t70\t+\tref\t200\t0\t70\t70\t70\t60\n"
                            "a\t103\t30\t100\t+\tref\t200\t30\t100\t70\t70\t60\n")

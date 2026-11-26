@@ -14,7 +14,7 @@ from workspace_layout import WorkspaceLayout
 
 
 def generate(root):
-    result, _, _ = create(root, job_outputs=True, project_delivery=True, with_source_evidence=True)
+    result, _, _ = create(root, job_outputs=True, project_delivery=True, with_source_evidence=True, sequence="GTTTAC")
     layout = WorkspaceLayout.detect(root)
     report = layout.path('report'); report.mkdir(parents=True, exist_ok=True)
     for name, value in [('manifest.json', '{}'), ('report.html', '<html></html>'), ('render_report.py', '# fixture')]:

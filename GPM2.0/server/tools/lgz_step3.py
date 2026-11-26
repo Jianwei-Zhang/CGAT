@@ -47,6 +47,8 @@ except ModuleNotFoundError:  # Imported as server.tools.grt_step3.
 
 ENGINE_VERSION = 1
 END_SEARCH_WINDOW = 2_000
+PROFILE_WINDOW = 5_000
+PROFILE_BIN_BP = 200
 ALIGNMENT_QUERY_WINDOW = 5_000_000
 MAX_EXTRACT_LENGTH = 5_000_000
 MUMMER_MIN_CLUSTER = 1_000
@@ -190,6 +192,37 @@ def tandem_matches(
     )
 
 
+def terminal_motif_profile(
+    sequence: str,
+    terminal: str,
+    rules: list[dict[str, object]],
+    window_bp: int = PROFILE_WINDOW,
+    bin_bp: int = PROFILE_BIN_BP,
+) -> dict[str, object]:
+    """Bin exact motif counts across the terminal window for report histograms."""
+    w = min(window_bp, len(sequence))
+    offset = 0 if terminal == "5prime" else len(sequence) - w
+    chunk = sequence[offset : offset + w].upper()
+    fwd_motifs = list(dict.fromkeys(str(r["motif"]).upper() for r in rules if not str(r.get("rule_id", "")).endswith("-rc") and r.get("motif")))
+    rev_motifs = list(dict.fromkeys(str(r["motif"]).upper() for r in rules if str(r.get("rule_id", "")).endswith("-rc") and r.get("motif")))
+    fwd_pat = re.compile("|".join(re.escape(m) for m in sorted(fwd_motifs, key=len, reverse=True))) if fwd_motifs else None
+    rev_pat = re.compile("|".join(re.escape(m) for m in sorted(rev_motifs, key=len, reverse=True))) if rev_motifs else None
+    fwd_counts: list[int] = []
+    rev_counts: list[int] = []
+    for pos in range(0, w, bin_bp):
+        sub = chunk[pos : pos + bin_bp]
+        fwd_counts.append(len(fwd_pat.findall(sub)) if fwd_pat else 0)
+        rev_counts.append(len(rev_pat.findall(sub)) if rev_pat else 0)
+    return {
+        "window": [offset, offset + w],
+        "bin_bp": bin_bp,
+        "forward": fwd_counts,
+        "reverse": rev_counts,
+        "forward_label": "/".join(fwd_motifs[:3]),
+        "reverse_label": "/".join(rev_motifs[:3]),
+    }
+
+
 def terminal_signal(
     sequence: str,
     terminal: str,
@@ -200,6 +233,7 @@ def terminal_signal(
     window = sequence[offset : offset + window_length]
     matches = tandem_matches(window, rules, "chromosome_min_repeat", False)
     return {
+        "report_signal_intervals": sorted({(offset + int(r["start0"]), offset + int(r["end0"])) for r in matches}),
         "present": bool(matches),
         "window_start": offset + 1,
         "window_end": offset + window_length,
@@ -221,6 +255,7 @@ def candidate_terminal_signal(
     else:
         terminal_matches = [row for row in matches if int(row["end0"]) > len(sequence) - boundary]
     return {
+        "report_outer_intervals": sorted({(int(r["start0"]), int(r["end0"])) for r in terminal_matches}),
         "present": bool(terminal_matches),
         "matched_rule_ids": sorted({str(row["rule_id"]) for row in terminal_matches}),
         "max_telomere_bp": max((int(row["length"]) for row in terminal_matches), default=0),
@@ -613,6 +648,7 @@ def extract_terminal_candidates(
                 "mummer_line": int(selected["line_number"]),
                 "mummer_query_start": int(selected["query_min"]),
                 "mummer_query_end": int(selected["query_max"]),
+                "report_outer_intervals": telomere["report_outer_intervals"],
                 "telomere_bp": int(telomere["max_telomere_bp"]),
                 "telomere_repeat_count": int(telomere["max_repeat_count"]),
                 "matched_rule_ids": telomere["matched_rule_ids"],
@@ -1761,10 +1797,14 @@ def run_step3(
                 )
             )
 
+        report_signals = []
         for chromosome in chromosome_order:
             for terminal in ("5prime", "3prime"):
                 before = terminal_signal(input_records[chromosome], terminal, rules)
                 after = terminal_signal(output_records[chromosome], terminal, rules)
+                report_signals.append({"chr": chromosome, "terminal": terminal,
+                                       "q2": before["report_signal_intervals"], "q3": after["report_signal_intervals"],
+                                       "q3_profile": terminal_motif_profile(output_records[chromosome], terminal, rules)})
                 accepted = accepted_by_terminal.get((chromosome, terminal))
                 if accepted is not None and (before["present"] or not after["present"]):
                     fail(f"accepted telomere candidate did not restore {chromosome}:{terminal}")
@@ -1833,6 +1873,10 @@ def run_step3(
             "events": events,
             "attempts": attempts,
             "terminal_rows": terminal_rows,
+            # Diagnostic coordinates already measured by the terminal rules. Not used for ranking/admission.
+            "report_signals": report_signals,
+            "report_selected_paf_lines": {c["candidate_id"]: c["minimap_line"] for c in candidates if c.get("minimap_line")},
+            "report_donor_signals": {c["candidate_id"]: c["report_outer_intervals"] for c in candidates},
         }
         (temporary / "result.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

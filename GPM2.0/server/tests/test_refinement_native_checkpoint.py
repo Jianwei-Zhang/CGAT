@@ -27,6 +27,11 @@ from workspace_layout import TOOL_DIRECTORIES
 @unittest.skipUnless(shutil.which("samtools"), "real indexing required")
 class NativeCheckpointTests(unittest.TestCase):
     def setUp(self):
+        # These fixtures simulate the producer, not subprocess resource collection.
+        self.enterContext(mock.patch(
+            "refinement_native_checkpoint._run_native",
+            side_effect=lambda *args, **kwargs: (subprocess.run(*args, **kwargs).returncode, None),
+        ))
         self.real_run = subprocess.run
         self.helper = fixture.NativeStageTests()
         self.helper.real_run = self.real_run

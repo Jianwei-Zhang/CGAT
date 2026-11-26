@@ -25,7 +25,7 @@ try:
     from refinement_publication import verify_baseline, prepare_publication
     from refinement_path import PathError
     from refinement_degap import materialize_patches, stage_degap
-    from refinement_native_trace import retained, verify_trace, normalized_edits, closed_lr_edits, TraceError
+    from refinement_native_trace import retained, verify_trace, normalized_edits, CLOSED_GAP_POLICY, closed_gap_edits, TraceError
     from refinement_native_formats import CandidateStore, parse_tgs, parse_quartet, parse_lr_rows, apply_lr_round
     from refinement_native_checkpoint import execute as execute_native, quartet_empty_outcome
 except ModuleNotFoundError:
@@ -37,7 +37,7 @@ except ModuleNotFoundError:
     from .refinement_publication import verify_baseline, prepare_publication
     from .refinement_path import PathError
     from .refinement_degap import materialize_patches, stage_degap
-    from .refinement_native_trace import retained, verify_trace, normalized_edits, closed_lr_edits, TraceError
+    from .refinement_native_trace import retained, verify_trace, normalized_edits, CLOSED_GAP_POLICY, closed_gap_edits, TraceError
     from .refinement_native_formats import CandidateStore, parse_tgs, parse_quartet, parse_lr_rows, apply_lr_round
     from .refinement_native_checkpoint import execute as execute_native, quartet_empty_outcome
 
@@ -284,8 +284,7 @@ def _stage(root, tool, groups, threads, run_id):
                           for original, native_name in original_to_native.items()}
         edits, rejected = normalized_edits(tool, traces, baseline, result_genome, gaps, native_dataset=dataset,
                                           native_names=original_to_native, job=native_directory.relative_to(root).as_posix())
-        if tool == "lrgapcloser":
-            edits, withheld = closed_lr_edits(edits, gaps, catalog)
+        edits, withheld = closed_gap_edits(edits, gaps, catalog, tool=tool)
         edits = materialize_patches(edits, catalog, paths["04_accepted"], tool=tool)
     catalog.verify_unchanged()
     verify_directory_links(runtime)
@@ -302,8 +301,7 @@ def _stage(root, tool, groups, threads, run_id):
                  "native_assembly": native_summary, "require_native_equality": not rejected and result_genome is not None,
                  "retained_flank_chromosomes": retained_flank_chromosomes,
                  "recipe": recipe, "artifacts": native_artifacts}
-    if tool == "lrgapcloser":
-        execution.update(gap_policy="closed_original_gaps_only", withheld_candidates=withheld)
+    execution.update(gap_policy=CLOSED_GAP_POLICY, withheld_candidates=withheld)
     atomic_json(paths["02_jobs"] / "execution.json", execution)
     staging = private / "final"
     provenance = prepare_publication(staging, baseline_payload, baseline_path, catalog, edits, execution, rejected)
