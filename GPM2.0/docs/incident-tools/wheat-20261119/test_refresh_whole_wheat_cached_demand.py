@@ -13,6 +13,12 @@ import refresh_whole_wheat_cached_demand as whole
 
 
 class WholeDraftStageTests(unittest.TestCase):
+    def test_extra_batches_follow_original_window_and_batch_order(self):
+        rows=whole.ordered_extra(['a','b','c','d'],{'a':'old-a','d':'old-d'},{'b':['b1','b2'],'c':['c1']})
+        self.assertEqual(rows,['old-a','b1','b2','c1','old-d'])
+        for bad in ({'a':['already done']},{'unbound':['foreign']}):
+            with self.assertRaises(ValueError):whole.ordered_extra(['a'],{'a':'old'},bad)
+
     def test_hit_and_original_core_projection_match_the_stock_paf_without_a_new_mapper(self):
         f=support.RegionalMappingTests();f.setUp();self.addCleanup(f.doCleanups)
         task=f.run_mapping();verified=m.verify_regional_task(f.root,task,members=f.catalog.parts);sp=verified['spec'];ctx=sp['context'];context=m._ops().json_file(f.root/ctx['path']);cid=ctx['path'].split('/')[-2];raw=sp['raw_receipt'];leaf=m._ops().json_file(f.root/raw['path']);paf,=[row for row in leaf['outputs'] if row['path'].endswith('/result.paf')]

@@ -107,10 +107,32 @@ def stage_shard(job):
     digest=write(dest,results);write(seal,dict(input=binding,sha256=digest));return name,digest,len(rows),len(results)
 
 
-def run(base,stage,owner,threads):
+LOCAL_WINDOW_RESULT='ffc6e0f5cd45948e5d5ff5140c1b6a15e977e6b8bcdf5c7477c699ed34c16f8e'
+BASE_EVIDENCE='4f9609e581cdece932e18ad0e69ce57ea5557f732f1e8ab48242ea85127d4e23'
+
+
+def ordered_extra(window_order, original, extra):
+    """Insert at original query/window ordinals, never append a later completed batch to the end."""
+    require(set(original).isdisjoint(extra) and set(original)|set(extra)<=set(window_order),'foreign or already included windows')
+    return [item for q in window_order for item in ([original[q]] if q in original else extra.get(q,()))]
+
+
+def stage_local_additions(path, stage, windows, originals):
+    report=get(path/'result.json',LOCAL_WINDOW_RESULT);require(report['batches']==15 and report['windows']==13 and report['native_mapper_starts']==0 and report['projected_rows']==1660,'wrong local dataset')
+    extra={};seen=set();ranks=set();n=0
+    for i,digest in enumerate(report['receipts'],1):
+        row=get(path/f'batch-{i:02d}.json',digest);q=windows[row['query']];t=row['task'];rank=PARTS[q.segment_id][0];require(row['index']==i and t['task_id'] not in seen and t['query_ids']==[q.segment_id] and q.cores==tuple(tuple(v) for v in row['cores']) and rank in FALLBACK,'foreign or duplicate local batch')
+        require(row['batch']==len(extra.get(q.window_id,[])),'changed local batch order');seen.add(t['task_id']);ranks.add(rank)
+        source=path/'workspace';rc=mapping.verify_regional_task(source,t,members=MEMBERS);require(sha256_file(source/t['receipt'])==row['receipt_sha256'],'local receipt changed');ident,=[v for v in rc['outputs'] if v['path']==t['paf']];require((ident['sha256'],ident['size'])==(row['projected_sha256'],row['projected_bytes']),'wrong projected PAF');stage_copy(member(source,t['paf']),member(stage,t['paf']),ident)
+        extra.setdefault(q.window_id,[]).append((t,[t['task_id'],ident['sha256']]));n+=row['projected_rows']
+    require(len(extra)==13 and len(seen)==15 and ranks==FALLBACK and n==report['projected_rows'],'incomplete local input')
+    return ordered_extra(windows,originals,extra)
+
+
+def run(base,stage,owner,threads,local_owner=None):
     global ROOT,STAGE,PARTS,WINDOWS,SKIP,FALLBACK,TOOL,MEMBERS,PROJECTOR,VALIDATOR,CODE
     began=monotonic();STAGE=stage;CODE=sha256_file(owner/'kit.sha256')
-    require(stage.parent==Path('/tmp') and stage.name==owner.name+'-'+CODE[:12] and owner.resolve()==owner and owner.parent==base and owner.name.startswith('q0-whole-updated.') and not(owner/'result/summary.json').exists(),'unsafe or complete run')
+    require(stage.parent==Path('/tmp') and stage.name==owner.name+'-'+CODE[:12] and owner.resolve()==owner and owner.parent==base and owner.name.startswith('q0-whole-local-maps.' if local_owner else 'q0-whole-updated.') and not(owner/'result/summary.json').exists(),'unsafe or complete run')
     stage.mkdir(mode=0o700,exist_ok=True);require(stage.resolve()==stage and stage.stat().st_uid==os.getuid() and not(stage.stat().st_mode&0o077),'unsafe node-local cache');write(stage/'owner.json',dict(owner=str(owner),kit=CODE));(stage/'receipts').mkdir(exist_ok=True);root=base/'q0-whole-dispatch-20261125.9Icl9fR7';full=get(root/'report-v2/result/final.json',FINAL);native=get(root/'native/native.json',NATIVE)
     snap,ROOT,PARTS,order,lens=bind(base/'q0-latest-fork-20261123-1435/control/snapshot.json',base/'q0-source-part-lookup-20261121-1600/source-part-lookup.json'); ids=sorted(PARTS);require(all(PARTS[p][0]==i for i,p in enumerate(ids)),'part ranks differ');SKIP={int(k) for k in native['parent_windows']};FALLBACK=set(native['retired_fallback_parents']);MEMBERS={p:(n,h) for p,(_,n,h) in PARTS.items()};TOOL=prep.executable_identity('minimap2');require(TOOL['sha256']=='cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3','foreign mapper identity');m=Path(mapping.__file__).parent;PROJECTOR=sha256_file(m/'q0_query_windows.py');VALIDATOR=sha256_file(m/'q0_alignments.py')
     before=decode(get(base/'q0-request-ready.44e274a7/control/global-first-request.json',REQ)['request'],lens);require(len(before)==3111 and sum(map(len,before.values()))==5599 and full['request_sha256']==REQ,'wrong initial demand')
@@ -153,10 +175,18 @@ def run(base,stage,owner,threads):
     for tid in native_order:
         leaf='grt/evidence/q0_prepare/tasks/'+tid;receipt=get(ROOT/leaf/'success.json',EXPECTED[tid]);spec=receipt['spec'];paf=leaf+'/result.paf';o,=[o for o in receipt['outputs'] if o['path']==paf];require(receipt['status']=='success' and stable_id('q0-map',spec)==tid and spec['tool']==TOOL and spec['members']==[[p,PARTS[p][2]] for p in sorted(set(spec['query_ids']+spec['target_ids']))] and earlier['native_matrices'][tid]['paf_sha256']==o['sha256'],'foreign native matrix');stage_copy(member(ROOT,paf),stage/paf,o)
         tasks.append(dict(task_id=tid,paf=paf,query_ids=spec['query_ids'],target_ids=spec['target_ids']));paf_identities.append([tid,o['sha256']])
+    originals={}
     for q in WINDOWS:
         if q not in locations:continue
-        tid,r,targets,h=locations.pop(q);paf='grt/evidence/q0_prepare/regional/projects/'+tid+'/result.paf';tasks.append(dict(task_id=tid,paf=paf,query_ids=[ids[r]],target_ids=[ids[n] for n in targets]));paf_identities.append([tid,h])
-    require(not locations and len(tasks)==59282,'incomplete ordered cache set'); generation=sha256(json.dumps(paf_identities,separators=(',',':')).encode()).hexdigest();del WINDOWS,locations,paf_identities
+        tid,r,targets,h=locations.pop(q);paf='grt/evidence/q0_prepare/regional/projects/'+tid+'/result.paf';originals[q]=(dict(task_id=tid,paf=paf,query_ids=[ids[r]],target_ids=[ids[n] for n in targets]),[tid,h])
+    require(not locations and len(originals)==59278 and len(tasks)==4,'incomplete ordered cache set')
+    digest=lambda rows:sha256(json.dumps(rows,separators=(',',':')).encode()).hexdigest()
+    if local_owner:
+        require(local_owner.parent==base and local_owner.resolve()==local_owner and local_owner.name.startswith('q0-local-only-maps-') and digest(paf_identities+[v[1] for v in originals.values()])==BASE_EVIDENCE,'baseline ordered evidence changed')
+        ordered=stage_local_additions(local_owner,stage,WINDOWS,originals);require(len(ordered)==59293,'incomplete extended batch list')
+    else:ordered=originals.values()
+    for task,identity in ordered:tasks.append(task);paf_identities.append(identity)
+    generation=digest(paf_identities);del WINDOWS,locations,paf_identities,ordered,originals
     done=last=0
     for row in stage_rows:
         stage_copy(member(ROOT,row['path']),member(stage,row['path']),row,96<<20);done+=row['size']
@@ -165,7 +195,7 @@ def run(base,stage,owner,threads):
     for s,seq in seqs.items():
         info=split_source(s,seq);require(not info.adjacencies and len(info.segments)==1,'foreign wheat split');p,=info.segments;require(p.segment_id in MEMBERS and MEMBERS[p.segment_id]==(p.interval.length,p.sequence_sha256),'source identity changed');parts[p.segment_id]=p
     require(parts.keys()==PARTS.keys() and {k:len(v) for k,v in seqs.items()}==lens,'source cohort changed');catalog=CandidateCatalog({'original_connections':edges},seqs,parts);ref,=prep.table(stage,'metadata/reference.tsv',('fai_relpath',));refs={row[0]:int(row[1]) for row in (v.split('\t') for v in (stage/ref['fai_relpath']).read_text().splitlines())};assign=prep.table(stage,'metadata/chr_assignments.tsv',('dataset_name','seq_name','assigned_chr_name'));require(all(x['assigned_chr_name'] in refs and lens[SourceKey(x['dataset_name'],x['seq_name'])]==int(x['seq_length_bp']) for x in assign),'assignment drift')
-    sel=owner/'selection';sel.mkdir(mode=0o700,exist_ok=True);require(sel.resolve()==sel and not(sel.stat().st_mode&0o077) and sel.stat().st_uid==os.getuid(),'unsafe private checkpoint directory'); result=owner/'result';result.mkdir(mode=0o700,exist_ok=True);require(result.resolve()==result,'linked result');proof=sha256_file(owner/'kit.sha256'); binding=['whole-wheat-updated-supplement-v1',SN,REQ,FINAL,proof,generation,threads];saved={};selector=adm.select_request_paths
+    sel=owner/'selection';sel.mkdir(mode=0o700,exist_ok=True);require(sel.resolve()==sel and not(sel.stat().st_mode&0o077) and sel.stat().st_uid==os.getuid(),'unsafe private checkpoint directory'); result=owner/'result';result.mkdir(mode=0o700,exist_ok=True);require(result.resolve()==result,'linked result');proof=sha256_file(owner/'kit.sha256'); binding=['whole-wheat-local-supplement-v1' if local_owner else 'whole-wheat-updated-supplement-v1',SN,REQ,FINAL,proof,generation,threads];saved={};selector=adm.select_request_paths
     def capture_demand(need,have,counts,issues):
         detail=dict(schema='wheat_cached_full_updated_demand_v1',decision_only=True,source_snapshot=SN,first_request=REQ,evidence_inventory=generation,has_path=have,counts=counts,issues=issues,source_intervals=record(need)); saved['questions']=write(result/'updated-questions.json.gz',detail);saved['after']=None if need is None else dict(sources=len(need),intervals=sum(map(len,need.values())),bases=sum(iv.length for v in need.values() for iv in v));saved['counts']=counts
     with (sel/'writer.lock').open('a') as lock:
@@ -173,7 +203,7 @@ def run(base,stage,owner,threads):
         def select(data,**kw):
             saved['pair_rows']=len(data.pair_links);require(saved['pair_rows']>=42698133 and 'checkpoint' not in kw,'invalid retained input or old checkpoint');return selector(data,checkpoint=store,**kw)
         def refresh(items):
-            require(len(items)==59282,'updated selector missing inputs');return threshold.initial_questions(stage,seqs,refs,assign,snap['alignments'],threads=threads,existing_catalog=catalog,supplementary=items,on_updated_questions=capture_demand)
+            require(len(items)==(59297 if local_owner else 59282),'updated selector missing inputs');return threshold.initial_questions(stage,seqs,refs,assign,snap['alignments'],threads=threads,existing_catalog=catalog,supplementary=items,on_updated_questions=capture_demand)
         request=dict(kind='partial_source_discovery',query_ids=sorted(ids[r] for r in FALLBACK),target_ids=ids);gate=FallbackGate(parts,before,refresh);actions=[]
         def observe(req,only):require(req is request,'matrix changed');actions.append('cache_probe' if only else 'would_run_original');return None if only else {'diagnostic_only':True}
         print('WHOLE_UPDATED_SELECTOR_START',len(seqs),len(tasks),generation,flush=True)
@@ -183,11 +213,16 @@ def run(base,stage,owner,threads):
             for v in reader(path,**kw):n+=1;yield v
             progress[0]+=1;progress[1]+=n
             if monotonic()-progress[2]>=60:print('DRAFT_PAF_READ',progress[0],progress[1],kw['artifact'],flush=True);progress[2]=monotonic()
-        with patch.object(threshold,'read_retained_paf',counted), patch.object(adm,'select_request_paths',side_effect=select):gate.dispatch(PHASES[0],[request],tasks,observe)
+        with patch.object(threshold,'read_retained_paf',counted), patch.object(adm,'select_request_paths',side_effect=select):
+            if local_owner:
+                refresh(tasks);actions.append('reuse_verified_evidence_rerank_only')  # no native dispatcher
+            else:gate.dispatch(PHASES[0],[request],tasks,observe)
         require(saved.get('questions') and not(stage/prep.MANIFEST).exists(),'not a completed isolated draft');saved['selection_chain']=store.previous
     summary=dict(schema='wheat_whole_first_cached_native_decision_v1',**saved,inputs=SN,first_request=REQ,regional_inventory=FINAL,kit_sha256=proof,evidence_digest=generation,regional=len(tasks)-4,native=4,base_pair_rows=42698133,methods=methods,actions=actions,mapper_starts=0,published_q0=False,elapsed_s=round(monotonic()-began,2),scope='All frozen initial inputs, four adopted native matrices, 59,278 existing exact partial-regional results, before candidate discovery or a new native fallback. Planning selection only; no formal Q0.')
+    if local_owner:
+        summary.update(schema='wheat_whole_local_supplement_readmission_v1',baseline_evidence=BASE_EVIDENCE,local_mapping=LOCAL_WINDOW_RESULT,scope='All 22 groups, fresh admission and draft path selection from the 4 prior native matrices and 59,293 verified regional inputs. Not a formal Q0 or result publication.')
     print('WHOLE_UPDATED_DEMAND',saved['after'],actions,write(result/'summary.json',summary),flush=True)
 
 
 if __name__=='__main__':
-    run(*(Path(x) for x in sys.argv[1:4]),int(sys.argv[4]))
+    run(*(Path(x) for x in sys.argv[1:4]),int(sys.argv[4]),*(Path(x) for x in sys.argv[5:]))
