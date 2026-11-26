@@ -319,46 +319,7 @@ where
     {
         return fail("light refined delivery includes sequence files");
     }
-    validate_artifact(
-        root,
-        SERVER_PATH,
-        string(&manifest, "server_final_path_sha256")?,
-        "authoritative refined path",
-    )?;
-    let server = read_json(root, SERVER_PATH)?;
-    if server["schema"] != "cgat.refined-final-path"
-        || server["schema_version"] != 1
-        || server["tool"] != manifest["tool"]
-        || server["baseline"] != manifest["baseline"]
-    {
-        return fail("refined Server path/delivery identity mismatch");
-    }
-    let mut actual = projected.clone();
-    for chr in actual["chromosomes"]
-        .as_array_mut()
-        .ok_or_else(|| anyhow!("invalid projected chromosomes"))?
-    {
-        chr.as_object_mut()
-            .ok_or_else(|| anyhow!("invalid projected chromosome"))?
-            .remove("display_evidence");
-    }
-    if project_server(&server)? != actual {
-        return fail("App Final Path is not the accepted Server refinement projection");
-    }
-    validate_artifact(
-        root,
-        "metadata/refinement/provenance.json",
-        string(&manifest, "provenance_sha256")?,
-        "refinement provenance",
-    )?;
-    let provenance = read_json(root, "metadata/refinement/provenance.json")?;
-    if provenance["tool"] != manifest["tool"]
-        || provenance["run_id"] != manifest["run_id"]
-        || provenance["execution"]["status"] != "success"
-        || provenance["artifacts"]["final_path.json"] != manifest["server_final_path_sha256"]
-    {
-        return fail("delivery provenance is not successful admitted refinement");
-    }
+    let (server, provenance) = validated_outcome_evidence(root, &manifest, projected)?;
     let measured = super::refined_source_evidence::validate(
         root, tables, &manifest, &server, &observed, cancel,
     )?;
@@ -496,6 +457,73 @@ where
         RefinementReadInputs::from_recipe(&provenance["execution"]["recipe"]),
         effect,
     ))
+}
+
+// Read only the small, sealed outcome artifacts, never the full workspace inventory
+// or FASTA. The persisted import projection binds them to this workspace even after
+// manual edits; a same-tool result from another run is not an acceptable substitute.
+fn validated_outcome_evidence(
+    root: &Path,
+    manifest: &Value,
+    projected: &Value,
+) -> Result<(Value, Value)> {
+    validate_artifact(
+        root,
+        SERVER_PATH,
+        string(manifest, "server_final_path_sha256")?,
+        "authoritative refined path",
+    )?;
+    let server = read_json(root, SERVER_PATH)?;
+    if server["schema"] != "cgat.refined-final-path"
+        || server["schema_version"] != 1
+        || server["tool"] != manifest["tool"]
+        || server["baseline"] != manifest["baseline"]
+    {
+        return fail("refined Server path/delivery identity mismatch");
+    }
+    let mut actual = projected.clone();
+    for chr in actual["chromosomes"]
+        .as_array_mut()
+        .ok_or_else(|| anyhow!("invalid projected chromosomes"))?
+    {
+        chr.as_object_mut()
+            .ok_or_else(|| anyhow!("invalid projected chromosome"))?
+            .remove("display_evidence");
+    }
+    if project_server(&server)? != actual {
+        return fail("App Final Path is not the accepted Server refinement projection");
+    }
+    validate_artifact(
+        root,
+        "metadata/refinement/provenance.json",
+        string(manifest, "provenance_sha256")?,
+        "refinement provenance",
+    )?;
+    let provenance = read_json(root, "metadata/refinement/provenance.json")?;
+    if provenance["tool"] != manifest["tool"]
+        || provenance["run_id"] != manifest["run_id"]
+        || provenance["execution"]["status"] != "success"
+        || provenance["artifacts"]["final_path.json"] != manifest["server_final_path_sha256"]
+    {
+        return fail("delivery provenance is not successful admitted refinement");
+    }
+    Ok((server, provenance))
+}
+
+pub(super) fn recover_legacy_effect(
+    root: &Path,
+    projected: &Value,
+) -> Result<Option<AutoRefinementEffect>> {
+    let manifest = read_json(root, MANIFEST)?;
+    if manifest["schema"] != "cgat.refinement-app-delivery"
+        || manifest["schema_version"] != 1
+        || manifest["package_version"] != GRT_REFINEMENT_SCHEMA_VERSION
+        || manifest["final_path_version"] != GRT_REFINED_FINAL_PATH_SCHEMA_VERSION
+    {
+        return fail("unsupported legacy refinement manifest");
+    }
+    let (server, proof) = validated_outcome_evidence(root, &manifest, projected)?;
+    validated_effect(&proof, &server)
 }
 
 fn validated_effect(proof: &Value, path: &Value) -> Result<Option<AutoRefinementEffect>> {

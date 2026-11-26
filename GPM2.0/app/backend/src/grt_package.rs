@@ -3,7 +3,8 @@
 //! Validation is pure and completes before the importer opens or mutates a
 //! workspace database. A validated in-memory contract is then persisted by the
 //! caller's single transaction. Read models, initialization, and trace queries
-//! depend only on persisted domain rows and never on raw package parser state.
+//! use persisted domain rows. Legacy outcome display may recover a missing summary
+//! from sealed delivery evidence bound to the persisted import projection.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;

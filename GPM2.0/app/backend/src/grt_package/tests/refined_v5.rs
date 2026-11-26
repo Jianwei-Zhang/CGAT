@@ -404,7 +404,7 @@ fn refined_light_import_keeps_provenance_but_does_not_claim_sequences_available(
 }
 
 #[test]
-fn previous_workspace_gains_an_empty_effect_catalog_without_reinterpreting_its_final_path()
+fn previous_workspace_recovers_verified_effect_without_reinterpreting_its_final_path()
 -> Result<()> {
     let temp = materialize(true);
     let (outcome, _) =
@@ -414,12 +414,68 @@ fn previous_workspace_gains_an_empty_effect_catalog_without_reinterpreting_its_f
     let conn = crate::db::open_workspace_db(db)?;
     conn.execute_batch("DROP TABLE grt_auto_refinement_effect; PRAGMA user_version=10;")?;
     drop(conn);
-    assert!(
-        load_grt_project_view(db)?
-            .auto_refinement_effects
-            .is_empty()
+    let effects = load_grt_project_view(db)?.auto_refinement_effects;
+    assert_eq!(effects.len(), 1);
+    assert_eq!(
+        (effects[0].closed, effects[0].partial, effects[0].original_gaps),
+        (0, 1, 1)
+    );
+    let project = initialize_grt_project(db, "Legacy refinement")?;
+    assert_eq!(
+        load_grt_project_view_for_project(db, project.project_id)?.auto_refinement_effects,
+        effects
     );
     assert_eq!(load_grt_final_path(db)?, original);
+    let conn = crate::db::open_workspace_db(db)?;
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM grt_auto_refinement_effect", [], |row| {
+            row.get::<_, i64>(0)
+        })?,
+        0
+    );
+    Ok(())
+}
+
+#[test]
+fn legacy_effect_recovery_keeps_missing_corrupt_or_mismatched_evidence_unknown() -> Result<()> {
+    for mode in ["missing", "hash", "totals", "projection", "pre_summary"] {
+        let temp = materialize(true);
+        let root = temp.path().join("refined.degap");
+        let (outcome, _) = crate::importer::import_from_extracted_bundle(&root)?;
+        let db = &outcome.project_db_path;
+        let conn = crate::db::open_workspace_db(db)?;
+        conn.execute("DELETE FROM grt_auto_refinement_effect", [])?;
+        let proof_path = root.join("metadata/refinement/provenance.json");
+        if mode == "missing" {
+            fs::remove_file(&proof_path)?;
+        } else if mode == "projection" {
+            let mut path = load_grt_final_path(db)?;
+            path["tool"] = Value::from("quartet");
+            conn.execute(
+                "UPDATE grt_package SET final_path_json=?1",
+                [path.to_string()],
+            )?;
+        } else {
+            let mut proof: Value = serde_json::from_slice(&fs::read(&proof_path)?)?;
+            if mode == "pre_summary" {
+                proof.as_object_mut().unwrap().remove("counts");
+                proof.as_object_mut().unwrap().remove("gap_outcomes");
+            } else {
+                proof["counts"]["closed"] = Value::from(99);
+            }
+            fs::write(&proof_path, serde_json::to_vec(&proof)?)?;
+            if mode != "hash" {
+                let manifest_path = root.join("metadata/refinement/manifest.json");
+                let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path)?)?;
+                manifest["provenance_sha256"] = Value::from(sha256_file(&proof_path)?);
+                fs::write(manifest_path, serde_json::to_vec(&manifest)?)?;
+            }
+        }
+        assert!(
+            load_grt_project_view(db)?.auto_refinement_effects.is_empty(),
+            "{mode}"
+        );
+    }
     Ok(())
 }
 

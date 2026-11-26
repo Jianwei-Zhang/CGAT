@@ -682,6 +682,28 @@ fn load_auto_effects(path: &Path, project: Option<i64>) -> Result<Vec<AutoRefine
             legacy.insert(k, effect);
         }
     }
+    if legacy.is_empty() {
+        // Older importers kept the sealed delivery but did not persist its outcome
+        // summary. Recover display statistics without changing the DB or adoption
+        // history. Missing/invalid evidence remains unknown, not zero or edit count.
+        let projected: Option<String> = conn
+            .query_row(
+                "SELECT final_path_json FROM grt_package WHERE id=1 AND schema_version='5'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let (Some(root), Some(json)) = (path.parent(), projected) {
+            let recovered = serde_json::from_str(&json).ok().and_then(|projected| {
+                super::refined_delivery::recover_legacy_effect(root, &projected)
+                    .ok()
+                    .flatten()
+            });
+            if let Some(effect) = recovered {
+                legacy.insert((effect.tool.clone(), effect.run_id.clone()), effect);
+            }
+        }
+    }
     for (k, _) in versions.keys() {
         legacy.remove(k);
     }
