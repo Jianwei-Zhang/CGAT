@@ -1,0 +1,19 @@
+#!/bin/bash
+#DSUB -n jm19_1A_continuity_admission
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=16,mem=163840MB"
+#DSUB -o continuity_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c continuity-kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+owner=$PWD
+code=$(mktemp -d /tmp/wheat-continuity-code.XXXXXXXX)
+tar -xzf tools.tgz -C "$code"
+export PYTHONPATH="$code/tools:$owner"
+python3 -Bu -m unittest -v test_wheat_continuous_dominant_admission
+python3 -Bu wheat_continuous_dominant_admission_readonly.py "$(dirname "$owner")" "$owner" --workers 8 --group 1A
+sha256sum continuity-admission.json
