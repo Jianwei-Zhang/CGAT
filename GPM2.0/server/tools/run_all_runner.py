@@ -44,7 +44,7 @@ from alignment_tasks import (AdaptiveDispatcher, AlignmentPlan, AlignmentTask, d
 
 
 PLAN_FIELDS = ["unit_id", "command_relpath", "detail_log_relpath"]
-STATUS_FIELDS = [
+LEGACY_STATUS_FIELDS = [
     "unit_id",
     "phase_index",
     "phase_total",
@@ -56,6 +56,7 @@ STATUS_FIELDS = [
     "exit_code",
     "detail_log_relpath",
 ]
+STATUS_FIELDS = [*LEGACY_STATUS_FIELDS, "peak_rss_mb"]
 LGZ_CACHE_MARKERS = {
     **dict.fromkeys(LGZ_PREPARE_IDS, ("LGZ prepare inputs are current:",)),
     "grt_step1": ("LGZ step1 cache hit:",),
@@ -161,6 +162,28 @@ def load_plan(server_dir: Path) -> list[PlanUnit]:
     return units
 
 
+def _wait_with_rusage(child: subprocess.Popen) -> tuple[int, float | None]:
+    if child.returncode is not None:
+        return child.returncode, None
+    if hasattr(os, "wait4"):
+        while True:
+            try:
+                _, status, rusage = os.wait4(child.pid, 0)
+                break
+            except InterruptedError:
+                continue
+            except ChildProcessError:
+                return child.wait(), None
+        code = -os.WTERMSIG(status) if os.WIFSIGNALED(status) else os.WEXITSTATUS(status)
+        child.returncode = code
+        rss = getattr(rusage, "ru_maxrss", 0) or 0
+        if rss > 0:
+            mb = rss / (1024.0 * 1024.0) if sys.platform == "darwin" else rss / 1024.0
+            return code, round(mb, 2)
+        return code, None
+    return child.wait(), None
+
+
 def atomic_write_status(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
@@ -171,6 +194,8 @@ def atomic_write_status(path: Path, rows: list[dict[str, str]]) -> None:
                 fieldnames=STATUS_FIELDS,
                 delimiter="\t",
                 lineterminator="\n",
+                extrasaction="ignore",
+                restval="",
             )
             writer.writeheader()
             writer.writerows(rows)
@@ -185,7 +210,7 @@ def load_prior_status(path: Path) -> dict[str, dict[str, str]]:
     try:
         with path.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle, delimiter="\t")
-            if list(reader.fieldnames or []) != STATUS_FIELDS:
+            if list(reader.fieldnames or []) not in (STATUS_FIELDS, LEGACY_STATUS_FIELDS):
                 return {}
             return {
                 row["unit_id"]: row
@@ -221,6 +246,7 @@ def initial_status_rows(
                 "elapsed_seconds": previous.get("elapsed_seconds", "") if state == "interrupted" else "",
                 "exit_code": previous.get("exit_code", "") if state == "interrupted" else "",
                 "detail_log_relpath": unit.detail_log_relpath,
+                "peak_rss_mb": previous.get("peak_rss_mb", "") if state == "interrupted" else "",
             }
         )
     return rows, abandoned
@@ -520,6 +546,7 @@ class Runner:
             task.largest_fraction is not None for task in tasks
         ) else None
         allocations = {}
+        peak_rss: dict[str, float] = {}
         self._event("PARALLEL", None, f"alignment_tasks={len(tasks)} thread_budget={budget}")
 
         def start(task, allocation):
@@ -528,7 +555,7 @@ class Runner:
             if task.unit_id not in started:
                 started[task.unit_id] = time.monotonic()
                 row.update(state="running", attempt=str(int(row["attempt"] or "0") + 1),
-                           started_at=timestamp(), ended_at="", elapsed_seconds="", exit_code="")
+                           started_at=timestamp(), ended_at="", elapsed_seconds="", exit_code="", peak_rss_mb="")
                 atomic_write_status(self.status_path, self.status_rows)
                 self._event("START", unit, f"attempt={row['attempt']} command={unit.command_relpath}")
             self._event("TASK_START", unit, f"threads={allocation} command={task.command.relative_to(self.server_dir)}")
@@ -539,6 +566,7 @@ class Runner:
             row = self._row(unit)
             remaining[task.unit_id] -= 1
             allocation, task_started, failure_logs = allocations.pop(task.command)
+            rss_str = f"{peak_rss[task.unit_id]:.2f}" if task.unit_id in peak_rss else ""
             if code == 0 and dispatcher is not None:
                 dispatcher.complete(task, allocation, time.monotonic() - task_started)
             self._event("TASK_END", unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)}")
@@ -547,7 +575,7 @@ class Runner:
             if code:
                 state = "interrupted" if cancelling or self.received_signal else "failed"
                 row.update(state=state, ended_at=timestamp(), exit_code=str(code),
-                           elapsed_seconds=f"{time.monotonic() - started[task.unit_id]:.3f}")
+                           elapsed_seconds=f"{time.monotonic() - started[task.unit_id]:.3f}", peak_rss_mb=rss_str)
                 atomic_write_status(self.status_path, self.status_rows)
                 self._event(state.upper(), unit, f"exit_code={code} command={task.command.relative_to(self.server_dir)} detail={unit.detail_log_relpath}"
                             + (self._failure_hint(unit, failure_logs) if state == "failed" else ""))
@@ -555,12 +583,12 @@ class Runner:
                 try:
                     checkpoint = self.outer_checkpoints.commit(prepared[task.unit_id])
                 except (OSError, OrchestrationContractError) as exc:
-                    row.update(state="failed", ended_at=timestamp(), exit_code="2")
+                    row.update(state="failed", ended_at=timestamp(), exit_code="2", peak_rss_mb=rss_str)
                     atomic_write_status(self.status_path, self.status_rows)
                     self._event("FAILED", unit, f"output validation/checkpoint failed: {exc}")
                     raise
                 row.update(state="success", ended_at=timestamp(), exit_code="0",
-                           elapsed_seconds=f"{time.monotonic() - started[task.unit_id]:.3f}")
+                           elapsed_seconds=f"{time.monotonic() - started[task.unit_id]:.3f}", peak_rss_mb=rss_str)
                 atomic_write_status(self.status_path, self.status_rows)
                 self._event("SUCCESS", unit, f"elapsed={row['elapsed_seconds']}s checkpoint={checkpoint.relative_to(self.server_dir)}")
 
@@ -570,7 +598,7 @@ class Runner:
                 tasks, budget, self.active_children, lambda: self.received_signal,
                 start, lambda task, line: self._child_line(by_id[task.unit_id], line), finish,
                 {**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id},
-                dispatch=dispatcher,
+                dispatch=dispatcher, peak_rss_out=peak_rss,
             )
         finally:
             if code:
@@ -892,7 +920,7 @@ class Runner:
                         self._handle_signal(self.received_signal, None)
                     self._stream_child(unit, child)
                     self._finish_refinement_group()
-                    child_return_code = child.wait()
+                    child_return_code, peak_rss_mb = _wait_with_rusage(child)
                     exit_code = (
                         128 - child_return_code
                         if child_return_code < 0
@@ -905,6 +933,7 @@ class Runner:
                             "ended_at": timestamp(),
                             "elapsed_seconds": f"{elapsed:.3f}",
                             "exit_code": str(exit_code),
+                            "peak_rss_mb": f"{peak_rss_mb:.2f}" if peak_rss_mb is not None else "",
                         }
                     )
                     if self.received_signal is not None:

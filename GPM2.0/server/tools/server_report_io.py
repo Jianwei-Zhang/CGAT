@@ -177,10 +177,17 @@ def timing_summary(layout, records):
                 secs = None
         except (ValueError, TypeError):
             secs = None
+        rss_mb = rt.get('peak_rss_mb')
+        try:
+            rss_mb = float(rss_mb) if rss_mb not in (None, '') else None
+            if rss_mb is not None and not 0 < rss_mb < float('inf'):
+                rss_mb = None
+        except (ValueError, TypeError):
+            rss_mb = None
         row = dict(unit=unit, stage=stage, output_directory=directory, status=status,
                    execution=('failed' if status in ('failed', 'interrupted') else execution if execution in
                               ('computed', 'cache_reused', 'frozen_original_lgz') else 'pending'),
-                   elapsed_seconds=secs, started_at=rt.get('started_at') or None,
+                   elapsed_seconds=secs, peak_rss_mb=rss_mb, started_at=rt.get('started_at') or None,
                    ended_at=rt.get('ended_at') or None, exit_code=rt.get('exit_code') or None,
                    parallel_group=group, reason=(record.get('not_executed_reason') or
                         (record.get('failure_reason')[:500] if isinstance(record.get('failure_reason'),str) and '/' not in record['failure_reason'] and '\\' not in record['failure_reason'] else None) or
@@ -193,12 +200,16 @@ def timing_summary(layout, records):
         starts = [r['started_at'] for r in rows if r['started_at']]
         ends = [r['ended_at'] for r in rows if r['ended_at']]
         seconds = [r['elapsed_seconds'] for r in rows if r['elapsed_seconds'] is not None]
+        rss_vals = [r['peak_rss_mb'] for r in rows if r['peak_rss_mb'] is not None]
         try:
             span = (max(map(datetime.fromisoformat, ends))-min(map(datetime.fromisoformat, starts))).total_seconds()
         except (ValueError, TypeError):
             span = None
         return dict(id=key, unit_count=len(rows), measured_unit_count=len(seconds), unit_seconds=sum(seconds) if seconds else None,
+                    peak_rss_mb=max(rss_vals) if rss_vals else None,
                     observed_span_seconds=span, statuses=dict(Counter(r['status'] for r in rows)),
                     executions=dict(Counter(r['execution'] for r in rows)))
-    return {'units': units, **{name: [aggregate(key, rows) for (kind,key),rows in groups.items() if kind == want]
-                              for name,want in [('stages','stage'), ('parallel_groups','parallel')]}}
+    all_rss = [r['peak_rss_mb'] for r in units if r['peak_rss_mb'] is not None]
+    return {'units': units, 'peak_rss_mb': max(all_rss) if all_rss else None,
+            **{name: [aggregate(key, rows) for (kind,key),rows in groups.items() if kind == want]
+               for name,want in [('stages','stage'), ('parallel_groups','parallel')]}}

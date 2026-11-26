@@ -268,7 +268,28 @@ def dispatch_environment(environment, task, threads, *, exclusive):
     return result
 
 
-def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_finish, environment, *, dispatch=None):
+def _poll_with_rusage(child):
+    if child.returncode is not None:
+        return child.returncode, None
+    if hasattr(os, "wait4"):
+        try:
+            pid, status, rusage = os.wait4(child.pid, os.WNOHANG)
+        except ChildProcessError:
+            return child.poll(), None
+        if pid == 0:
+            return None, None
+        code = -os.WTERMSIG(status) if os.WIFSIGNALED(status) else os.WEXITSTATUS(status)
+        child.returncode = code
+        rss = getattr(rusage, "ru_maxrss", 0) or 0
+        if rss > 0:
+            is_darwin = hasattr(os, "uname") and os.uname().sysname == "Darwin"
+            mb = rss / (1024.0 * 1024.0) if is_darwin else rss / 1024.0
+            return code, round(mb, 2)
+        return code, None
+    return child.poll(), None
+
+
+def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_finish, environment, *, dispatch=None, peak_rss_out=None):
     """All callbacks run on the caller thread; each command owns a process group."""
     pending = sorted(tasks, key=lambda task: task.priority, reverse=True)
     limits = [task.max_concurrent for task in tasks if task.max_concurrent is not None]
@@ -352,7 +373,10 @@ def run_tasks(tasks, budget, children, cancel_signal, on_start, on_line, on_fini
                     if item["buffer"]:
                         on_line(item["task"], item["buffer"])
             for pid, item in list(active.items()):
-                code = item["child"].poll()
+                code, peak_mb = _poll_with_rusage(item["child"])
+                if peak_mb is not None and peak_rss_out is not None:
+                    uid = item["task"].unit_id
+                    peak_rss_out[uid] = max(peak_rss_out.get(uid, 0.0), peak_mb)
                 if code not in {None, 0} and not failure:
                     failure = 128 - code if code < 0 else code
                     failed_pid = pid

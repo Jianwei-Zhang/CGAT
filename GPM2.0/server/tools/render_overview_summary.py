@@ -1,6 +1,7 @@
 """Opening overview card: single-rail q0->Final stage switcher (P1), 4 genome quality charts (P2), and runtime bar."""
 from __future__ import annotations
 
+from datetime import datetime
 import json
 import math
 
@@ -996,9 +997,198 @@ def _svg_chr_coverage_t2t(lgz, chr_order, fstats, tel_info, cen_map):
     return "".join(svg), meta
 
 
+def _fmt_mem(mb):
+    if mb is None:
+        return "—"
+    v = max(0.0, float(mb))
+    if v >= 1024.0:
+        return f"{v / 1024.0:.2f} GB"
+    return f"{v:.0f} MB" if v >= 10 else f"{v:.1f} MB"
+
+
+def _parse_iso_ts(raw):
+    if not raw or not isinstance(raw, str):
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+    except (ValueError, TypeError):
+        return None
+
+
+def _runtime_modal_html(units, buckets, total_sec, wall_span, max_rss):
+    """Build detailed SVG charts (unit durations, Gantt timeline / peak memory) + table for modal."""
+    stage_meta = {k: (zh, en, col) for k, zh, en, col in buckets}
+
+    # Summary strip
+    n_comp = sum(1 for u in units if u.get("execution") == "computed")
+    n_cache = sum(1 for u in units if u.get("execution") == "cache_reused")
+    strip_bits = [
+        f'<span>{bi("累计单元耗时", "Total unit time")} <b>{esc(_fmt_dur(total_sec))}</b></span>',
+    ]
+    if wall_span is not None and wall_span > 0:
+        strip_bits.append(f'<span>{bi("墙钟跨度", "Wall span")} <b>{esc(_fmt_dur(wall_span))}</b></span>')
+    strip_bits.append(f'<span>{bi(f"单元 {len(units)}（计算 {n_comp} · 复用 {n_cache}）", f"{len(units)} units ({n_comp} computed · {n_cache} cached)")}</span>')
+    if max_rss is not None:
+        strip_bits.append(f'<span>{bi("峰值内存", "Peak RSS")} <b class="is-ok">{esc(_fmt_mem(max_rss))}</b></span>')
+    else:
+        strip_bits.append(f'<span class="muted">{bi("内存：未采集（新运行自动记录）", "Memory: not recorded (captured on new runs)")}</span>')
+    summary_strip = f'<div class="story-meta-strip ov-rt-strip">{"".join(strip_bits)}</div>'
+
+    # Chart A: Horizontal Unit Duration Breakdown (show non-zero units; cap at 12 by grouping smallest tail)
+    nz = [u for u in units if float(u.get("elapsed_seconds") or 0.0) > 0]
+    chart_rows = []
+    if len(nz) <= 12:
+        chart_rows = [(u["unit"], u.get("stage") or "", float(u["elapsed_seconds"]), u.get("execution") == "cache_reused") for u in nz]
+    else:
+        top = sorted(nz, key=lambda u: float(u["elapsed_seconds"]), reverse=True)[:11]
+        top_ids = {u["unit"] for u in top}
+        for u in nz:
+            if u["unit"] in top_ids:
+                chart_rows.append((u["unit"], u.get("stage") or "", float(u["elapsed_seconds"]), u.get("execution") == "cache_reused"))
+        rest = sum(float(u["elapsed_seconds"]) for u in nz if u["unit"] not in top_ids)
+        if rest > 0:
+            chart_rows.append((f"+{len(nz) - len(top_ids)} others", "", rest, False))
+
+    W = 460
+    max_s = max([0.1, *(r[2] for r in chart_rows)])
+    rh_a = 20
+    H_a = max(144, 16 + len(chart_rows) * rh_a + 10)
+    bx_a, bw_a = 128, 224
+    svg_a = [f'<svg class="ov-svg" viewBox="0 0 {W} {H_a}" role="img" aria-label="Unit duration breakdown">']
+    for i, (uname, st, sec, is_cached) in enumerate(chart_rows):
+        y = 12 + i * rh_a
+        col = stage_meta.get(st, ("", "", "var(--brand)"))[2]
+        fw = max(3.0, bw_a * sec / max_s)
+        pct = 100.0 * sec / max(0.001, total_sec)
+        disp = uname if len(uname) <= 19 else uname[:18] + "…"
+        svg_a.append(f'<text x="{bx_a - 8}" y="{y + 10}" text-anchor="end" class="ov-bar-lbl"><title>{esc(uname)}</title>{esc(disp)}</text>')
+        svg_a.append(f'<rect x="{bx_a}" y="{y + 1.5}" width="{bw_a}" height="10" rx="2" fill="var(--surface-muted)"/>')
+        op = ".48" if is_cached else ".92"
+        svg_a.append(f'<rect x="{bx_a}" y="{y + 1.5}" width="{fw:.1f}" height="10" rx="2" fill="{col}" opacity="{op}"><title>{esc(uname)}: {_fmt_dur(sec)} ({sec:.1f}s, {pct:.1f}%)</title></rect>')
+        svg_a.append(f'<text x="{bx_a + bw_a + 8}" y="{y + 10}" class="ov-bar-val">{esc(_fmt_dur(sec))} · {pct:.1f}%</text>')
+    svg_a.append("</svg>")
+    card_a = f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("任务耗时分布", "Unit Durations")}</h4><span class="ov-chart-meta">{bi("浅色 = 缓存复用", "Faded = cached")}</span></div>{"".join(svg_a)}</article>'
+
+    # Chart B1: Peak Memory Chart (when peak_rss_mb is recorded)
+    mem_units = [u for u in units if u.get("peak_rss_mb") is not None and float(u["peak_rss_mb"]) > 0]
+    card_mem = ""
+    if mem_units:
+        mem_shown = mem_units[:12] if len(mem_units) <= 12 else sorted(mem_units, key=lambda u: float(u["peak_rss_mb"]), reverse=True)[:12]
+        max_m = max(1.0, max(float(u["peak_rss_mb"]) for u in mem_shown))
+        rh_m = 20
+        H_m = max(144, 16 + len(mem_shown) * rh_m + 10)
+        bx_m, bw_m = 128, 240
+        svg_m = [f'<svg class="ov-svg" viewBox="0 0 {W} {H_m}" role="img" aria-label="Peak memory breakdown">']
+        for i, u in enumerate(mem_shown):
+            y = 12 + i * rh_m
+            mb = float(u["peak_rss_mb"])
+            col = stage_meta.get(u.get("stage") or "", ("", "", "var(--brand)"))[2]
+            fw = max(3.0, bw_m * mb / max_m)
+            disp = u["unit"] if len(u["unit"]) <= 19 else u["unit"][:18] + "…"
+            svg_m.append(f'<text x="{bx_m - 8}" y="{y + 10}" text-anchor="end" class="ov-bar-lbl"><title>{esc(u["unit"])}</title>{esc(disp)}</text>')
+            svg_m.append(f'<rect x="{bx_m}" y="{y + 1.5}" width="{bw_m}" height="10" rx="2" fill="var(--surface-muted)"/>')
+            svg_m.append(f'<rect x="{bx_m}" y="{y + 1.5}" width="{fw:.1f}" height="10" rx="2" fill="{col}" opacity=".88"><title>{esc(u["unit"])}: {_fmt_mem(mb)}</title></rect>')
+            svg_m.append(f'<text x="{bx_m + bw_m + 8}" y="{y + 10}" class="ov-bar-val">{esc(_fmt_mem(mb))}</text>')
+        svg_m.append("</svg>")
+        card_mem = f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("峰值内存分布 (RSS)", "Peak Memory (RSS)")}</h4><span class="ov-chart-meta is-ok">{esc(_fmt_mem(max_rss))}</span></div>{"".join(svg_m)}</article>'
+
+    # Chart B2: Wall-clock Gantt Timeline (when timestamps are available)
+    gantt_items = []
+    for u in units:
+        t0 = _parse_iso_ts(u.get("started_at"))
+        t1 = _parse_iso_ts(u.get("ended_at"))
+        sec = float(u.get("elapsed_seconds") or 0.0)
+        if t1 is not None and t0 is None and sec > 0:
+            t0 = t1 - sec
+        if t0 is not None and t1 is not None and t1 >= t0 and (t1 - t0 > 0 or sec > 0):
+            gantt_items.append((u["unit"], u.get("stage") or "", t0, max(t1, t0 + sec), sec, u.get("execution") == "cache_reused"))
+    card_gantt = ""
+    if gantt_items:
+        t_min = min(x[2] for x in gantt_items)
+        t_max = max(x[3] for x in gantt_items)
+        span = max(1.0, t_max - t_min)
+        g_shown = gantt_items[:14]
+        rh_g = 18
+        H_g = max(144, 18 + len(g_shown) * rh_g + 22)
+        bx_g, bw_g = 128, 312
+        svg_g = [f'<svg class="ov-svg" viewBox="0 0 {W} {H_g}" role="img" aria-label="Execution timeline">']
+        for frac in (0.0, 0.25, 0.5, 0.75, 1.0):
+            gx = bx_g + bw_g * frac
+            svg_g.append(f'<line x1="{gx:.1f}" y1="10" x2="{gx:.1f}" y2="{H_g - 20}" stroke="var(--border-subtle)" stroke-dasharray="{"" if frac in (0.0, 1.0) else "2.5 3"}"/>')
+            svg_g.append(f'<text x="{gx:.1f}" y="{H_g - 7}" text-anchor="{"start" if frac == 0 else ("end" if frac == 1 else "middle")}" class="ov-ax-txt">{esc("0" if frac == 0 else _fmt_dur(span * frac))}</text>')
+        for i, (uname, st, t0, t1, sec, is_cached) in enumerate(g_shown):
+            y = 14 + i * rh_g
+            col = stage_meta.get(st, ("", "", "var(--brand)"))[2]
+            rx = bx_g + bw_g * ((t0 - t_min) / span)
+            rw = max(3.5, bw_g * ((t1 - t0) / span))
+            disp = uname if len(uname) <= 19 else uname[:18] + "…"
+            svg_g.append(f'<text x="{bx_g - 8}" y="{y + 9}" text-anchor="end" class="ov-bar-lbl"><title>{esc(uname)}</title>{esc(disp)}</text>')
+            svg_g.append(f'<rect x="{rx:.1f}" y="{y + 1.5}" width="{rw:.1f}" height="9" rx="2" fill="{col}" opacity="{".48" if is_cached else ".92"}"><title>{esc(uname)}: {_fmt_dur(sec)} (offset +{_fmt_dur(t0 - t_min)})</title></rect>')
+        svg_g.append("</svg>")
+        card_gantt = f'<article class="ov-chart-card"><div class="ov-chart-head"><h4>{bi("执行时间轴 (甘特图)", "Execution Timeline")}</h4><span class="ov-chart-meta">{esc(_fmt_dur(span))}</span></div>{"".join(svg_g)}</article>'
+
+    # Arrange charts neatly (2-col grid; if 3 charts, Gantt spans full width cleanly)
+    charts_html = ""
+    if card_mem and card_gantt:
+        charts_html = f'<div class="ov-charts-grid">{card_a}{card_mem}</div><div style="margin-top:.75rem">{card_gantt}</div>'
+    elif card_mem:
+        charts_html = f'<div class="ov-charts-grid">{card_a}{card_mem}</div>'
+    elif card_gantt:
+        charts_html = f'<div class="ov-charts-grid">{card_a}{card_gantt}</div>'
+    else:
+        charts_html = card_a
+
+    # Detail table
+    exec_labels = {
+        "computed": bi("实际计算", "Computed"),
+        "cache_reused": bi("缓存复用", "Cached"),
+        "frozen_original_lgz": bi("复用原 LGZ", "Frozen LGZ"),
+        "failed": bi("失败", "Failed"),
+    }
+    trows = []
+    for u in units:
+        sec = u.get("elapsed_seconds")
+        sec_f = float(sec) if sec is not None else 0.0
+        pct = f"{100.0 * sec_f / total_sec:.1f}%" if (sec is not None and total_sec > 0) else "—"
+        st = u.get("stage") or ""
+        st_lbl = bi(stage_meta[st][0], stage_meta[st][1]) if st in stage_meta else esc(st or "—")
+        ex_lbl = exec_labels.get(u.get("execution") or "", esc(u.get("execution") or "—"))
+        rss = _fmt_mem(u.get("peak_rss_mb"))
+        st_txt = u.get("status") or "—"
+        st_cls = "tone-ok" if st_txt == "success" else ("tone-err" if st_txt in ("failed", "interrupted") else "tone-neutral")
+        trows.append(
+            f'<tr><th scope="row"><code>{esc(u["unit"])}</code></th>'
+            f'<td>{st_lbl}</td><td>{ex_lbl}</td>'
+            f'<td class="numeric">{esc(_fmt_dur(sec_f)) if sec is not None else "—"}</td>'
+            f'<td class="numeric">{esc(pct)}</td>'
+            f'<td class="numeric">{esc(rss)}</td>'
+            f'<td><span class="badge {st_cls}">{esc(st_txt)}</span></td></tr>'
+        )
+    table_html = (
+        '<div class="project-dataset-scroll" style="margin-top:.85rem">'
+        '<table class="project-dataset-table ov-rt-table">'
+        '<thead><tr>'
+        f'<th scope="col">{bi("执行单元", "Unit")}</th>'
+        f'<th scope="col">{bi("阶段", "Stage")}</th>'
+        f'<th scope="col">{bi("方式", "Mode")}</th>'
+        f'<th scope="col">{bi("耗时", "Duration")}</th>'
+        f'<th scope="col">{bi("占比", "Share")}</th>'
+        f'<th scope="col">{bi("峰值内存", "Peak RSS")}</th>'
+        f'<th scope="col">{bi("状态", "Status")}</th>'
+        f'</tr></thead><tbody>{"".join(trows)}</tbody></table></div>'
+    )
+
+    return (
+        '<template id="ov-runtime-modal" data-title-zh="运行耗时与资源详情" data-title-en="Runtime & Resource Details">'
+        + summary_strip + charts_html + table_html
+        + "</template>"
+    )
+
+
 def _runtime_bar_html(lgz):
-    """Compact 1-row stacked runtime bar from verified lgz_summary.timing.units."""
-    units = (lgz.get("timing") or {}).get("units") or []
+    """Compact 1-row clickable runtime bar + modal template from verified lgz_summary.timing."""
+    timing = lgz.get("timing") or {}
+    units = timing.get("units") or []
     if not units:
         return ""
     buckets = [
@@ -1011,18 +1201,35 @@ def _runtime_bar_html(lgz):
     sums = {k: 0.0 for k, _, _, _ in buckets}
     reused = {k: True for k, _, _, _ in buckets}
     seen = {k: False for k, _, _, _ in buckets}
+    rss_vals = []
+    starts, ends = [], []
     for u in units:
         st = u.get("stage") or ""
         sec = float(u.get("elapsed_seconds") or 0.0)
-        if st not in sums:
-            continue
-        sums[st] += max(0.0, sec)
-        seen[st] = True
-        if u.get("execution") != "cache_reused":
-            reused[st] = False
+        if st in sums:
+            sums[st] += max(0.0, sec)
+            seen[st] = True
+            if u.get("execution") != "cache_reused":
+                reused[st] = False
+        if u.get("peak_rss_mb") is not None:
+            try:
+                rv = float(u["peak_rss_mb"])
+                if rv > 0:
+                    rss_vals.append(rv)
+            except (ValueError, TypeError):
+                pass
+        t0 = _parse_iso_ts(u.get("started_at"))
+        t1 = _parse_iso_ts(u.get("ended_at"))
+        if t0 is not None:
+            starts.append(t0)
+        if t1 is not None:
+            ends.append(t1)
     total = sum(sums.values())
     if total <= 0:
         return ""
+
+    max_rss = max(rss_vals) if rss_vals else timing.get("peak_rss_mb")
+    wall_span = (max(ends) - min(starts)) if (starts and ends and max(ends) >= min(starts)) else None
 
     segs = []
     legs = []
@@ -1037,12 +1244,18 @@ def _runtime_bar_html(lgz):
         segs.append(f'<span class="ov-rt-seg" style="width:{max(1.2, pct):.3f}%;background:{col}" title="{esc(tip)}"></span>')
         legs.append(f'<span class="ov-rt-item"><i class="ov-rt-dot" style="background:{col}"></i>{bi(zh, en)} <b>{esc(dur)}</b></span>')
 
+    mem_bit = f'<span class="ov-rt-mem">{bi("峰值内存", "Peak")} <b>{esc(_fmt_mem(max_rss))}</b></span>' if max_rss else ""
+    modal = _runtime_modal_html(units, buckets, total, wall_span, max_rss)
     return (
-        '<div class="ov-runtime-bar">'
+        '<button type="button" class="ov-runtime-bar" data-story-open="ov-runtime-modal" '
+        'title="点击查看各任务耗时、时间轴与内存详情 / Click for runtime & resource details">'
         f'<span class="ov-rt-head">{bi("运行耗时", "Runtime")} <b>{esc(_fmt_dur(total))}</b></span>'
+        f"{mem_bit}"
         f'<span class="ov-rt-track" aria-hidden="true">{"".join(segs)}</span>'
         f'<span class="ov-rt-legend">{"".join(legs)}</span>'
-        "</div>"
+        f'<span class="ov-rt-more">{bi("详情 ↗", "Details ↗")}</span>'
+        "</button>"
+        + modal
     )
 
 
@@ -1357,15 +1570,23 @@ STYLE = """<style>
 .ov-bar-lbl.is-win{fill:var(--gen-closed)}
 .ov-bar-val{font-family:var(--font-mono);font-size:var(--svg-micro);font-weight:600;fill:var(--text-secondary)}
 .ov-bar-val.is-win{fill:var(--gen-closed)}
-.ov-runtime-bar{display:flex;align-items:center;gap:.6rem .9rem;flex-wrap:wrap;margin-top:.75rem;padding:.46rem .78rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle);font-size:var(--text-xs);color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.ov-runtime-bar{width:100%;display:flex;align-items:center;gap:.55rem .85rem;flex-wrap:wrap;margin-top:.75rem;padding:.48rem .78rem;border:1px solid var(--border-subtle);border-radius:var(--radius);background:var(--surface-subtle);font-family:var(--font-sans);font-size:var(--text-xs);color:var(--text-secondary);font-variant-numeric:tabular-nums;text-align:left;cursor:pointer;transition:border-color .12s,background .12s,box-shadow .12s}
+.ov-runtime-bar:hover{border-color:var(--brand);background:var(--surface-panel);box-shadow:0 1px 3px rgba(15,23,42,.06)}
 .ov-rt-head{white-space:nowrap;color:var(--text-muted)}
 .ov-rt-head b{color:var(--text-primary);font-family:var(--font-mono);font-weight:600}
-.ov-rt-track{flex:1 1 160px;min-width:120px;display:flex;height:7px;border-radius:999px;overflow:hidden;background:var(--surface-muted);gap:1px}
+.ov-rt-mem{white-space:nowrap;color:var(--text-muted)}
+.ov-rt-mem b{color:var(--gen-closed);font-family:var(--font-mono);font-weight:600}
+.ov-rt-track{flex:1 1 150px;min-width:110px;display:flex;height:7px;border-radius:999px;overflow:hidden;background:var(--surface-muted);gap:1px}
 .ov-rt-seg{display:block;height:100%}
-.ov-rt-legend{display:inline-flex;align-items:center;gap:.35rem .7rem;flex-wrap:wrap}
-.ov-rt-item{display:inline-flex;align-items:center;gap:.28rem;white-space:nowrap}
+.ov-rt-legend{display:inline-flex;align-items:center;gap:.35rem .65rem;flex-wrap:wrap}
+.ov-rt-item{display:inline-flex;align-items:center;gap:.26rem;white-space:nowrap}
 .ov-rt-item b{font-family:var(--font-mono);font-weight:600;color:var(--text-primary)}
 .ov-rt-dot{display:inline-block;width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.ov-rt-more{margin-left:auto;color:var(--accent);font-weight:600;white-space:nowrap}
+.ov-rt-strip{margin:0 0 .75rem;padding:.45rem .65rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
+.ov-rt-strip b.is-ok{color:var(--gen-closed)}
+.ov-rt-table th,.ov-rt-table td{padding:7px 10px;font-size:var(--text-sm)}
+.ov-rt-table thead th{font-size:var(--text-xs)}
 @media (max-width:860px){
   .ov-charts-grid{grid-template-columns:1fr}
   .ov-stepper{flex-wrap:wrap}

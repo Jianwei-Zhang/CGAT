@@ -307,7 +307,12 @@ class ReportOverviewTests(unittest.TestCase):
             self.assertIn("01_lgz/report.html", page.read_text())
             manifest = json.loads(l.path("report/manifest.json").read_text())
             self.assertEqual(manifest["workspace_layout"]["schema"], "cgat.workspace.job-outputs.v2")
-            self.assertIn(manifest["stage_timing_summary"]["units"][0]["status"], ("failed", "interrupted"))
+            unit_row = manifest["stage_timing_summary"]["units"][0]
+            self.assertIn(unit_row["status"], ("failed", "interrupted"))
+            self.assertIn("peak_rss_mb", unit_row)
+            if i == 0:
+                self.assertIsNotNone(unit_row["peak_rss_mb"])
+                self.assertGreater(unit_row["peak_rss_mb"], 0)
             for mode in ("full", "light"):
                 text(delivery_staging_path(root, mode) / "data", "x")
                 facts = collect_unit(root, "package_" + mode, {})
