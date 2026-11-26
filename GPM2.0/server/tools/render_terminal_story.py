@@ -406,7 +406,7 @@ def _inspection(t, side, size):
 
 def terminal_card(lgz):
     rows = lgz.get("terminal_scene")
-    head = ("terminal-process", "06", "端粒处理", "Telomere processing")
+    head = ("terminal-process", "06", "端粒处理", "Telomere Processing")
     if not rows:
         return section(*head, '<p class="muted">' + bi("本次没有可核验的 q2 → q3 末端检测记录。", "No verifiable q2 → q3 end assessment is available.") + '</p>',
                        sub_zh="q2 → q3", sub_en="q2 → q3")

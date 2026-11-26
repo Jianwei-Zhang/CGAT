@@ -474,7 +474,7 @@ def structural_detail(d, step_idx=None, total_steps=1):
 
 def repair_card(lgz, structural=False):
     key, num, prior, after = (("structural-repair", "05", "q1", "q2") if structural else ("first-repair", "04", "q0", "q1"))
-    zh, en = (("结构修正与再填补", "Structural correction and refill") if structural else ("第一轮修补", "First repair"))
+    zh, en = (("结构修复", "Structural Repair") if structural else ("局部修补", "Local Repair"))
     rows = lgz.get("step2_scene" if structural else "step1_scene")
     if rows is None:
         return section(key, num, zh, en,

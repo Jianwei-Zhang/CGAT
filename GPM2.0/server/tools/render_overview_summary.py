@@ -420,32 +420,32 @@ def _build_stage_tracks(vm, chr_order, colors, winning_v, winning_tool_rec, tel_
 
     stages = [
         {
-            "key": "q0", "tag": "q0", "zh": "初始路径", "en": "Initial",
+            "key": "q0", "tag": "q0", "zh": "初始路径", "en": "Initial Path",
             "sub_zh": q0_sub_zh, "sub_en": q0_sub_en,
-            "href": "#alignment-q0", "jump_zh": "03 初始路径 q0", "jump_en": "03 Initial q0",
+            "href": "#alignment-q0", "jump_zh": "03 初始路径", "jump_en": "03 Initial Path",
             "show_tel": False, "is_final": False, "rows": q0_rows,
         },
         {
-            "key": "q1", "tag": "q1", "zh": "局部修补", "en": "Local",
+            "key": "q1", "tag": "q1", "zh": "局部修补", "en": "Local Repair",
             "sub_zh": q1_sub_zh, "sub_en": q1_sub_en,
-            "href": "#step1-repair", "jump_zh": "04 局部修补", "jump_en": "04 Local Repair",
+            "href": "#first-repair", "jump_zh": "04 局部修补", "jump_en": "04 Local Repair",
             "show_tel": False, "is_final": False, "rows": q1_rows,
         },
         {
-            "key": "q2", "tag": "q2", "zh": "结构修复", "en": "Structural",
+            "key": "q2", "tag": "q2", "zh": "结构修复", "en": "Structural Repair",
             "sub_zh": q2_sub_zh, "sub_en": q2_sub_en,
-            "href": "#step2-repair", "jump_zh": "05 结构修复", "jump_en": "05 Structural",
+            "href": "#structural-repair", "jump_zh": "05 结构修复", "jump_en": "05 Structural Repair",
             "show_tel": False, "is_final": False, "rows": q2_rows,
         },
         {
             "key": "q3",
             "tag": "q3" if auto else "Final",
-            "zh": "端粒处理" if auto else "端粒与交付",
-            "en": "Telomeres" if auto else "Final (LGZ)",
+            "zh": "端粒处理" if auto else "最终路径",
+            "en": "Telomere Processing" if auto else "Final Path",
             "sub_zh": q3_sub_zh, "sub_en": q3_sub_en,
-            "href": "#terminal-repair" if auto else "#final-path",
-            "jump_zh": "06 端粒处理" if auto else "07 Final Path",
-            "jump_en": "06 Telomeres" if auto else "07 Final Path",
+            "href": "#terminal-process" if auto else "#final-path",
+            "jump_zh": "06 端粒处理" if auto else "07 最终路径",
+            "jump_en": "06 Telomere Processing" if auto else "07 Final Path",
             "show_tel": True, "is_final": not auto, "rows": q3_rows,
         },
     ]
@@ -462,9 +462,9 @@ def _build_stage_tracks(vm, chr_order, colors, winning_v, winning_tool_rec, tel_
             fsub_zh = f"剩 {fg} Gap"
             fsub_en = f"{fg} gaps"
         stages.append({
-            "key": "final", "tag": "Final", "zh": tname, "en": tname,
+            "key": "final", "tag": "Final", "zh": f"最终路径 · {tname}", "en": f"Final · {tname}",
             "sub_zh": fsub_zh, "sub_en": fsub_en,
-            "href": "#final-path", "jump_zh": "08 Final Path", "jump_en": "08 Final Path",
+            "href": "#final-path", "jump_zh": "08 最终路径", "jump_en": "08 Final Path",
             "show_tel": True, "is_final": True, "rows": final_rows or q3_rows,
         })
 

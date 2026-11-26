@@ -164,10 +164,10 @@ def final_card(vm):
         ids[g['chromosome']].append(g['gap_id'])
     index = {gid: (ci, gi) for ci, gids in enumerate(ids.values()) for gi, gid in enumerate(gids)}
     if versions is None:
-        return section('final-path', num, 'Final Path', 'Final Path',
+        return section('final-path', num, '最终路径', 'Final Path',
                        '<p class="muted">' + bi('此旧报告未记录可核对的交付路径。', 'No verified delivery path was recorded in this report model.') + '</p>')
     if not versions:
-        return section('final-path', num, 'Final Path', 'Final Path',
+        return section('final-path', num, '最终路径', 'Final Path',
                        '<p class="muted">' + (bi('本批没有已验证的自动精修交付。', 'No verified refined version was published in this batch.') if auto else bi('本批未记录可核对的 LGZ 成品。', 'No verified LGZ delivery recorded for this run.')) + '</p>')
 
     v = _select_version(versions, tools, auto)
@@ -238,7 +238,7 @@ def final_card(vm):
     )
 
     if v['tracks']:
-        zbtn = zoom_button(f"{num} Final Path · 放大视图", f"{num} Final Path · Enlarged view")
+        zbtn = zoom_button(f"{num} 最终路径 · 放大视图", f"{num} Final Path · Enlarged view")
         tracks = (
             '<div class="final-frame" data-zoom-frame="1">' + ruler
             + '<div class="final-preview-list">' + ''.join(_row(c, domain, refs.get(c['chr']), idx, colors, tool_disp, suppressed_gids) for c in v_tracks) + '</div>'
@@ -252,7 +252,7 @@ def final_card(vm):
     sub_zh = f"LGZ + {tool_disp}" if auto else "LGZ 自动构建"
     sub_en = f"LGZ + {tool_disp}" if auto else "LGZ-only"
     body = STYLE + '<div class="final-version">' + unchanged + toolbar + tracks + '</div>' + SCRIPT
-    return section('final-path', num, 'Final Path', 'Final Path', body,
+    return section('final-path', num, '最终路径', 'Final Path', body,
                    sub_zh=sub_zh, sub_en=sub_en, right=head_path)
 
 

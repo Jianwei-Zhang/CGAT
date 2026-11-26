@@ -58,8 +58,9 @@ def gap_card(vm):
     note = (bi('本批未记录有效的原始 gap 分母。', 'No valid original gap denominator for this batch.') if total is None else
             bi(f'{total:,} 个原始 Gap · {len(tools)} 个工具', f'{total:,} original gaps · {len(tools)} tools'))
     if total and 'original_loci' not in ref:
-        return section('auto-refinement', '07', '自动精修', 'Automatic refinement',
-                       '<p class="muted">' + note + ' · ' + bi('旧报告只保存了预览，不绘制推测的位点。', 'Only a preview was recorded; a complete locus map is unavailable.') + '</p>')
+        return section('auto-refinement', '07', '自动精修', 'Auto Refinement',
+                       '<p class="muted">' + note + ' · ' + bi('旧报告只保存了预览，不绘制推测的位点。', 'Only a preview was recorded; a complete locus map is unavailable.') + '</p>',
+                       sub_zh='q3 → Final', sub_en='q3 → Final')
 
     degap_href = next((t.get('degap_global_href') for t in tools if t['tool'] == 'degap' and t.get('degap_global_href')), None)
     degap_top_link = (
@@ -103,7 +104,7 @@ def gap_card(vm):
         + ''.join(f'<span>{esc(fmt_bp_short(round(max_len * i / 4)))}</span>' for i in range(5))
         + '</span></div>'
     ) if payload['chr'] else ''
-    zbtn = zoom_button('07 自动精修 · 放大视图', '07 Automatic refinement · Enlarged view') if payload['chr'] else ''
+    zbtn = zoom_button('07 自动精修 · 放大视图', '07 Auto Refinement · Enlarged view') if payload['chr'] else ''
     track_view = (
         '<div class="gap-frame" data-zoom-frame="1" data-gap-panel="track">'
         + ruler + '<div data-gap-rows></div>' + zbtn + '</div>'
@@ -120,7 +121,7 @@ def gap_card(vm):
         '<script type="application/json" id="auto-gap-data">' + data + '</script>'
         + STYLE + SCRIPT
     )
-    return section('auto-refinement', '07', '自动精修', 'Automatic refinement', body, right=note)
+    return section('auto-refinement', '07', '自动精修', 'Auto Refinement', body, sub_zh='q3 → Final', sub_en='q3 → Final', right=note)
 
 
 STYLE = '''<style>

@@ -323,7 +323,7 @@ def input_card(inputs):
             )
     aux_html = ('<div class="input-aux-bar">' + "".join(aux) + '</div>') if aux else ""
     count_right = bi(f"{len(rows)} 个数据集", f"{len(rows)} datasets") if rows else ""
-    return section("inputs", "01", "输入数据", "Inputs", INPUT_STYLE + grid + aux_html + "".join(templates), right=count_right)
+    return section("inputs", "01", "输入数据", "Input Data", INPUT_STYLE + grid + aux_html + "".join(templates), right=count_right)
 
 
 def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None):
@@ -370,7 +370,7 @@ def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None
     )
     groups = assignment.get("groups")
     if groups is None:
-        return section("chr-groups", "02", "染色体分组", "Chromosome groups",
+        return section("chr-groups", "02", "染色体分组", "Chromosome Grouping",
                        ASSIGN_STYLE + '<p class="muted">' + bi("未记录完整的分组成员表", "Complete membership table unavailable") + "</p>" + rule_modal,
                        title_extra=rule_btn, right=cut)
 
@@ -524,7 +524,7 @@ def assignment_card(assignment, *, ref_tracks=None, assemblies=None, funnel=None
     if unassigned_count > 0:
         right_bits.append(bi(f"{unassigned_count:,} 未分配", f"{unassigned_count:,} unassigned"))
     right_bits.append(cut)
-    return section("chr-groups", "02", "染色体分组", "Chromosome groups",
+    return section("chr-groups", "02", "染色体分组", "Chromosome Grouping",
                    ASSIGN_STYLE + toggle + table_html + rule_modal,
                    title_extra=rule_btn, right=" · ".join(right_bits))
 
@@ -553,11 +553,11 @@ def _q0_visual_offset(track, domain):
 def q0_card(lgz):
     tracks = lgz.get("q0_scene")
     if not tracks:
-        return section("alignment-q0", "03", "初始路径 q0", "Initial path q0",
+        return section("alignment-q0", "03", "初始路径", "Initial Path",
                        '<p class="muted">' + bi(
                            "没有可核对的完整 q0 路径与定位证据，不绘制推测比对。",
                            "No verified complete q0 selection is available; alignments have not been inferred.",
-                       ) + "</p>")
+                       ) + "</p>", sub_zh="q0", sub_en="q0")
     domain = max([1] + [max(t["length_bp"] or 0, (t["ref"] or {}).get("length_bp", 0)) for t in tracks])
     sources = [d["name"] for d in lgz["inputs"]["assemblies"]]
     sources.extend(sorted({p["dataset"] for t in tracks for p in t["parts"] if p["kind"] == "source"} - set(sources)))
@@ -711,7 +711,7 @@ def q0_card(lgz):
         + "".join(f"<span>{esc(fmt_bp_short(round(domain * i / 4)))}</span>" for i in range(5))
         + "</span></div>"
     )
-    zbtn = zoom_button("03 初始路径 q0 · 放大视图", "03 Initial path q0 · Enlarged view")
+    zbtn = zoom_button("03 初始路径 · 放大视图", "03 Initial Path · Enlarged view")
     frame_html = f'<div class="q0-frame" data-zoom-frame="1">{axis_html}{"".join(rows_html)}{zbtn}</div>'
     body_html = (
         style
@@ -722,5 +722,5 @@ def q0_card(lgz):
     if constructed:
         right_bits.append(bi(f"q0 总长 {fmt_bp_short(total_q0_bp)}", f"q0 {fmt_bp_short(total_q0_bp)}"))
         right_bits.append(bi(f"{total_gaps} Gap", f"{total_gaps} gaps"))
-    return section("alignment-q0", "03", "初始路径 q0", "Initial path q0", body_html,
-                   right=" · ".join(right_bits))
+    return section("alignment-q0", "03", "初始路径", "Initial Path", body_html,
+                   sub_zh="q0", sub_en="q0", right=" · ".join(right_bits))
