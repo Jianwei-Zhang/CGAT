@@ -1,0 +1,940 @@
+{
+  "changed_evidence_or_score_only_groups": [],
+  "changed_geometry_groups": [],
+  "groups": {
+    "1A": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 146,
+        "sequence_overlap": 7
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 383,
+      "new_questions": {
+        "unproven_join": 146,
+        "weak_placement": 23
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 146,
+        "sequence_overlap": 7
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 383,
+      "old_questions": {
+        "unproven_join": 146,
+        "weak_placement": 23
+      },
+      "request": {
+        "both_bp": 641628,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "1B": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 186,
+        "sequence_overlap": 7
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 712,
+      "new_questions": {
+        "unproven_join": 186,
+        "weak_placement": 25
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 186,
+        "sequence_overlap": 7
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 712,
+      "old_questions": {
+        "unproven_join": 186,
+        "weak_placement": 25
+      },
+      "request": {
+        "both_bp": 790321,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "1D": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 84,
+        "sequence_overlap": 9
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 245,
+      "new_questions": {
+        "unproven_join": 84,
+        "weak_placement": 11
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 84,
+        "sequence_overlap": 9
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 245,
+      "old_questions": {
+        "unproven_join": 84,
+        "weak_placement": 11
+      },
+      "request": {
+        "both_bp": 346771,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "2A": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 229,
+        "sequence_overlap": 8
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 596,
+      "new_questions": {
+        "unproven_join": 229,
+        "weak_placement": 36
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 229,
+        "sequence_overlap": 8
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 596,
+      "old_questions": {
+        "unproven_join": 229,
+        "weak_placement": 36
+      },
+      "request": {
+        "both_bp": 899487,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "2B": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 230,
+        "sequence_overlap": 5
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 626,
+      "new_questions": {
+        "unproven_join": 230,
+        "weak_placement": 25
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 230,
+        "sequence_overlap": 5
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 626,
+      "old_questions": {
+        "unproven_join": 230,
+        "weak_placement": 25
+      },
+      "request": {
+        "both_bp": 950037,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "2D": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 77,
+        "sequence_overlap": 3
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 307,
+      "new_questions": {
+        "unproven_join": 77,
+        "weak_placement": 7
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 77,
+        "sequence_overlap": 3
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 307,
+      "old_questions": {
+        "unproven_join": 77,
+        "weak_placement": 7
+      },
+      "request": {
+        "both_bp": 268836,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "3A": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 176,
+        "sequence_overlap": 7
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 431,
+      "new_questions": {
+        "unproven_join": 176,
+        "weak_placement": 23
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 176,
+        "sequence_overlap": 7
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 431,
+      "old_questions": {
+        "unproven_join": 176,
+        "weak_placement": 23
+      },
+      "request": {
+        "both_bp": 734446,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "3B": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 217,
+        "sequence_overlap": 7
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 800,
+      "new_questions": {
+        "unproven_join": 217,
+        "weak_placement": 21
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 217,
+        "sequence_overlap": 7
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 800,
+      "old_questions": {
+        "unproven_join": 217,
+        "weak_placement": 21
+      },
+      "request": {
+        "both_bp": 735220,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "3D": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 101,
+        "sequence_overlap": 6
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 281,
+      "new_questions": {
+        "unproven_join": 101,
+        "weak_placement": 11
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 101,
+        "sequence_overlap": 6
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 281,
+      "old_questions": {
+        "unproven_join": 101,
+        "weak_placement": 11
+      },
+      "request": {
+        "both_bp": 349368,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "4A": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 155,
+        "sequence_overlap": 9
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 555,
+      "new_questions": {
+        "unproven_join": 155,
+        "weak_placement": 23
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 155,
+        "sequence_overlap": 9
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 555,
+      "old_questions": {
+        "unproven_join": 155,
+        "weak_placement": 23
+      },
+      "request": {
+        "both_bp": 722713,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "4B": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 182,
+        "sequence_overlap": 6
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 584,
+      "new_questions": {
+        "unproven_join": 182,
+        "weak_placement": 17
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 182,
+        "sequence_overlap": 6
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 584,
+      "old_questions": {
+        "unproven_join": 182,
+        "weak_placement": 17
+      },
+      "request": {
+        "both_bp": 630555,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "4D": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 69,
+        "sequence_overlap": 3
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 192,
+      "new_questions": {
+        "unproven_join": 69,
+        "weak_placement": 9
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 69,
+        "sequence_overlap": 3
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 192,
+      "old_questions": {
+        "unproven_join": 69,
+        "weak_placement": 9
+      },
+      "request": {
+        "both_bp": 260673,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "5A": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 190,
+        "sequence_overlap": 6
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 639,
+      "new_questions": {
+        "unproven_join": 190,
+        "weak_placement": 28
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 190,
+        "sequence_overlap": 6
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 639,
+      "old_questions": {
+        "unproven_join": 190,
+        "weak_placement": 28
+      },
+      "request": {
+        "both_bp": 778190,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "5B": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 285,
+        "sequence_overlap": 8
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 887,
+      "new_questions": {
+        "unproven_join": 285,
+        "weak_placement": 36
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 285,
+        "sequence_overlap": 8
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 887,
+      "old_questions": {
+        "unproven_join": 285,
+        "weak_placement": 36
+      },
+      "request": {
+        "both_bp": 1115452,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "5D": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 96,
+        "sequence_overlap": 2
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 658,
+      "new_questions": {
+        "unproven_join": 96,
+        "weak_placement": 12
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 96,
+        "sequence_overlap": 2
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 658,
+      "old_questions": {
+        "unproven_join": 96,
+        "weak_placement": 12
+      },
+      "request": {
+        "both_bp": 353197,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "6A": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 159,
+        "sequence_overlap": 7
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 427,
+      "new_questions": {
+        "unproven_join": 159,
+        "weak_placement": 25
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 159,
+        "sequence_overlap": 7
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 427,
+      "old_questions": {
+        "unproven_join": 159,
+        "weak_placement": 25
+      },
+      "request": {
+        "both_bp": 674434,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "6B": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 283,
+        "sequence_overlap": 7
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 799,
+      "new_questions": {
+        "unproven_join": 283,
+        "weak_placement": 36
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 283,
+        "sequence_overlap": 7
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 799,
+      "old_questions": {
+        "unproven_join": 283,
+        "weak_placement": 36
+      },
+      "request": {
+        "both_bp": 1118463,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "6D": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 71,
+        "sequence_overlap": 4
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 241,
+      "new_questions": {
+        "unproven_join": 71,
+        "weak_placement": 9
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 71,
+        "sequence_overlap": 4
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 241,
+      "old_questions": {
+        "unproven_join": 71,
+        "weak_placement": 9
+      },
+      "request": {
+        "both_bp": 298955,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "7A": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 147,
+        "sequence_overlap": 11
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 678,
+      "new_questions": {
+        "unproven_join": 147,
+        "weak_placement": 19
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 147,
+        "sequence_overlap": 11
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 678,
+      "old_questions": {
+        "unproven_join": 147,
+        "weak_placement": 19
+      },
+      "request": {
+        "both_bp": 734204,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "7B": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 270,
+        "sequence_overlap": 9
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 847,
+      "new_questions": {
+        "unproven_join": 270,
+        "weak_placement": 31
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 270,
+        "sequence_overlap": 9
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 847,
+      "old_questions": {
+        "unproven_join": 270,
+        "weak_placement": 31
+      },
+      "request": {
+        "both_bp": 1041973,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "7D": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 135,
+        "sequence_overlap": 6
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 432,
+      "new_questions": {
+        "unproven_join": 135,
+        "weak_placement": 11
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 135,
+        "sequence_overlap": 6
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 432,
+      "old_questions": {
+        "unproven_join": 135,
+        "weak_placement": 11
+      },
+      "request": {
+        "both_bp": 427231,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    },
+    "Un": {
+      "changed_source_cuts": 0,
+      "new_built": true,
+      "new_join_types": {
+        "reference_unknown": 134,
+        "sequence_overlap": 10
+      },
+      "new_only_placement_ids": 0,
+      "new_only_question_ids": 0,
+      "new_placements": 498,
+      "new_questions": {
+        "unproven_join": 134,
+        "weak_placement": 16
+      },
+      "old_built": true,
+      "old_join_types": {
+        "reference_unknown": 134,
+        "sequence_overlap": 10
+      },
+      "old_only_placement_ids": 0,
+      "old_only_question_ids": 0,
+      "old_placements": 498,
+      "old_questions": {
+        "unproven_join": 134,
+        "weak_placement": 16
+      },
+      "request": {
+        "both_bp": 503778,
+        "new_only_bp": 0,
+        "old_only_bp": 0,
+        "same": true
+      },
+      "same_ids_different_placement_records": 0,
+      "same_path_record": true,
+      "same_source_cuts_joins": true,
+      "same_source_order_and_strand": true
+    }
+  },
+  "local_mapping": "ffc6e0f5cd45948e5d5ff5140c1b6a15e977e6b8bcdf5c7477c699ed34c16f8e",
+  "local_readback": "5b14bed1c71c7aec13c3496a15262e4f1b3cdd138fce228f46dd3d4881cf5a9a",
+  "new_counts": {
+    "positive_placement_stop": 3337,
+    "sequence_overlap_stop": 147,
+    "unbuilt_without_reference_seed": 0,
+    "unproven_join": 3622,
+    "weak_placement": 454
+  },
+  "new_pair_rows": 71253541,
+  "new_summary": "d23a49af479b6c9b81916518e8034d4044ea31b5c97229c5d0ce1624138fc9d4",
+  "old_counts": {
+    "positive_placement_stop": 3337,
+    "sequence_overlap_stop": 147,
+    "unbuilt_without_reference_seed": 0,
+    "unproven_join": 3622,
+    "weak_placement": 454
+  },
+  "old_pair_rows": 71251881,
+  "old_summary": "ef67a79f96a87adb9cd13d86c652b0fe4c6b769a717d5ddadda9196414eabffa",
+  "schema": "wheat_before_after_15_local_projections_v1",
+  "scope": "Same frozen engine; fresh whole-input admissions and 22 draft winners, not a formal Q0 or biological ground truth. Retired/added question IDs alone do not prove closure; inspect actual directed joins and cuts. Group interval differences can overlap; use the separate whole-wheat union.",
+  "six_previous_contacts": [
+    {
+      "groups": [
+        "1B"
+      ],
+      "id": "q0-placement-9ebd8254ba33213b892015ad",
+      "kind": "weak_placement",
+      "old_placement_id_still_selected": true,
+      "old_source_slice_geometry_still_selected": true,
+      "question_still_present": true,
+      "same_question_spans": true,
+      "sides_previously_hit": [
+        0
+      ]
+    },
+    {
+      "groups": [
+        "3B"
+      ],
+      "id": "q0-placement-e3187ccba2ada864ae41bfd8",
+      "kind": "weak_placement",
+      "old_placement_id_still_selected": true,
+      "old_source_slice_geometry_still_selected": true,
+      "question_still_present": true,
+      "same_question_spans": true,
+      "sides_previously_hit": [
+        0
+      ]
+    },
+    {
+      "groups": [
+        "5A"
+      ],
+      "id": "q0-join-3d04007cc2d52afb34c040a3",
+      "kind": "unproven_join",
+      "new_join_kinds_at_same_cuts": [
+        "reference_unknown"
+      ],
+      "question_still_present": true,
+      "same_directed_source_pair_count": 1,
+      "same_question_spans": true,
+      "sides_previously_hit": [
+        1
+      ]
+    },
+    {
+      "groups": [
+        "5A"
+      ],
+      "id": "q0-join-b128951ac384e927ab22ecc9",
+      "kind": "unproven_join",
+      "new_join_kinds_at_same_cuts": [
+        "reference_unknown"
+      ],
+      "question_still_present": true,
+      "same_directed_source_pair_count": 1,
+      "same_question_spans": true,
+      "sides_previously_hit": [
+        0
+      ]
+    },
+    {
+      "groups": [
+        "7A"
+      ],
+      "id": "q0-placement-074e9f5a3c919b3f18f01dc7",
+      "kind": "weak_placement",
+      "old_placement_id_still_selected": true,
+      "old_source_slice_geometry_still_selected": true,
+      "question_still_present": true,
+      "same_question_spans": true,
+      "sides_previously_hit": [
+        0
+      ]
+    },
+    {
+      "groups": [
+        "7A"
+      ],
+      "id": "q0-join-3035db5b1dc5ba4c5a2635d0",
+      "kind": "unproven_join",
+      "new_join_kinds_at_same_cuts": [
+        "reference_unknown"
+      ],
+      "question_still_present": true,
+      "same_directed_source_pair_count": 1,
+      "same_question_spans": true,
+      "sides_previously_hit": [
+        1
+      ]
+    }
+  ],
+  "whole_request": {
+    "both_bp": 14375932,
+    "new_only_bp": 0,
+    "old_only_bp": 0,
+    "same": true
+  }
+}
