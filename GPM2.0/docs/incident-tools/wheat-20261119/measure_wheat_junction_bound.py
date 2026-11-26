@@ -48,8 +48,8 @@ def frozen(folder, result):
     return summary, detail, positions, paths
 
 
-def measure(folder, result):
-    summary, detail, positions, paths = frozen(folder, result)
+def measure(folder, result, *, on_candidate=None, checkpoints=None):
+    summary, detail, positions, paths = checkpoints or frozen(folder, result)
     issues = detail["issues"]
     weak = {x["id"] for x in issues if x["kind"] == "weak_placement"}
     unknown = {x["id"] for x in issues if x["kind"] == "unproven_join"}
@@ -77,6 +77,8 @@ def measure(folder, result):
                 if i+1 < len(path.nodes): neighbors.append((alt, ps[path.nodes[i+1]], path.joins[i]))
                 possible = {possible_window(l, r, minimum) for l, r, j in neighbors if j.join_id in unknown} - {None}
                 if possible:
+                    if on_candidate is not None:
+                        on_candidate(path.chromosome, pid, alt, [(l, r, j, possible_window(l,r,minimum) if j.join_id in unknown else None) for l,r,j in neighbors])
                     windows.update(possible); counts["geometry_pairs_with_possible_local_probe"] += 1
             by_chr[path.chromosome] = len(windows) - previous
     return dict(counts=counts, unknown_joins=len(unknown), eligible_local_windows_upper=len(windows),

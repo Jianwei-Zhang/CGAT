@@ -1,0 +1,13 @@
+#!/bin/bash
+#DSUB -n jm19_q0_panel_ab
+#DSUB -q x86
+#DSUB -nl agent-X86-45
+#DSUB -aa
+#DSUB -R "cpu=32,mem=131072MB"
+#DSUB -o panel_%J.out
+set -eo pipefail
+umask 077
+sha256sum -c --quiet kit.sha256
+exec 9>panel.lock; flock -n 9
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+python3 -Bu run_wheat_shortlist_panel.py "$(dirname "$PWD")" 32

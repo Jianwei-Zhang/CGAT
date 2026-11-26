@@ -1,0 +1,43 @@
+"""No impossible-flank proof is allowed to remove a real mapper request."""
+from pathlib import Path
+from hashlib import sha256
+from types import SimpleNamespace
+from tempfile import TemporaryDirectory
+import unittest
+
+from lgz_core.q0_sources import SourceKey,Interval
+from lgz_core.q0_paths import Placement,ReferenceAnchor,PathGraph,PairLink,PathPolicy
+from lgz_core.q0_alignments import parse_paf_line
+from lgz_core.q0_junction_review import possible_window
+from screen_wheat_junction_flanks import screen_all,maybe_old_cut
+from assess_wheat_shortlist_panel import read_arm
+
+
+def p(k,start,stop,orientation='+'):
+    s=SourceKey('ds',k);span=Interval(0,stop-start);r=Interval(start,stop);return Placement(k,k,s,span,orientation,'chr',(r,),(span,),('r',),(ReferenceAnchor(span,r,'r'),))
+
+def paf(a,b,qs,qe,ts,te,strand='+'):
+    n=qe-qs;return f'{a.segment_id}\t{a.interval.length}\t{qs}\t{qe}\t{strand}\t{b.segment_id}\t{b.interval.length}\t{ts}\t{te}\t{n}\t{n}\t60\tcg:Z:{n}M\n'
+
+class Targeted(unittest.TestCase):
+    def test_missing_witness_and_retained_probe(self):
+        left,alt,right=p('l',0,300),p('a',200,600),p('r',500,900);ref=SimpleNamespace(kind='reference_unknown')
+        hit=PairLink(parse_paf_line(paf(left,alt,200,300,0,100),artifact='a',line_number=1),left.source,alt.source)
+        self.assertTrue(any(j.kind=='sequence_overlap' for j in PathGraph((left,alt),(hit,),first_request=True).joins('l','a')))
+        self.assertTrue(maybe_old_cut(left,alt,[hit],ref,PathPolicy()))
+        # Only the right flank may request; the other side absolutely needs an old overlap.
+        cases=[('chr','pid',alt,[(left,alt,ref,None),(alt,right,ref,possible_window(alt,right,100))])]
+        self.assertEqual(screen_all(cases,[],['chr'])['eligible_upper'],0)
+        self.assertEqual(screen_all(cases,[hit],['chr'])['eligible_upper'],1)
+        witness=PairLink(parse_paf_line(paf(alt,right,300,400,0,100),artifact='b',line_number=1),alt.source,right.source)
+        self.assertEqual(screen_all(cases,[hit,witness],['chr'])['eligible_upper'],0)
+
+    def test_screen_strand_and_wrong_arm_inventory(self):
+        a,b=p('q',0,300),p('t',200,500);raw=paf(a,b,200,300,0,100).encode();lookup={k:dict(length=300,contig=k,dataset='ds') for k in ('q','t')}
+        with TemporaryDirectory() as d:
+            f=Path(d)/'matrix.paf';f.write_bytes(raw);pin=sha256(raw).hexdigest(); rows,geo,links=read_arm(f,pin,{'q'},{'t'},lookup,{frozenset(('q','t'))},True)
+            self.assertEqual(rows['retained'],1);self.assertEqual(sum(geo.values()),1);self.assertEqual(sum(map(len,links.values())),1)
+            with self.assertRaises(ValueError):read_arm(f,pin,{'q'},set(),lookup,set(),True)
+            with self.assertRaises(ValueError):read_arm(f,'0'*64,{'q'},{'t'},lookup,set(),True)
+
+if __name__=='__main__':unittest.main()
