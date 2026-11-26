@@ -8,7 +8,7 @@ try:
     from render_refinement_report import badge_bi, bi, esc, fmt_bp_short
     from render_repair_story import DIALOG
     from render_terminal_story import _axis, _rect
-    from report_gap_story import NAMES
+    from report_gap_story import NAMES, tool_order
     from report_manual_story import REASONS
 except ModuleNotFoundError:
     from .render_final_story import STYLE as PREVIEW_STYLE, _part
@@ -17,7 +17,7 @@ except ModuleNotFoundError:
     from .render_refinement_report import badge_bi, bi, esc, fmt_bp_short
     from .render_repair_story import DIALOG
     from .render_terminal_story import _axis, _rect
-    from .report_gap_story import NAMES
+    from .report_gap_story import NAMES, tool_order
     from .report_manual_story import REASONS
 
 
@@ -188,6 +188,39 @@ def _batch(batch, number):
     return ''.join(body + templates)
 
 
+def _manual_timing_bar(tool_timing):
+    if not isinstance(tool_timing, dict) or not tool_timing:
+        return ''
+    def _dur(s):
+        v = max(0.0, float(s or 0.0))
+        if v >= 3600:
+            h = int(v // 3600); m = int(round((v - h * 3600) / 60.0))
+            return f'{h}h {m}m' if m else f'{h}h'
+        return f'{v / 60.0:.1f}m' if v >= 60 else (f'{v:.0f}s' if v >= 10 else f'{v:.1f}s')
+    def _mem(mb):
+        v = float(mb)
+        return f'{v / 1024.0:.2f} GB' if v >= 1024.0 else f'{v:.0f} MB'
+    bits = []
+    for tkey in sorted(tool_timing, key=lambda k: (tool_order(k), k)):
+        rec = tool_timing[tkey]
+        if not isinstance(rec, dict):
+            continue
+        sec = rec.get('elapsed_seconds')
+        rss = rec.get('peak_rss_mb')
+        if sec is None and rss is None:
+            continue
+        name = NAMES.get(tkey, tkey)
+        parts = []
+        if sec is not None:
+            parts.append(_dur(sec))
+        if rss is not None and float(rss) > 0:
+            parts.append(_mem(rss))
+        bits.append(f'<span class="badge tone-neutral"><b>{esc(name)}</b> {esc(" · ".join(parts))}</span>')
+    if not bits:
+        return ''
+    return '<div class="manual-locus-bar" style="margin:.15rem 0 .45rem"><span class="manual-locus-lbl">' + bi('工具耗时与内存：', 'Per-tool runtime:') + '</span>' + ''.join(bits) + '</div>'
+
+
 def manual_card(batches, base=''):
     if not batches:
         return ''
@@ -205,10 +238,11 @@ def manual_card(batches, base=''):
         else:
             status = badge_bi('无可导回补丁', 'No patch to import', 'neutral')
         options.append(f'<option value="{i}" title="{full}">{short}</option>')
+        timing_bar = _manual_timing_bar(b.get('tool_timing'))
         panels.append(
             f'<div data-manual-batch="{i}"' + (' hidden' if i else '') + '>'
             f'<div class="manual-head-bar">{status}<span class="muted">{bi("基线是该批导出时的 App 路径；纳入本批 FASTA 不等于已导回 App。", "Baseline: App path at this export; inclusion in batch FASTA does not mean imported into App.")}</span></div>'
-            + _batch(b, i) + '</div>'
+            + timing_bar + _batch(b, i) + '</div>'
         )
     chooser = (
         '<label class="manual-batch-picker">' + bi('导出批次', 'Export batch') + ' <select data-manual-select>' + ''.join(options) + '</select></label>'

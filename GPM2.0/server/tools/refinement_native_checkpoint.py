@@ -492,12 +492,30 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
         started = time.monotonic()
         started_at = datetime.now(timezone.utc).isoformat()
         print(f"[REFINEMENT NATIVE START] tool={invocation.tool} run={record['run_id']} log={log}", flush=True)
+        peak_rss_mb = None
         with log.open("xb") as stream:
-            process = subprocess.run(launcher, cwd=invocation.cwd, env=invocation.environment,
+            child = subprocess.Popen(launcher, cwd=invocation.cwd, env=invocation.environment,
                                      stdout=stream, stderr=subprocess.STDOUT)
+            if hasattr(os, "wait4"):
+                while True:
+                    try:
+                        _, status_bits, rusage = os.wait4(child.pid, 0)
+                        break
+                    except InterruptedError:
+                        continue
+                returncode = -os.WTERMSIG(status_bits) if os.WIFSIGNALED(status_bits) else os.WEXITSTATUS(status_bits)
+                child.returncode = returncode
+                rss = getattr(rusage, "ru_maxrss", 0) or 0
+                if rss > 0:
+                    is_darwin = hasattr(os, "uname") and os.uname().sysname == "Darwin"
+                    peak_rss_mb = round(rss / (1024.0 * 1024.0) if is_darwin else rss / 1024.0, 2)
+            else:
+                returncode = child.wait()
         seconds = time.monotonic() - started
-        record.update(native_returncode=process.returncode, native_status="validating", phase="native")
+        record.update(native_returncode=returncode, native_status="validating", phase="native")
         record["timing"]["native_seconds"] = seconds
+        if peak_rss_mb is not None:
+            record["timing"]["peak_rss_mb"] = peak_rss_mb
         atomic_json(marker, record)
         verify_inputs()
         try:
@@ -505,7 +523,7 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
             # actual process exit first; capture still requires valid substeps
             # for a successful or explicitly supported no-candidate outcome.
             result, native_identities = capture(root, invocation.tool, record["run_id"], directory, invocation,
-                                                process.returncode, log, chromosomes, parameters, prepared_files, driver,
+                                                returncode, log, chromosomes, parameters, prepared_files, driver,
                                                 require_units=launch_request is not None)
             if launch_request is not None:
                 substeps = checked_json(root, paths["02_jobs"] / SUMMARY)
@@ -525,7 +543,8 @@ def execute(root, invocation, recipe, paths, record, identities, verify_inputs, 
                  "native_root": paths["03_native"].relative_to(root).as_posix(), "input_dependencies": input_hashes,
                  "attempt_paths": {name: str(paths[name]) for name in ("01_inputs", "02_jobs", "03_native")},
                  "execution": {"command": list(invocation.command), "cwd": str(invocation.cwd), "threads": record["threads"],
-                               "returncode": process.returncode, "native_seconds": seconds, "started_at": started_at,
+                               "returncode": returncode, "native_seconds": seconds, "started_at": started_at,
+                               **({"peak_rss_mb": peak_rss_mb} if peak_rss_mb is not None else {}),
                                "driver": driver.relative_to(root).as_posix() if driver is not None else None,
                                **({"launcher_command": list(launcher), "native_substeps": record["native_substeps"]}
                                   if launch_request is not None else {}),

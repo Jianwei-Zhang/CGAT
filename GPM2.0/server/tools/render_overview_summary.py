@@ -1034,13 +1034,13 @@ def _runtime_modal_html(units, buckets, total_sec, wall_span, max_rss):
         strip_bits.append(f'<span class="muted">{bi("内存：未采集（新运行自动记录）", "Memory: not recorded (captured on new runs)")}</span>')
     summary_strip = f'<div class="story-meta-strip ov-rt-strip">{"".join(strip_bits)}</div>'
 
-    # Chart A: Horizontal Unit Duration Breakdown (show non-zero units; cap at 12 by grouping smallest tail)
+    # Chart A: Horizontal Unit Duration Breakdown (show non-zero units; cap at 16 by grouping smallest tail)
     nz = [u for u in units if float(u.get("elapsed_seconds") or 0.0) > 0]
     chart_rows = []
-    if len(nz) <= 12:
+    if len(nz) <= 16:
         chart_rows = [(u["unit"], u.get("stage") or "", float(u["elapsed_seconds"]), u.get("execution") == "cache_reused") for u in nz]
     else:
-        top = sorted(nz, key=lambda u: float(u["elapsed_seconds"]), reverse=True)[:11]
+        top = sorted(nz, key=lambda u: float(u["elapsed_seconds"]), reverse=True)[:15]
         top_ids = {u["unit"] for u in top}
         for u in nz:
             if u["unit"] in top_ids:
@@ -1107,7 +1107,7 @@ def _runtime_modal_html(units, buckets, total_sec, wall_span, max_rss):
         t_min = min(x[2] for x in gantt_items)
         t_max = max(x[3] for x in gantt_items)
         span = max(1.0, t_max - t_min)
-        g_shown = gantt_items[:14]
+        g_shown = gantt_items[:18]
         rh_g = 18
         H_g = max(144, 18 + len(g_shown) * rh_g + 22)
         bx_g, bw_g = 128, 312
@@ -1185,10 +1185,113 @@ def _runtime_modal_html(units, buckets, total_sec, wall_span, max_rss):
     )
 
 
-def _runtime_bar_html(lgz):
-    """Compact 1-row clickable runtime bar + modal template from verified lgz_summary.timing."""
+def _expand_refinement_units(vm, raw_units):
+    """Expand the coarse `refinement` unit into per-tool auto-refinement rows and include manual tool timings."""
+    auto_tools = (vm.get("refinement_summary") or {}).get("tools") or []
+    auto_rows = []
+    for t in auto_tools:
+        tm = t.get("timing")
+        if not isinstance(tm, dict):
+            continue
+        sec = tm.get("elapsed_seconds")
+        if sec is None:
+            sec = tm.get("native_seconds")
+        if sec is None and tm.get("peak_rss_mb") is None:
+            continue
+        tname = NAMES.get(t["tool"], t["tool"])
+        reused = bool(t.get("native_reused") or t.get("result_reused"))
+        st_raw = t.get("status") or "published"
+        st_norm = "success" if st_raw == "published" else ("failed" if st_raw in ("failed", "invalidated") else st_raw)
+        auto_rows.append({
+            "unit": f"refine:{tname}",
+            "stage": "refinement",
+            "status": st_norm,
+            "execution": "cache_reused" if reused else "computed",
+            "elapsed_seconds": float(sec) if sec is not None else 0.0,
+            "peak_rss_mb": tm.get("peak_rss_mb"),
+            "started_at": tm.get("started_at"),
+            "ended_at": tm.get("ended_at"),
+            "_order": (tm.get("started_at") or "9999", tool_order(t["tool"])),
+        })
+    auto_rows.sort(key=lambda r: r["_order"])
+    for r in auto_rows:
+        r.pop("_order", None)
+
+    expanded = []
+    inserted_auto = False
+    for u in raw_units:
+        if u.get("unit") == "refinement" and auto_rows:
+            inserted_auto = True
+            expanded.extend(auto_rows)
+            parent_sec = float(u.get("elapsed_seconds") or 0.0)
+            tools_sum = sum(float(r.get("elapsed_seconds") or 0.0) for r in auto_rows)
+            overhead = parent_sec - tools_sum
+            if overhead > 10.0:
+                last_end = max((r["ended_at"] for r in auto_rows if r.get("ended_at")), default=None)
+                expanded.append({
+                    "unit": "refine:publish",
+                    "stage": "refinement",
+                    "status": u.get("status") or "success",
+                    "execution": u.get("execution") or "computed",
+                    "elapsed_seconds": round(overhead, 3),
+                    "peak_rss_mb": None,
+                    "started_at": last_end,
+                    "ended_at": u.get("ended_at"),
+                })
+        else:
+            expanded.append(u)
+    if auto_rows and not inserted_auto:
+        expanded.extend(auto_rows)
+
+    # Append manual refinement per-tool timings (if recorded on any manual batch)
+    manual_batches = (vm.get("manual_summary") or {}).get("batches") or []
+    manual_agg = {}
+    for b in manual_batches:
+        tt = b.get("tool_timing")
+        if not isinstance(tt, dict):
+            continue
+        for tkey, rec in tt.items():
+            if not isinstance(rec, dict):
+                continue
+            sec = rec.get("elapsed_seconds")
+            rss = rec.get("peak_rss_mb")
+            if sec is None and rss is None:
+                continue
+            slot = manual_agg.setdefault(tkey, {
+                "elapsed_seconds": 0.0, "peak_rss_mb": None,
+                "started_at": None, "ended_at": None,
+            })
+            if sec is not None:
+                slot["elapsed_seconds"] = round(slot["elapsed_seconds"] + float(sec), 3)
+            if rss is not None and float(rss) > 0:
+                slot["peak_rss_mb"] = max(slot["peak_rss_mb"] or 0.0, float(rss))
+            st, en = rec.get("started_at"), rec.get("ended_at")
+            if st and (slot["started_at"] is None or st < slot["started_at"]):
+                slot["started_at"] = st
+            if en and (slot["ended_at"] is None or en > slot["ended_at"]):
+                slot["ended_at"] = en
+    for tkey in sorted(manual_agg, key=lambda k: (tool_order(k), k)):
+        rec = manual_agg[tkey]
+        tname = NAMES.get(tkey, tkey)
+        expanded.append({
+            "unit": f"manual:{tname}",
+            "stage": "manual",
+            "status": "success",
+            "execution": "computed",
+            "elapsed_seconds": rec["elapsed_seconds"],
+            "peak_rss_mb": rec["peak_rss_mb"],
+            "started_at": rec["started_at"],
+            "ended_at": rec["ended_at"],
+        })
+    return expanded
+
+
+def _runtime_bar_html(vm):
+    """Compact 1-row clickable runtime bar + modal template with per-tool auto/manual breakdown."""
+    lgz = vm.get("lgz_summary") or {}
     timing = lgz.get("timing") or {}
-    units = timing.get("units") or []
+    raw_units = timing.get("units") or []
+    units = _expand_refinement_units(vm, raw_units)
     if not units:
         return ""
     buckets = [
@@ -1197,6 +1300,7 @@ def _runtime_bar_html(lgz):
         ("lgz", "LGZ 修补", "LGZ", "var(--ds-1)"),
         ("refinement", "自动精修", "Refine", "var(--gen-closed)"),
         ("delivery", "打包交付", "Package", "var(--border-strong)"),
+        ("manual", "手动精修", "Manual", "var(--ds-2)"),
     ]
     sums = {k: 0.0 for k, _, _, _ in buckets}
     reused = {k: True for k, _, _, _ in buckets}
@@ -1248,7 +1352,7 @@ def _runtime_bar_html(lgz):
     modal = _runtime_modal_html(units, buckets, total, wall_span, max_rss)
     return (
         '<button type="button" class="ov-runtime-bar" data-story-open="ov-runtime-modal" '
-        'title="点击查看各任务耗时、时间轴与内存详情 / Click for runtime & resource details">'
+        'title="点击查看各任务与工具耗时、时间轴及内存详情 / Click for per-unit & per-tool runtime details">'
         f'<span class="ov-rt-head">{bi("运行耗时", "Runtime")} <b>{esc(_fmt_dur(total))}</b></span>'
         f"{mem_bit}"
         f'<span class="ov-rt-track" aria-hidden="true">{"".join(segs)}</span>'
@@ -1445,7 +1549,7 @@ def overview_summary_card(vm):
     c2_svg, c2_meta = _svg_contig_continuity(stages, sv, fstats, auto)
     c3_svg, c3_meta = _svg_donuts(sv, fstats, tel_info, lgz, colors, auto)
     c4_svg, c4_meta = _svg_chr_coverage_t2t(lgz, chr_order, fstats, tel_info, cen_map)
-    rt_html = _runtime_bar_html(lgz)
+    rt_html = _runtime_bar_html(vm)
 
     p2_html = (
         '<div class="ov-subblock">'

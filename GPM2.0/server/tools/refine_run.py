@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import time
 import uuid
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -242,9 +244,20 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
                  "preset": profile, "tool_parameters": override_params or None, "runtime_sha256": fingerprint(runtime)})
     check_identities(identities)
     verify_directory_links(runtime)
+    rusage_info = {}
+    started_mono = time.monotonic()
+    started_at = datetime.now(timezone.utc).isoformat()
     try:
         with native_log.open("xb") as log:
-            code = run_child_group(command, environment=invocation.environment, cwd=cwd, output=log)
+            code = run_child_group(command, environment=invocation.environment, cwd=cwd, output=log, rusage_out=rusage_info)
+        elapsed_seconds = round(max(0.0, time.monotonic() - started_mono), 3)
+        ended_at = datetime.now(timezone.utc).isoformat()
+        timing_rec = {
+            "elapsed_seconds": elapsed_seconds,
+            "started_at": started_at,
+            "ended_at": ended_at,
+            **({"peak_rss_mb": rusage_info["peak_rss_mb"]} if "peak_rss_mb" in rusage_info else {}),
+        }
         if code in (130, 143):
             raise KeyboardInterrupt
         if locus["kind"] != "gap":
@@ -281,12 +294,21 @@ def run_tool(layout, batch_dir, locus, tool, seeds, prepared, groups, reads_bind
             (attempt / "patch.seq").write_bytes(sequence)
         row = output_row(locus, tool, status, reason=reason, patch=patch, version=version, revision=revision, attempt_id=attempt_id)
         durable_json(attempt / "completion.json", {"schema": "cgat.manual-refinement-completion.v1", "row": row,
-                     "native_exit": code, "artifacts": {str(path.relative_to(layout.root)): sha for path, sha in artifacts.items()}})
+                     "native_exit": code, "timing": timing_rec,
+                     "artifacts": {str(path.relative_to(layout.root)): sha for path, sha in artifacts.items()}})
         return row, attempt / "patch.seq" if patch else None
     except (OSError, ValueError, KeyError, TypeError) as exc:
         # Paths and native error payloads stay on the Server, not in a result
         # bundle that can be sent to a different host/user.
-        durable_json(attempt / "failure.json", {"type": type(exc).__name__, "reason": str(exc)})
+        elapsed_seconds = round(max(0.0, time.monotonic() - started_mono), 3)
+        ended_at = datetime.now(timezone.utc).isoformat()
+        timing_rec = {
+            "elapsed_seconds": elapsed_seconds,
+            "started_at": started_at,
+            "ended_at": ended_at,
+            **({"peak_rss_mb": rusage_info["peak_rss_mb"]} if "peak_rss_mb" in rusage_info else {}),
+        }
+        durable_json(attempt / "failure.json", {"type": type(exc).__name__, "reason": str(exc), "tool": tool, "timing": timing_rec})
         return output_row(locus, tool, "failed", reason="native_execution_or_evidence_failed", version=version,
                           revision=revision, attempt_id=attempt_id), None
 

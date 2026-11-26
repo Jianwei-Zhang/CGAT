@@ -142,6 +142,18 @@ class ReportFrontendUITests(unittest.TestCase):
                  "started_at": "2026-11-26T10:00:42+08:00", "ended_at": "2026-11-26T10:02:42+08:00"},
             ],
         }
+        vm["refinement_summary"]["tools"][0]["timing"] = {
+            "elapsed_seconds": 75.0, "native_seconds": 70.0, "peak_rss_mb": 2048.0,
+            "started_at": "2026-11-26T10:00:42+08:00", "ended_at": "2026-11-26T10:01:57+08:00",
+        }
+        vm["refinement_summary"]["tools"][1]["timing"] = {
+            "elapsed_seconds": 40.0, "native_seconds": 36.0, "peak_rss_mb": 1024.0,
+            "started_at": "2026-11-26T10:01:58+08:00", "ended_at": "2026-11-26T10:02:38+08:00",
+        }
+        vm["manual_summary"]["batches"] = [{
+            "batch_sha256": "a" * 64, "report_status": "no_patch", "result_counts": {},
+            "tool_timing": {"degap": {"elapsed_seconds": 30.0, "peak_rss_mb": 512.0}},
+        }]
         html_rt = render_overview(vm)
         self._assert_offline_safe(html_rt, expect_single_main=True)
         self.assertIn('data-story-open="ov-runtime-modal"', html_rt)
@@ -149,6 +161,9 @@ class ReportFrontendUITests(unittest.TestCase):
         self.assertIn('aria-label="Unit duration breakdown"', html_rt)
         self.assertIn('aria-label="Peak memory breakdown"', html_rt)
         self.assertIn('aria-label="Execution timeline"', html_rt)
+        self.assertIn('refine:DEGAP', html_rt)
+        self.assertIn('refine:TGS-GapCloser', html_rt)
+        self.assertIn('manual:DEGAP', html_rt)
         self.assertIn('2.00 GB', html_rt)
         self.assertEqual(html.count('id="inputs"'), 1)
         self.assertIn("12.5%", html)

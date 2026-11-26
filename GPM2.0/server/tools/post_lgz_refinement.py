@@ -198,7 +198,7 @@ def validate_completion(root, run_id):
         return False, str(error)
 
 
-def run_child_group(command, *, environment, cwd=None, output=None):
+def run_child_group(command, *, environment, cwd=None, output=None, rusage_out=None):
     """Keep the workspace lock until the worker and its native group stop.
 
     Direct invocations use the same verified parent/worker boundary as run_all.
@@ -230,15 +230,38 @@ def run_child_group(command, *, environment, cwd=None, output=None):
         if received is not None:
             forward(received, None)
         while True:
-            try:
-                code = child.wait(timeout=0.1)
-                return 128 + received if received is not None else (128 - code if code < 0 else code)
-            except subprocess.TimeoutExpired:
+            if hasattr(os, "wait4"):
+                try:
+                    pid, status_bits, rusage = os.wait4(child.pid, os.WNOHANG)
+                except InterruptedError:
+                    continue
+                except ChildProcessError:
+                    code = child.wait()
+                    return 128 + received if received is not None else (128 - code if code < 0 else code)
+                if pid:
+                    code = -os.WTERMSIG(status_bits) if os.WIFSIGNALED(status_bits) else os.WEXITSTATUS(status_bits)
+                    child.returncode = code
+                    rss = getattr(rusage, "ru_maxrss", 0) or 0
+                    if rusage_out is not None and rss > 0:
+                        is_darwin = hasattr(os, "uname") and os.uname().sysname == "Darwin"
+                        rusage_out["peak_rss_mb"] = round(rss / (1024.0 * 1024.0) if is_darwin else rss / 1024.0, 2)
+                    return 128 + received if received is not None else (128 - code if code < 0 else code)
                 if deadline is not None and time.monotonic() >= deadline:
                     try:
                         os.killpg(child.pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
+                time.sleep(0.05)
+            else:
+                try:
+                    code = child.wait(timeout=0.1)
+                    return 128 + received if received is not None else (128 - code if code < 0 else code)
+                except subprocess.TimeoutExpired:
+                    if deadline is not None and time.monotonic() >= deadline:
+                        try:
+                            os.killpg(child.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
     finally:
         if child is not None:
             if child.poll() is None:

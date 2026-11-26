@@ -22,6 +22,62 @@ BATCH = re.compile("[a-f0-9]{32}")
 OUTCOMES = ("closed", "partial", "unfilled", "rejected")
 
 
+def _safe_float(value, *, positive_only=False):
+    if value in (None, ""):
+        return None
+    try:
+        v = float(value)
+        if v != v or v in (float("inf"), float("-inf")):
+            return None
+        if positive_only and v <= 0:
+            return None
+        if not positive_only and v < 0:
+            return None
+        return v
+    except (ValueError, TypeError):
+        return None
+
+
+def _manual_tool_timing(root, batch_dir):
+    """Aggregate per-tool elapsed_seconds / peak_rss_mb from verified manual job receipts."""
+    jobs_dir = batch_dir / "02_jobs"
+    if not jobs_dir.is_dir() or jobs_dir.is_symlink():
+        return {}
+    agg = {}
+    for receipt_name in ("completion.json", "failure.json"):
+        for path in sorted(jobs_dir.rglob(receipt_name)):
+            if path.is_symlink() or not path.is_file():
+                continue
+            try:
+                rel = path.relative_to(root).as_posix()
+                data = obj(root, rel)
+            except (OSError, ValueError, KeyError, TypeError):
+                continue
+            trec = data.get("timing")
+            if not isinstance(trec, dict):
+                continue
+            row = data.get("row") if isinstance(data.get("row"), dict) else {}
+            tool = row.get("tool") or data.get("tool")
+            if not safe_name(tool):
+                continue
+            sec = _safe_float(trec.get("elapsed_seconds"))
+            rss = _safe_float(trec.get("peak_rss_mb"), positive_only=True)
+            st = trec.get("started_at") if isinstance(trec.get("started_at"), str) else None
+            en = trec.get("ended_at") if isinstance(trec.get("ended_at"), str) else None
+            slot = agg.setdefault(tool, {"tool": tool, "elapsed_seconds": 0.0, "peak_rss_mb": None,
+                                         "started_at": None, "ended_at": None, "attempt_count": 0})
+            slot["attempt_count"] += 1
+            if sec is not None:
+                slot["elapsed_seconds"] = round(slot["elapsed_seconds"] + sec, 3)
+            if rss is not None:
+                slot["peak_rss_mb"] = max(slot["peak_rss_mb"] or 0.0, rss)
+            if st and (slot["started_at"] is None or st < slot["started_at"]):
+                slot["started_at"] = st
+            if en and (slot["ended_at"] is None or en > slot["ended_at"]):
+                slot["ended_at"] = en
+    return agg
+
+
 def manual_batches(layout, verify_content=False):
     from refine_report import INDEX_SCHEMA, REPORT_SCHEMA, _batch_dir, manual_patch_path
     from report_manual_story import collect_manual_story
@@ -70,13 +126,16 @@ def manual_batches(layout, verify_content=False):
             )
         )
         result_counts = Counter(r["status"] for r in row["results"] if safe_name(r.get("status")))
+        bdir = _batch_dir(layout, batch)
+        tool_timing = _manual_tool_timing(root, bdir)
         batches.append(
             dict(
                 batch_sha256=batch,
                 report_status=status,
                 completed_at=row.get("completed_at"),
                 result_counts=dict(result_counts),
-                story=collect_manual_story(layout,batch,_batch_dir(layout,batch),summary,owner,owned,verify_content),
+                tool_timing=tool_timing,
+                story=collect_manual_story(layout,batch,bdir,summary,owner,owned,verify_content),
                 report_href=file_href(root, home + "/report.html"),
                 summary_relpath=home + "/summary.json",
                 patch_relpath=patch,
@@ -418,6 +477,32 @@ def refinement(layout, batch):
                 page_href = file_href(root, f"{folder}/gaps/{page_no:06d}.html")
                 if page_href:
                     gap_links[gid] = dict(href=page_href, anchor=gap_anchor(gid), kind="gap_card")
+        raw_t = execution.get("timing") if isinstance(execution.get("timing"), dict) else {}
+        origin = execution.get("native_origin") if isinstance(execution.get("native_origin"), dict) else {}
+        tool_elapsed = _safe_float(
+            raw_t.get("before_publication_seconds")
+            if raw_t.get("before_publication_seconds") is not None else
+            (raw_t.get("native_seconds") if raw_t.get("native_seconds") is not None else origin.get("native_seconds"))
+        )
+        tool_native_sec = _safe_float(
+            raw_t.get("native_seconds") if raw_t.get("native_seconds") is not None else origin.get("native_seconds")
+        )
+        tool_rss = _safe_float(
+            raw_t.get("peak_rss_mb") if raw_t.get("peak_rss_mb") is not None else origin.get("peak_rss_mb"),
+            positive_only=True,
+        )
+        tool_started = (raw_t.get("started_at") if isinstance(raw_t.get("started_at"), str) else None) or (
+            origin.get("started_at") if isinstance(origin.get("started_at"), str) else None
+        )
+        tool_ended = (raw_t.get("admission_finished_at") if isinstance(raw_t.get("admission_finished_at"), str) else None) or (
+            origin.get("ended_at") if isinstance(origin.get("ended_at"), str) else None
+        )
+        tool_timing = (
+            dict(elapsed_seconds=tool_elapsed, native_seconds=tool_native_sec,
+                 peak_rss_mb=tool_rss, started_at=tool_started, ended_at=tool_ended)
+            if any(v is not None for v in (tool_elapsed, tool_native_sec, tool_rss, tool_started, tool_ended))
+            else None
+        )
         out["tools"].append(
             dict(
                 **extra,
@@ -429,6 +514,7 @@ def refinement(layout, batch):
                 native_executed=execution.get("native_executed", r.get("native_executed")),
                 native_status=execution.get("native_status", r.get("native_status")),
                 phase=rec.get("phase"),
+                timing=tool_timing,
                 counts=counts(r["counts"], OUTCOMES) if r.get("counts") is not None else None,
                 reason=sanitized_reason(rec.get("error")),
                 publication_verified=bool(pub),
