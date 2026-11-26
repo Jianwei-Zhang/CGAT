@@ -16,11 +16,15 @@ from lgz_core.q0_retained_hits import _checked_line,retained_geometry_cache
 from lgz_core.q0_sources import SourceKey
 from lgz_core.q0_threshold_questions import questions
 from lgz_core.q0_threshold_acceptance import record
-from plan_wheat_panel_neighborhoods import PANEL
+from plan_wheat_panel_neighborhoods import PANEL,INDIRECT,pinned_panel
 
 HOOD='bcf5a6370946d0e2dff0557511143eba9cd5a06c196a4a800ae4252e001f4ccd'
 
-def neighborhood(owner):return checked(owner/'neighborhoods.json',HOOD)
+HOODS={PANEL:HOOD, INDIRECT:'fa5f6891eb1b5423ade9214b1acb7bd9f59d269dd5e8d4697e9a632303f2bd1c'}
+
+def neighborhood(owner):
+    raw=(owner/'neighborhoods.json').read_bytes(); h=json.loads(raw)
+    require(HOODS.get(h['panel'])==sha256(raw).hexdigest(),'unknown panel/neighborhood pair');return h
 
 def prepare(owner,snap,root,orig,regional,spools,names,hood):
     inv={r['path']:r for r in snap['files']};files=[];counts=Counter()
@@ -37,7 +41,7 @@ def prepare(owner,snap,root,orig,regional,spools,names,hood):
                     h.update(line)
                     if line.split(b'\t',1)[0] in names[ds]:emit(i,str(n).encode()+b'\t'+line);counts['reference']+=1
             require(h.hexdigest()==ident['sha256'] and (root/rel).stat().st_size==ident['size'],'foreign reference PAF')
-    data=dict(schema='wheat_panel_fresh_common_v1',neighborhoods=HOOD,panel=PANEL,selection=hood['selection'],rows_sha256=sha256_file(owner/'common-rows.gz'),files=files,rows=counts)
+    data=dict(schema='wheat_panel_fresh_common_v1',neighborhoods=HOODS[hood['panel']],panel=hood['panel'],selection=hood['selection'],rows_sha256=sha256_file(owner/'common-rows.gz'),files=files,rows=counts)
     with (owner/'common.json').open('x') as f:json.dump(data,f,sort_keys=True,separators=(',',':'));f.write('\n')
 
 
@@ -67,7 +71,7 @@ def run(owner,stage,mapped):
     global PLAN,LOOKUP,CAT,BYID,REFS,COMMON,ARMS,CACHE,RLENS
     import review_wheat_frozen_group as worker
     from bound_regional_scope_from_native_receipts import LOOKUP_SHA
-    common=json.loads((stage/'common.json').read_bytes());hood=neighborhood(stage);PLAN=checked(mapped/'panel.json',PANEL);recording=json.loads((mapped/'mapping.json').read_bytes());require(common['neighborhoods']==HOOD and common['panel']==PANEL==recording['panel'] and common['selection']==PLAN['selection'] and sha256_file(stage/'common-rows.gz')==common['rows_sha256'],'unbound panel inputs')
+    common=json.loads((stage/'common.json').read_bytes());hood=neighborhood(stage);PLAN,pin=pinned_panel(mapped/'panel.json');recording=json.loads((mapped/'mapping.json').read_bytes());require(common['neighborhoods']==HOODS[pin] and common['panel']==hood['panel']==pin==recording['panel'] and common['selection']==PLAN['selection'] and sha256_file(stage/'common-rows.gz')==common['rows_sha256'],'unbound panel inputs')
     base=owner.parent; lookup=base/'q0-source-part-lookup-20261121-1600/source-part-lookup.json';LOOKUP=checked(lookup,LOOKUP_SHA);snap,root,parts,order,lens=bind(base/'q0-latest-fork-20261123-1435/control/snapshot.json',lookup);subset={k for r in hood['cases'] for k in r['parts']};BYID={k:order[parts[k][0]] for k in subset};worker.BYID=BYID;CAT=worker.genome_subset(root,snap,parts,subset);ref,=(r for r in snap['files'] if r['path'].startswith('data/reference/') and r['path'].endswith('.fai'));RLENS={r[0]:int(r[1]) for line in bounded(root/ref['path'],4<<20,ref['sha256']).decode().splitlines() if (r:=line.split('\t'))}
     names=defaultdict(dict);keys=defaultdict(dict);queries=set(PLAN['queries']);qsrc={BYID[k] for k in queries}; CACHE=retained_geometry_cache()
     for k,s in BYID.items():
@@ -91,7 +95,7 @@ def run(owner,stage,mapped):
                 z=readhit(line,p.name,n,names[None],names[None]);links.append(PairLink(z,BYID[q],BYID[t]))
         require(digest.hexdigest()==recording['mapper'][arm]['paf_sha256'],'unbound native output');ARMS[arm]=links
     with ProcessPoolExecutor(max_workers=8,mp_context=get_context('fork')) as pool:cases=list(pool.map(select_case,hood['cases']))
-    doc=dict(schema='wheat_paired_local_fresh_admission_v1',panel=PANEL,neighborhoods=HOOD,common_sha256=sha256_file(stage/'common.json'),mapping_sha256=sha256_file(mapped/'mapping.json'),excluded_old_pair_rows=heldout,cases=cases,published_q0=False,scope='All original reference hits and fresh Q0 placement/path/next request in eight predeclared local source cohorts. Not full wheat or either retired parent.')
+    doc=dict(schema='wheat_paired_local_fresh_admission_v1',panel=pin,neighborhoods=HOODS[pin],common_sha256=sha256_file(stage/'common.json'),mapping_sha256=sha256_file(mapped/'mapping.json'),excluded_old_pair_rows=heldout,cases=cases,published_q0=False,scope='All original reference hits and fresh Q0 placement/path/next request in the predeclared local source cohorts. Not full wheat or either retired parent.')
     with (owner/'readmission.json').open('x') as f:json.dump(doc,f,sort_keys=True,separators=(',',':'));f.write('\n')
 
 if __name__=='__main__':run(Path.cwd(),*map(Path,sys.argv[1:3]))

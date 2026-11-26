@@ -1,4 +1,5 @@
 """Prespecify a local re-admission panel from the frozen reference placements alone, not either new PAF."""
+from hashlib import sha256
 from pathlib import Path
 import json, sys
 from measure_wheat_junction_bound import frozen
@@ -9,8 +10,14 @@ from bound_regional_scope_from_native_receipts import LOOKUP_SHA
 
 PANEL='8ecec1cd21d0240dad8fe6e9fe8f3cd2d45e0d690f2e3931f404d88bfbc1985c'
 
+INDIRECT='15fd2e5a2ff25b04b67648285b012a1c713a120174419e8a92e3b98bc63a3c02'
+
+def pinned_panel(path):
+    raw=path.read_bytes(); pin=sha256(raw).hexdigest()
+    need(pin in (PANEL,INDIRECT),'unknown preregistered panel'); return json.loads(raw),pin
+
 def plan(folder,result,lookup_path,panel_file):
-    panel=checked(panel_file,PANEL);lookup=checked(lookup_path,LOOKUP_SHA);summary,_,positions,paths=frozen(folder,result);out=[]
+    panel,pin=pinned_panel(panel_file);lookup=checked(lookup_path,LOOKUP_SHA);summary,_,positions,paths=frozen(folder,result);out=[]
     need(panel['selection']==summary['selection_chain'],'foreign admission'); by_chr={p.chromosome:p for p in paths};groups={}
     with (folder/'admission.jsonl').open('rb') as f:
         for c in sorted({r['chromosome'] for r in panel['cases']}):
@@ -23,7 +30,7 @@ def plan(folder,result,lookup_path,panel_file):
         # Include whole sources on either side, actual reference co-locations (also off shortlist), and immediate selected flanks.
         parts=sorted(forced|{p.segment_id for p in ps.values() if any(a.intersection(b) for a in p.reference_intervals for b in regions)})
         need({row['q'],row['t']}<=set(parts),'missing panel partner');out.append(dict(stratum=row['stratum'],chromosome=c,join=row['join'],parts=parts,bp=sum(lookup[k]['length'] for k in parts)))
-    return dict(schema='wheat_raw_readmission_neighborhoods_v1',panel=PANEL,selection=summary['selection_chain'],cases=out)
+    return dict(schema='wheat_raw_readmission_neighborhoods_v1',panel=pin,selection=summary['selection_chain'],cases=out)
 
 if __name__=='__main__':
     with Path(sys.argv[5]).open('x') as f:json.dump(plan(*map(Path,sys.argv[1:5])),f,sort_keys=True,separators=(',',':'));f.write('\n')

@@ -1,5 +1,6 @@
 """Isolated native A/B. Never execute the two retired queries; never write a production receipt."""
 from hashlib import sha256
+import gzip
 import json
 import mmap
 import os
@@ -13,7 +14,8 @@ from time import monotonic
 
 LOOK='2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89'
 TOOL='cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3'
-FORBID={'q0-source-part-865ba1fbce846067c7ffff38'}
+QUESTIONS='9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97'
+INDIRECT='15fd2e5a2ff25b04b67648285b012a1c713a120174419e8a92e3b98bc63a3c02'
 
 def need(ok,msg):
     if not ok: raise ValueError(msg)
@@ -47,6 +49,15 @@ def run(base,owner,threads):
     need(digest(lookup)==LOOK==panel['lookup'] and panel['selection']=='5c4b0771b6a8112396adc21c710e748c3aaad44db11c0f5dc77edca8ec9aa31b','foreign panel'); parts=json.loads(lookup.read_bytes());keep=set(panel['retained']);qs=set(panel['queries'])
     retired={p for p,x in parts.items() if (x['dataset'],x['contig']) in {('JM19_hifiasm','ptg000010l'),('JM19_flye_ABD','JM19flyeA_contig_4549')}}
     need(len(retired)==2 and not qs&retired and 1<=len(qs)<=8 and max(parts[q]['length'] for q in qs)<=500000 and len(keep)==3755 and len(parts)==38267,'unsafe control queries')
+    # Measure target selection separately from writing/verifying the two FASTAs.
+    # The input is the already produced, frozen demand; this is not the cost of constructing that draft.
+    tick=monotonic(); raw=(base/'q0-whole-updated.We9jf3UC/result/updated-questions.json.gz').read_bytes()
+    need(sha256(raw).hexdigest()==QUESTIONS==panel['questions'],'wrong demand input')
+    by_source={(v['dataset'],v['contig']):k for k,v in parts.items()}; spans=json.loads(gzip.decompress(raw))['source_intervals']
+    selected={by_source[s['dataset'],s['contig']] for s,ivs in spans if ivs}
+    need(selected==keep and len(selected)==len(spans),'wrong derived shortlist');selection_s=monotonic()-tick
+    if panel.get('schema')=='wheat_indirect_only_native_panel_v1':
+        need(digest(owner/'panel.json')==INDIRECT and len(qs)==3 and not qs&keep,'wrong indirect-only panel')
     full=base/'gpm_server/grt/evidence/q0_prepare/tasks/q0-map-a6056c2d8fcb81f6ca19d1a7/target.fa'; sig=signature(full)
     tool=Path(shutil.which('minimap2')).resolve();need(digest(tool)==TOOL and 1<=threads<=32,'foreign mapper')
     need(not (owner/'mapping.json').exists() and shutil.disk_usage('/tmp').free>5<<30,'complete run or unsafe scratch')
@@ -63,6 +74,6 @@ def run(base,owner,threads):
             need(signature(full)==sig and digest(tool)==TOOL and digest(query)==qsha,'input changed during mapping');tmp.rename(dest)
             rows[label]=dict(seconds=round(monotonic()-tick,3),bytes=dest.stat().st_size,paf_sha256=digest(dest)); print('MAPPER_DONE',label,rows[label],flush=True)
         need(digest(small)==smallsha,'shortlist changed')
-    with (owner/'mapping.json').open('x') as f:json.dump(dict(panel=digest(owner/'panel.json'),tool_sha256=TOOL,original_bp=31706122489,shortlist_bp=2302475263,shortlist_fasta=smallsha,query_fasta=qsha,setup_verify_extract_s=round(setup,3),mapper=rows,threads=threads,formal_q0=False),f,sort_keys=True);f.write('\n')
+    with (owner/'mapping.json').open('x') as f:json.dump(dict(panel=digest(owner/'panel.json'),tool_sha256=TOOL,original_bp=31706122489,shortlist_bp=2302475263,shortlist_fasta=smallsha,query_fasta=qsha,setup_verify_extract_s=round(setup,3),included_target_selection_s=round(selection_s,4),mapper=rows,threads=threads,formal_q0=False),f,sort_keys=True);f.write('\n')
 
 if __name__=='__main__':run(Path(sys.argv[1]),Path.cwd(),int(sys.argv[2]))

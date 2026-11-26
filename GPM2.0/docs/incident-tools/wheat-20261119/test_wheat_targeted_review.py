@@ -11,6 +11,8 @@ from lgz_core.q0_alignments import parse_paf_line
 from lgz_core.q0_junction_review import possible_window
 from screen_wheat_junction_flanks import screen_all,maybe_old_cut
 from assess_wheat_shortlist_panel import read_arm,calls
+from plan_wheat_indirect_panel import choose
+from summarize_wheat_paired_outcomes import footprint,request_delta
 
 
 def p(k,start,stop,orientation='+'):
@@ -38,6 +40,19 @@ class Targeted(unittest.TestCase):
         full,_,fullreq=calls([a,b],[z],'q','t',lookup);other,_,req=calls([a,b],[],'q','t',lookup)
         self.assertIn(['sequence_overlap',250,50],full);self.assertFalse(other)
         self.assertTrue(fullreq['assessable'] and req['assessable'])
+
+    def test_indirect_panel_is_not_a_second_direct_demand_run(self):
+        l,r=p('original',0,300),p('wanted',200,500,'-');slices=[SimpleNamespace(source=x.source,orientation=x.orientation,interval=x.interval) for x in (l,r)]
+        path=SimpleNamespace(chromosome='chr',slices=slices,joins=[SimpleNamespace(kind='sequence_overlap',join_id='j')]);ids={x.segment_id:dict(dataset='ds',contig=x.segment_id,length=x.interval.length) for x in (l,r)}
+        pending=[[{'dataset':'ds','contig':'wanted'},[[200,300]]]]; cases,retained,counts=choose([path],ids,pending,set())
+        self.assertEqual((len(cases),retained,counts),(1,['wanted'],{'-':1}));self.assertEqual((cases[0]['q'],cases[0]['target_cut_distance_to_demand']),('original',0))
+        self.assertFalse(choose([path],ids,pending,{'original'})[0]);self.assertFalse(choose([path],ids,pending+[[{'dataset':'ds','contig':'original'},[[0,100]]]],set())[0])
+
+    def test_request_delta_is_source_qualified_and_unknown_is_not_empty(self):
+        s={'dataset':'d','contig':'c'};o={'dataset':'e','contig':'c'}
+        full=[[s,[[0,10],[30,31]]]]; reduced=[[s,[[4,12],[40,42]]],[o,[[7,9]]]]; original=footprint([[s,[[7,11],[29,33]]]])
+        self.assertEqual(request_delta(full,reduced,original),dict(full_only_bp=5,reduced_only_bp=6,full_only_in_frozen_demand_bp=1,reduced_only_in_frozen_demand_bp=1,same=False))
+        self.assertFalse(request_delta(None,[],original)['same']);self.assertTrue(request_delta(None,None,original)['same'])
 
     def test_screen_strand_and_wrong_arm_inventory(self):
         a,b=p('q',0,300),p('t',200,500);raw=paf(a,b,200,300,0,100).encode();lookup={k:dict(length=300,contig=k,dataset='ds') for k in ('q','t')}
