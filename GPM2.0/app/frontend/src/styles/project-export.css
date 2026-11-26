@@ -86,11 +86,14 @@
 .project-export-identity dd > .project-export-project-badge { background: var(--surface-subtle, #f8fafc); border-color: var(--border-default, #cbd5e1); color: var(--text-primary, #1e293b); }
 .project-export-head > .project-export-actions { flex: 0 0 auto; flex-wrap: nowrap; max-width: 100%; margin-left: auto; align-items: center; }
 .project-preview-toolbar .final-path-export-toggle {
-  display: inline-grid;
-  place-items: center;
-  width: 2.1429rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
   height: 2.1429rem;
-  padding: 0;
+  padding: 0 8px;
+  white-space: nowrap;
 }
 [data-project-export-toggle]:focus-visible {
   outline: 2px solid var(--focus-ring, #4f82b5);

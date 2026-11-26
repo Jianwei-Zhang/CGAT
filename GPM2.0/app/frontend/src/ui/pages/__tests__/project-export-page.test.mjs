@@ -122,7 +122,7 @@ test("project export page renders assignment bars before placed statistics with 
   assert.doesNotMatch(html, /project-preview-heading|project-preview-subtitle|project-preview-legend/);
   assert.doesNotMatch(html, /card project-export-card/);
   assert.doesNotMatch(html, /data-project-export-refresh/);
-  assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"\s+aria-label="导出" data-app-tooltip="导出"[^>]*><svg/);
+  assert.match(html, /class="button ghost tiny final-path-export-toggle"[\s\S]*data-project-export-toggle="true"\s+aria-label="导出"[^>]*><svg[\s\S]*?<\/svg><span>导出<\/span><\/button>/);
   assert.match(html, /class="final-path-export-menu is-hidden" data-project-export-menu/);
   assert.match(html, /data-preview-format="png"/);
   assert.match(html, /data-project-export-action="tsv"/);
@@ -2458,4 +2458,19 @@ test("project AGP menu and all-export plan remain available without FASTA", asyn
     pickSaveFilePath: async value => { options = value; return "/out/project.agp"; },
   } });
   assert.deepEqual(options, { defaultPath: "project.agp", filters: [{ name: "AGP", extensions: ["agp"] }] });
+});
+
+
+test("Home export button uses a text-fitting horizontal layout like Import and Open", () => {
+  for (const selector of [
+    ".projects-page .project-header-actions .final-path-export-toggle",
+    ".project-preview-toolbar .final-path-export-toggle",
+  ]) {
+    const rule = componentsCss.slice(componentsCss.indexOf(`${selector} {`)).split("}")[0];
+    assert.match(rule, /display: inline-flex;/);
+    assert.match(rule, /align-items: center;/);
+    assert.match(rule, /gap: 8px;/);
+    assert.match(rule, /width: auto;/);
+    assert.match(rule, /white-space: nowrap;/);
+  }
 });

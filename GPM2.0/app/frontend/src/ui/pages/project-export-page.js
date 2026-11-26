@@ -1405,7 +1405,7 @@ function renderProjectExportMenu({ labels, fresh, previewReady, canExportFasta, 
   return `
     <div class="final-path-export" data-project-export>
       <button type="button" class="button ghost tiny final-path-export-toggle" data-project-export-toggle="true"
-        aria-label="${label}" data-app-tooltip="${label}" aria-expanded="false">${projectIcon("export")}</button>
+        aria-label="${label}" aria-expanded="false">${projectIcon("export")}<span>${escapeHtml(labels.export)}</span></button>
       <div class="final-path-export-menu is-hidden" data-project-export-menu>
         ${item("agp", canExportFasta ? "agp + .components.fa" : "agp", pending, canExportFasta ? labels.exportAgp : labels.exportAgpOnly)}
         ${canExportFasta ? item("fasta", "fasta") : ""}

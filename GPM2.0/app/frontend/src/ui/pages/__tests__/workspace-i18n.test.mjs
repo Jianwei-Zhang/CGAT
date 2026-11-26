@@ -995,6 +995,12 @@ test("selected-project table and paths use compact visible divider headings", ()
     assert.match(html, /class="project-export-page project-integrated-overview"/);
     assert.match(html, /class="project-header-actions"[\s\S]*data-project-export-toggle="true"[\s\S]*id="initializer-enter-assembly-button"/);
     assert.equal((html.match(/data-project-export-toggle="true"/g) || []).length, 1);
+    const exportButton = html.match(/<button[^>]*data-project-export-toggle="true"[^>]*>[\s\S]*?<\/button>/)?.[0];
+    assert.ok(exportButton);
+    assert.match(exportButton, locale === "en"
+      ? /<svg[\s\S]*?<\/svg><span>Export<\/span><\/button>/
+      : /<svg[\s\S]*?<\/svg><span>导出<\/span><\/button>/);
+    assert.doesNotMatch(exportButton, /data-app-tooltip=/);
     assert.ok(html.indexOf('data-project-export-toggle="true"') < html.indexOf('id="project-data-catalog"'));
     assert.match(html, locale === "en" ? /<h3 id="overview-preview-title">Pseudomolecule Preview<\/h3>/ : /<h3 id="overview-preview-title">假分子预览<\/h3>/);
     assert.ok(html.indexOf('id="project-data-catalog"') < html.indexOf('data-overview-summary'));
