@@ -161,7 +161,7 @@ small,.muted{color:var(--text-muted);font-size:var(--text-sm)}
 .is-hidden{display:none!important}
 
 /* Sticky Single-Row Topbar Header */
-.cgat-header{position:sticky;top:0;z-index:40;background:var(--surface-panel);background:var(--surface-header);backdrop-filter:saturate(180%) blur(10px);-webkit-backdrop-filter:saturate(180%) blur(10px);border-top:2.5px solid var(--brand);border-bottom:1px solid var(--border-subtle);box-shadow:0 1px 2px rgba(15,23,42,.03)}
+.cgat-header{position:sticky;top:0;z-index:40;background:var(--surface-panel);background:var(--surface-header);backdrop-filter:saturate(180%) blur(10px);-webkit-backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--border-subtle);box-shadow:0 1px 2px rgba(15,23,42,.03)}
 .cgat-header-inner{max-width:1280px;margin:0 auto;min-height:48px;padding:.46rem 1.5rem;display:flex;flex-direction:column;justify-content:center}
 .cgat-header.is-centered .cgat-header-inner{max-width:1200px}
 .cgat-title-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem 1.25rem;min-width:0}

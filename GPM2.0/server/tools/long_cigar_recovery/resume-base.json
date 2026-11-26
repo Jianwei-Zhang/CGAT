@@ -254,7 +254,7 @@
         "tools/render_overview_report.py": "3f650c0f994b3e37eef67f66799de202a5eb08a3dc4290ceec70c74ffcc6f19b",
         "tools/render_overview_summary.py": "a820b56e016627995c57efcd87ee82e3cf00c3dd8ce4727d6af268444f7302c1",
         "tools/render_path_story.py": "3f2d2a905e77d3692b1676043571ac6142caf8fe91e9a20ababcc9a824281aae",
-        "tools/render_refinement_report.py": "a25194af92ea5345a6f719cc7080f5d776ce7a464381264514a7f1585db592e5",
+        "tools/render_refinement_report.py": "3784c4f01a19b00c97193a71915aa14a2e5167e179e85f536b9054b6e3ee61a3",
         "tools/render_repair_story.py": "c88da34cd8b6e781ff765ebfc96f490cd8d9664c53f78f74c1f9f694736afbed",
         "tools/render_server_report.py": "e053fb2bcdbdd3c63951e96654db4e284c83f47cc942bcb8e0007993ff522b0c",
         "tools/render_template.py": "854efccc70ed4c3fba3ef6d05c1079d599d440923325b83f2575874dc85cd958",
