@@ -440,7 +440,7 @@ def refinement(layout, batch):
             for view in nv.get("views") or []:
                 if not isinstance(view, dict):
                     continue
-                wp = view.get("wrapper_path")
+                wp = view.get("display_path") or view.get("wrapper_path")
                 if not isinstance(wp, str) or not wp:
                     continue
                 vhref = file_href(root, folder + "/" + wp)

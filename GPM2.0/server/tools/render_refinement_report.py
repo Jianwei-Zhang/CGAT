@@ -1580,8 +1580,8 @@ def render_tool_pages(summary, provenance, final, assets, *, page_size=PAGE_SIZE
     vis_status = vis_info.get("status", "not_available")
     vis_reason = vis_info.get("reason", "")
     visualization_links = {
-        source["workspace_path"]: row["wrapper_path"]
-        for row in vis_info.get("views", []) if "wrapper_path" in row
+        source["workspace_path"]: row.get("display_path") or row["wrapper_path"]
+        for row in vis_info.get("views", []) if "display_path" in row or "wrapper_path" in row
         for source in row["sources"]
     }
     lookup = {row["workspace_path"]: row for row in assets}
@@ -1690,8 +1690,8 @@ def render_failure(summary):
     diagnostics_error, source_diagnostics = summary["diagnostics_error"], summary["source_diagnostics"]
     vis_info = summary.get("native_visualization", {})
     vis_links = {
-        source["workspace_path"]: row["wrapper_path"]
-        for row in vis_info.get("views", []) if "wrapper_path" in row
+        source["workspace_path"]: row.get("display_path") or row["wrapper_path"]
+        for row in vis_info.get("views", []) if "display_path" in row or "wrapper_path" in row
         for source in row["sources"]
     }
     lookup = {row["workspace_path"]: row for row in assets}

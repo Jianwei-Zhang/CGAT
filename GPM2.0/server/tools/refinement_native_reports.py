@@ -27,13 +27,14 @@ WRAPPER_CSP = ("default-src 'none'; style-src 'unsafe-inline'; frame-src 'self' 
 # native overview may request a generated filename, never a path or URL.
 DETAIL_REQUEST = "cgat.native-report.open-detail"
 DETAIL_CLICK = f"""(()=>{{
+  if (window.parent === window) return;
   for (const kind of ["click", "auxclick"]) document.addEventListener(kind, event => {{
     const link = event.target?.closest?.("a[href]");
     if (!link) return;
     const href = link.getAttribute("href");
     if (!href || href.startsWith("#")) return;
     event.preventDefault();
-    if (kind === "click" && window.parent !== window) {{
+    if (kind === "click") {{
       window.parent.postMessage({{type: "{DETAIL_REQUEST}", name: href}}, "*");
     }}
   }}, true);
@@ -333,21 +334,14 @@ def transform(raw, unused_scripts, local_pages, inline_images=(), *, artifact_jo
         raise UnsupportedView("native JavaScript requires unsupported browser/network capabilities")
     check_css("\n".join(re.findall(r"<style[^>]*>(.*?)</style>", text, re.S | re.I)), set(inline_images))
     insert = '<meta http-equiv="Content-Security-Policy" content="' + escape(CSP, quote=True) + '">'
-    note = ('<div style="padding:.7em;background:#eef5ff;color:#17212b;font:14px system-ui">'
-            'Native tool visualization, not CGAT accepted/final sequence. Use the CGAT navigation above this frame. '
-            '/ 原生工具可视化，不是 CGAT 接纳或最终序列；请使用框架上方的 CGAT 导航。</div>')
+    patches = [*inspect.patches, (inspect.head_end, inspect.head_end, insert)]
     if overview:
-        note += "<script>" + DETAIL_CLICK + "</script>"
-    patches = [*inspect.patches, (inspect.head_end, inspect.head_end, insert),
-               (inspect.body_end, inspect.body_end, note)]
+        patches.append((inspect.body_end, inspect.body_end, "<script>" + DETAIL_CLICK + "</script>"))
     for start, end, replacement in sorted(patches, reverse=True):
         text = text[:start] + replacement + text[end:]
-    # Upstream creates its detail links inside a JS template string. Stay in
-    # the existing sandbox instead of asking it for prohibited popup windows.
-    text = re.sub(r'target\s*=\s*([\'"])_blank\1', 'target="_self"', text, flags=re.I)
     return text.encode(), {"removed_unused_external_scripts": len(inspect.patches) - inspect.detached_artifacts,
                            "detached_native_artifact_links": inspect.detached_artifacts,
-                           "csp": CSP, "detail_navigation": "allowlisted_wrapper_frame" if overview else "none",
+                           "csp": CSP, "detail_navigation": "direct_native_or_wrapper_frame" if overview else "none",
                            "scripts": len(inspect.scripts)}
 
 
@@ -591,8 +585,8 @@ def prepare(tool, native, jobs, gaps, assets, read, *, remaining_budget, page_si
             body += '<tr><td colspan="4" class="muted">No native visualization entries recorded. / 未记录原生可视化条目。</td></tr>'
         for row in group:
             name = (
-                '<a href="' + escape(row["wrapper_path"].removeprefix(HOME + "/"), quote=True) + '"><strong>' + escape(row["name"]) + '</strong></a>'
-                if "wrapper_path" in row else '<code>' + escape(row["name"]) + '</code>'
+                '<a href="' + escape(row["display_path"].removeprefix(HOME + "/"), quote=True) + '"><strong>' + escape(row["name"]) + '</strong></a>'
+                if "display_path" in row else '<code>' + escape(row["name"]) + '</code>'
             )
             links = ' · '.join(
                 '<a href="' + escape(source["raw_report_path"], quote=True) + '">HTML source / HTML 原文</a> <code>' + escape(source["sha256"]) + '</code>'

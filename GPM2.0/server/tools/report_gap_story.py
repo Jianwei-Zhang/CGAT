@@ -44,7 +44,7 @@ def native_views(layout, folder, summary, files, ids):
             continue
         if not all(f in files and file_href(layout.root, f"{folder}/{f}") and sha256_file(physical(layout.root, f"{folder}/{f}")) == files[f] for f in (wrapper, display)):
             continue
-        href = file_href(layout.root, f"{folder}/{wrapper}")
+        href = file_href(layout.root, f"{folder}/{display}")
         by_name[name] = href
         for source in view.get("sources", []):
             if isinstance(source.get("source_path"), str):
