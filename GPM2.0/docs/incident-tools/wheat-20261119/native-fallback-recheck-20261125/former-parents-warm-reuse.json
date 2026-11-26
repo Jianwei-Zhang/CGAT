@@ -1,0 +1,31 @@
+{
+  "bare_projection_rejected": true,
+  "closure": "f82d1c21827c6821e084534d230445b66cb0e5dc5a3767f7ce039fee5b2b579a",
+  "generated_fasta_bytes_not_transferred": 1092639851,
+  "generated_fasta_count": 30,
+  "mapping": "ffc6e0f5cd45948e5d5ff5140c1b6a15e977e6b8bcdf5c7477c699ed34c16f8e",
+  "native_mapper_starts": 0,
+  "query_windows": 13,
+  "receiver_layout": 2,
+  "rows": 1660,
+  "schema": "wheat_relocated_regional_cache_v1",
+  "scope": "Exact replay of the 15 previous requests in a fresh numbered workspace with real source DNA verified. Does not establish that a future planner requests these batches, or that other caches are complete. No production workspace writes.",
+  "source_bp_verified": 18175606961,
+  "source_layout": 1,
+  "source_parts": 2533,
+  "tasks": 15,
+  "transferred_bytes": 35440851,
+  "transferred_files": 180,
+  "work": {
+    "candidates": 0,
+    "chain_reused": 15,
+    "chain_started": 0,
+    "dispatched": 15,
+    "frontier_omitted": 0,
+    "projection_built": 0,
+    "projection_only": 0,
+    "projection_reused": 15,
+    "raw_reused": 15,
+    "raw_started": 0
+  }
+}

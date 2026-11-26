@@ -1,0 +1,18 @@
+#!/bin/bash
+#DSUB -n jm19_q0_reuse_15
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-04
+#DSUB -R "cpu=1,mem=4096MB"
+#DSUB -o reuse_%J.out
+set -euo pipefail
+umask 077
+here=$PWD;base=$(dirname "$here"); h="$base/q0-bound-first-demand.8xpsAJ"; donor="$base/q0-local-only-maps-20261126.uWC4iQQn"; tools="$base/q0-formal-placement-budget.Q7M6PYWa/tools.tgz"
+sha256sum --quiet -c kit.sha256
+printf '%s  %s\n' d01fb9b2fc0b5c81a2c3a471368936d6fa4efe392d56f428fffc622f6c081b04 "$tools" 0fe17ea73802a8fac489303dfd45ea2624c1dd7dc45a648b5270c9642ea1ef8a "$donor/run_wheat_local_only_batches.py" 9d0971e43033a2be9124a7956cfa41a9832c3c9d760f2768701e5090c5f7300d "$h/controls.sha256" | sha256sum --quiet -c -
+set +u;source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"; set -u
+w=$(mktemp -d /tmp/wheat-cache-adoption.XXXXXXXX);trap 'rm -rf -- "$w"' EXIT; tar -xzf "$tools" -C "$w"; mkdir "$w/helpers" result
+while read -r pin f; do case "$f" in *.py) cp "$h/$f" "$w/helpers/$f"; printf '%s  %s\n' "$pin" "$w/helpers/$f" | sha256sum --quiet -c -;; esac; done < "$h/controls.sha256"
+cp "$donor/run_wheat_local_only_batches.py" "$w/helpers/"; export PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$w/tools:$w/helpers"
+python3 -Bu verify_wheat_relocated_regional_cache.py "$base" "$donor" "$w/receiver" "$here/result"
+sha256sum result/adoption-files.json.gz result/result.json
