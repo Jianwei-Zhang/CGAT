@@ -695,13 +695,13 @@ def _svg_donuts(sv, fstats, tel_info, lgz, colors, auto):
         svg.append(f'<text x="{cx}" y="129" text-anchor="middle" class="ov-donut-cap t-zh">{esc(czh)}</text>')
         svg.append(f'<text x="{cx}" y="129" text-anchor="middle" class="ov-donut-cap t-en">{esc(cen)}</text>')
     svg.append(
-        '<g transform="translate(100,155)">'
+        '<g transform="translate(110,155)">'
         '<rect x="0" y="-6.5" width="7" height="7" rx="1.5" fill="var(--brand)"/>'
         '<text x="11" y="0" class="ov-leg-txt t-zh">LGZ / 原有</text><text x="11" y="0" class="ov-leg-txt t-en">LGZ / Orig</text>'
-        '<rect x="92" y="-6.5" width="7" height="7" rx="1.5" fill="var(--gen-closed)"/>'
-        '<text x="103" y="0" class="ov-leg-txt t-zh">精修 / 达标</text><text x="103" y="0" class="ov-leg-txt t-en">Refined / OK</text>'
-        '<rect x="190" y="-6.5" width="7" height="7" rx="1.5" fill="var(--surface-muted)" stroke="var(--border-default)"/>'
-        '<text x="201" y="0" class="ov-leg-txt t-zh">剩余 / 缺失</text><text x="201" y="0" class="ov-leg-txt t-en">Remaining</text>'
+        '<rect x="88" y="-6.5" width="7" height="7" rx="1.5" fill="var(--gen-closed)"/>'
+        '<text x="99" y="0" class="ov-leg-txt t-zh">精修 / 达标</text><text x="99" y="0" class="ov-leg-txt t-en">Refined / OK</text>'
+        '<rect x="180" y="-6.5" width="7" height="7" rx="1.5" fill="var(--surface-muted)" stroke="var(--border-default)"/>'
+        '<text x="191" y="0" class="ov-leg-txt t-zh">剩余 / 缺失</text><text x="191" y="0" class="ov-leg-txt t-en">Remaining</text>'
         "</g>"
     )
     svg.append("</svg>")
@@ -1118,23 +1118,23 @@ STYLE = """<style>
 .ov-chart-meta{font:500 .73rem/1.2 var(--font-mono);color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .ov-chart-meta.is-ok{color:var(--gen-closed);font-weight:600}
 .ov-svg{display:block;width:100%;height:auto;flex:1 1 auto;background:var(--surface-panel);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:.18rem}
-.ov-ax-txt{font:500 9.5px/1 var(--font-mono);fill:var(--text-muted)}
-.ov-ax-lbl{font:600 10px/1 var(--font-mono);fill:var(--text-secondary)}
+.ov-ax-txt{font-family:var(--font-mono);font-size:9px;font-weight:500;fill:var(--text-muted)}
+.ov-ax-lbl{font-family:var(--font-mono);font-size:9.5px;font-weight:600;fill:var(--text-secondary)}
 .ov-ax-lbl.is-win{fill:var(--gen-closed)}
-.ov-val-txt{font:600 9.5px/1 var(--font-mono);fill:var(--text-primary)}
-.ov-val-mini{font:600 9px/1 var(--font-mono);fill:var(--text-primary)}
-.ov-lbl-win{font:650 9.5px/1 var(--font-mono);fill:var(--gen-closed)}
-.ov-lbl-sub{font:500 9.5px/1 var(--font-mono);fill:var(--text-muted)}
-.ov-donut-big{font:700 12.5px/1 var(--font-mono);fill:var(--text-primary)}
-.ov-donut-sub{font:500 8.8px/1 var(--font-mono);fill:var(--text-muted)}
-.ov-donut-title{font:600 10.2px/1 inherit;fill:var(--text-primary)}
-.ov-donut-cap{font:500 8.8px/1 inherit;fill:var(--text-muted)}
-.ov-leg-txt{font:500 9px/1 inherit;fill:var(--text-secondary)}
-.ov-bar-lbl{font:600 10.2px/1 var(--font-mono);fill:var(--text-secondary)}
+.ov-val-txt{font-family:var(--font-mono);font-size:9.5px;font-weight:600;fill:var(--text-primary)}
+.ov-val-mini{font-family:var(--font-mono);font-size:8.5px;font-weight:600;fill:var(--text-primary)}
+.ov-lbl-win{font-family:var(--font-mono);font-size:9.5px;font-weight:650;fill:var(--gen-closed)}
+.ov-lbl-sub{font-family:var(--font-mono);font-size:9px;font-weight:500;fill:var(--text-muted)}
+.ov-donut-big{font-family:var(--font-mono);font-size:12px;font-weight:700;fill:var(--text-primary)}
+.ov-donut-sub{font-family:var(--font-mono);font-size:8.5px;font-weight:500;fill:var(--text-muted)}
+.ov-donut-title{font-size:10px;font-weight:600;fill:var(--text-primary)}
+.ov-donut-cap{font-size:8.5px;font-weight:500;fill:var(--text-muted)}
+.ov-leg-txt{font-size:8.5px;font-weight:500;fill:var(--text-secondary)}
+.ov-bar-lbl{font-family:var(--font-mono);font-size:10px;font-weight:600;fill:var(--text-secondary)}
 .ov-bar-lbl.is-win{fill:var(--gen-closed)}
-.ov-bar-val{font:600 9.8px/1 var(--font-mono);fill:var(--text-secondary)}
+.ov-bar-val{font-family:var(--font-mono);font-size:9.5px;font-weight:600;fill:var(--text-secondary)}
 .ov-bar-val.is-win{fill:var(--gen-closed)}
-.ov-mini-title{font:600 10px/1 inherit;fill:var(--text-secondary)}
+.ov-mini-title{font-size:9.5px;font-weight:600;fill:var(--text-secondary)}
 @media (max-width:860px){
   .ov-charts-grid{grid-template-columns:1fr}
   .ov-stepper{flex-wrap:wrap}
