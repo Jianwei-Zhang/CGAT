@@ -39,13 +39,12 @@ async function check(){
   async function open(file,css){await call('Page.navigate',{url:pathToFileURL(path.resolve(file)).href},s);for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector(${JSON.stringify(css)})`))return;await delay(30);}throw Error('missing '+css);}
   async function click(css){await evaluate(`document.querySelector(${JSON.stringify(css)}).click()`);}
   async function close(){await click('[data-story-close]');await delay(30);}
-  await open(pages[0],'[data-final-version]');
+  await open(pages[0],'#final-path [data-copy]');
   assert.equal(await evaluate("document.querySelectorAll('#final-path details[open]').length"),0);
-  for(const [i,tool] of ['DEGAP','TGS-GapCloser'].entries()){
-    await evaluate(`(()=>{const el=document.querySelector('[data-final-version]');el.selectedIndex=${i};el.dispatchEvent(new Event('change'))})()`);
-    const sel='.final-version:not([hidden])',btn=sel+' summary [data-story-open]';const file=await evaluate(`document.querySelector('${sel} [data-copy]').dataset.copy`);
-    assert.ok(file.endsWith(i?'.tgsgapcloser.fa':'.degap.fa')&&fs.statSync(file).isFile());await click(btn);
-    assert.equal(await evaluate("document.querySelector('dialog').matches(':modal')"),true);assert.ok((await evaluate("document.querySelector('dialog [aria-pressed=true]').textContent")).startsWith(tool));await close();assert.equal(await evaluate(`document.activeElement===document.querySelector('${btn}')`),true);
+  {
+    const btn='#final-path summary [data-story-open]';const file=await evaluate("document.querySelector('#final-path [data-copy]').dataset.copy");
+    assert.ok(file.endsWith('.degap.fa')&&fs.statSync(file).isFile());await click(btn);
+    assert.equal(await evaluate("document.querySelector('dialog').matches(':modal')"),true);assert.ok((await evaluate("document.querySelector('dialog [aria-pressed=true]').textContent")).startsWith('DEGAP'));await close();assert.equal(await evaluate(`document.activeElement===document.querySelector('${btn}')`),true);
   }
   const panel='[data-manual-batch]:not([hidden])';
   for(const version of ['v1','v2']){

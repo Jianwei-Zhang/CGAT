@@ -247,7 +247,7 @@
         "tools/refinement_tgs_units.py": "d02d0e08763557dc542e9a96dfa8dab0bff3fde7e8ae7ad932648b037829a511",
         "tools/refinement_tools.py": "90c37af806a0186ff12e5c2dae16adf2172ebc358a67b2631ab5470153fbc037",
         "tools/regenerate_reports.py": "2b5406674b2de520c8714482e0661be45e124cbfa815a1abdb89c47fa2e0c901",
-        "tools/render_final_story.py": "fda2503b2de986e2f162aaf8e38a057d64b165c225317369517aab48c3e6bd76",
+        "tools/render_final_story.py": "c6c19875c38a17453e4d3d92923cc77a34fa31656cf12e5ad17a8505d74c5752",
         "tools/render_gap_story.py": "9244ff7be49e35cb32395a6ccfad28752b62d522d94a2a993fa863aea2241d16",
         "tools/render_manual_report.py": "e5ba78618547f622c28825a9a8da003243619d558fb09f07fbb345ee146a5d56",
         "tools/render_manual_story.py": "07cc9009f98be778b95830053315118c4ef9eb82f6479b17bf8865d1101d74a2",

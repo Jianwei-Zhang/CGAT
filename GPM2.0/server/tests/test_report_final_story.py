@@ -48,3 +48,25 @@ class FinalStoryTests(unittest.TestCase):
         self.assertEqual(final_versions(self.layout,{},dict(tools=[{'publication_verified':False}]),{'status':'failed'},[], 'full_pipeline'),[])
         vm={'meta':{'mode':'full_pipeline'},'refinement_summary':{'tools':[{'tool':'degap'}],'original_loci':[]},'lgz_summary':{},'final_versions':[]}
         self.assertIn('No verified refined version',final_card(vm));self.assertNotIn('LGZ-only',final_card(vm))
+
+    def test_auto_selects_highest_closed_version_with_priority_tiebreak_and_header_path(self):
+        files=self.publication(self.edited)
+        v_tgs=supplied_version(self.layout,'degap',{'server_final_directory':'/srv/run/05_final'},files,self.edited,quick={},transaction='a',edits=0)
+        v_tgs['tool']='tgsgapcloser';v_tgs['fasta']='/srv/run/05_final/02_tgsgapcloser/assembly.fa'
+        v_lr=copy.deepcopy(v_tgs);v_lr['tool']='lrgapcloser';v_lr['edits']=3;v_lr['fasta']='/srv/run/05_final/04_lrgapcloser/assembly.fa'
+        v_degap=copy.deepcopy(v_tgs);v_degap['tool']='degap';v_degap['edits']=2;v_degap['fasta']='/srv/run/05_final/01_degap/assembly.fa'
+        # LR has 2 closed + 1 partial; DEGAP has 2 closed -> tie on closed count, DEGAP wins by priority.
+        tools=[
+            {'tool':'tgsgapcloser','gap_decisions':{'g1':{'state':'retained'},'g2':{'state':'retained'},'g3':{'state':'retained'}}},
+            {'tool':'lrgapcloser','gap_decisions':{'g1':{'state':'closed'},'g2':{'state':'closed'},'g3':{'state':'partial'}}},
+            {'tool':'degap','gap_decisions':{'g1':{'state':'closed'},'g2':{'state':'closed'},'g3':{'state':'retained'}}},
+        ]
+        vm={'meta':{'mode':'full_pipeline'},'lgz_summary':{'inputs':{'assemblies':[]},'reference_tracks':{'chr1':{'length_bp':14}}},
+            'refinement_summary':{'tools':tools,'original_loci':self.edited['original_gaps']},'final_versions':[v_tgs,v_lr,v_degap]}
+        html=final_card(vm)
+        self.assertIn('LGZ + DEGAP',html)
+        self.assertIn('data-copy="/srv/run/05_final/01_degap/assembly.fa"',html)
+        self.assertIn('class="final-head-fasta"',html)
+        self.assertNotIn('data-final-version',html)
+        self.assertNotIn('class="preview-label"',html)
+        self.assertIn('class="preview-part-txt"',html)
