@@ -1,0 +1,643 @@
+{
+  "admission_receipt_sha256": "03e6423723b2fc92f1f2a6d2afe06ec5f2b7db568f78c90d823bd8b8ec9a7358",
+  "cross_group_occupancy": {
+    "100000": {
+      "all_three_paths_available": true,
+      "passed": true,
+      "source_interval_conflicts": []
+    },
+    "1000000": {
+      "all_three_paths_available": true,
+      "passed": true,
+      "source_interval_conflicts": []
+    }
+  },
+  "elapsed_s": 2775.8997925817966,
+  "formal_q0_lgz": "HOLD",
+  "formal_workspace_modified": false,
+  "fragment_refinement_run": false,
+  "mapper_calls": 0,
+  "one_a_loop_sha256": "bcab3dc094aee5deaa57dc3823039b705d1b4e7a818e4f2ad1606374c7ececad",
+  "pair_receipt_sha256": "0fc588ffb618ce5258fa0af16ddf9b83500ea30dc144b4a15b9c0c8c0c2c3578",
+  "results": {
+    "3B_locus_100000": {
+      "admission_reference_bp": 687528060,
+      "frozen_metrics": {
+        "gap_count": 217,
+        "gap_placeholder_bp": 21700,
+        "max_slice_bp": 22945670,
+        "reference_union_bp": 148428877,
+        "score": [
+          160299658,
+          -217,
+          -217,
+          -223,
+          -225,
+          22945670
+        ],
+        "slice_N50_bp": 15667328,
+        "slices": 225,
+        "source_bp": 160299658
+      },
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 21060,
+          "envelope_only_atoms": 10527,
+          "inconsistent_anchor_frame_atoms": 110,
+          "unknown_atoms": 13
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 100000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 8196,
+        "union_audit": {
+          "accepted_unions": 3523,
+          "maximum_rejected_map_bp": 6502,
+          "rejected_atom_bp_sum": 2072271,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 14716
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 100,
+        "gap_placeholder_bp": 10000,
+        "max_slice_bp": 56415588,
+        "reference_union_bp": 642487432,
+        "score": [
+          778206162,
+          -100,
+          -100,
+          -93,
+          -101,
+          56415588
+        ],
+        "slice_N50_bp": 17631120,
+        "slices": 101,
+        "source_bp": 778206162
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "3B_locus_100000-path.json.gz",
+      "path_sha256": "10ad759fb8e99511eaae757a56fc270880bfd005af645885f9fbe2aa0c642f70",
+      "reference_gain_vs_baseline_bp": 495796857,
+      "reference_loss_vs_baseline_bp": 1738302,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-708de4f3941710d5b6eec88d",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000449l"
+            ],
+            "source_bp": 936974
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-af07ed6d0d75e0487ea0da87",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000508l"
+            ],
+            "source_bp": 643821
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-4fa985dfece27519eba15472",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000447l"
+            ],
+            "source_bp": 1438860
+          }
+        ],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_opposite_orientation": 2192434,
+          "same_group_same_orientation": 557546611
+        },
+        "source_union_bp": {
+          "same_group_opposite_orientation": 3019655,
+          "same_group_same_orientation": 673129615
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 1,
+          "no_legal_join": 5
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 107,
+        "proposal_source_length_weight": 810380093,
+        "score_calls": 103
+      }
+    },
+    "3B_locus_1000000": {
+      "admission_reference_bp": 687528060,
+      "frozen_metrics": {
+        "gap_count": 217,
+        "gap_placeholder_bp": 21700,
+        "max_slice_bp": 22945670,
+        "reference_union_bp": 148428877,
+        "score": [
+          160299658,
+          -217,
+          -217,
+          -223,
+          -225,
+          22945670
+        ],
+        "slice_N50_bp": 15667328,
+        "slices": 225,
+        "source_bp": 160299658
+      },
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 21123,
+          "envelope_only_atoms": 10527,
+          "inconsistent_anchor_frame_atoms": 47,
+          "unknown_atoms": 13
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 1000000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 8196,
+        "union_audit": {
+          "accepted_unions": 3612,
+          "maximum_rejected_map_bp": 6502,
+          "rejected_atom_bp_sum": 2044323,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 14627
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 98,
+        "gap_placeholder_bp": 9800,
+        "max_slice_bp": 56415588,
+        "reference_union_bp": 633784741,
+        "score": [
+          768980082,
+          -98,
+          -98,
+          -91,
+          -99,
+          56415588
+        ],
+        "slice_N50_bp": 17842876,
+        "slices": 99,
+        "source_bp": 768980082
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "3B_locus_1000000-path.json.gz",
+      "path_sha256": "5ae7aa1f1eeb62e09713c4cc4d43ccd64a155608a89a019103366221228b31d2",
+      "reference_gain_vs_baseline_bp": 495796857,
+      "reference_loss_vs_baseline_bp": 10440993,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-708de4f3941710d5b6eec88d",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000449l"
+            ],
+            "source_bp": 936974
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-af07ed6d0d75e0487ea0da87",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000508l"
+            ],
+            "source_bp": 643821
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-4fa985dfece27519eba15472",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000447l"
+            ],
+            "source_bp": 1438860
+          }
+        ],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_opposite_orientation": 2192434,
+          "same_group_same_orientation": 551149892
+        },
+        "source_union_bp": {
+          "same_group_opposite_orientation": 3019655,
+          "same_group_same_orientation": 666453063
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 3,
+          "no_legal_join": 5
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 107,
+        "proposal_source_length_weight": 810380093,
+        "score_calls": 103
+      }
+    },
+    "3B_native": {
+      "control_only": true,
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 67,
+        "gap_placeholder_bp": 6700,
+        "max_slice_bp": 48140967,
+        "reference_union_bp": 355707233,
+        "score": [
+          451586836,
+          -67,
+          -67,
+          -64,
+          -68,
+          48140967
+        ],
+        "slice_N50_bp": 20369456,
+        "slices": 68,
+        "source_bp": 451586836
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "3B-top10-native-path.json.gz",
+      "path_sha256": "c4f549a5c5d8d90d8f0ff0d69e3c7042a13fce7e126a44550255ebad0011f41d",
+      "reference_gain_vs_baseline_bp": 282073982,
+      "reference_loss_vs_baseline_bp": 74795626,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-09dd121d0bd7b02524d2abb0",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000565l"
+            ],
+            "source_bp": 1782074
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-708de4f3941710d5b6eec88d",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000449l"
+            ],
+            "source_bp": 936974
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-ae04ca2ab39f43eed85a214d",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000510l"
+            ],
+            "source_bp": 1428861
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-f46c59f62b26c3223a4d3570",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000082l"
+            ],
+            "source_bp": 3973219
+          },
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-af07ed6d0d75e0487ea0da87",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000508l"
+            ],
+            "source_bp": 643821
+          }
+        ],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_opposite_orientation": 6300650,
+          "same_group_same_orientation": 314384685
+        },
+        "source_union_bp": {
+          "same_group_opposite_orientation": 8764949,
+          "same_group_same_orientation": 397714602
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 37,
+          "no_legal_join": 2
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 107,
+        "proposal_source_length_weight": 810380093,
+        "score_calls": 106
+      }
+    },
+    "3D_locus_100000": {
+      "admission_reference_bp": 568277502,
+      "frozen_metrics": {
+        "gap_count": 101,
+        "gap_placeholder_bp": 10100,
+        "max_slice_bp": 66039582,
+        "reference_union_bp": 95634512,
+        "score": [
+          100416624,
+          -101,
+          -101,
+          -106,
+          -108,
+          66039582
+        ],
+        "slice_N50_bp": 66039582,
+        "slices": 108,
+        "source_bp": 100416624
+      },
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 5267,
+          "envelope_only_atoms": 2543,
+          "inconsistent_anchor_frame_atoms": 50,
+          "unknown_atoms": 1
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 100000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 2659,
+        "union_audit": {
+          "accepted_unions": 1247,
+          "maximum_rejected_map_bp": 4207,
+          "rejected_atom_bp_sum": 319833,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 2413
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 60,
+        "gap_placeholder_bp": 6000,
+        "max_slice_bp": 68660094,
+        "reference_union_bp": 516443728,
+        "score": [
+          578919898,
+          -60,
+          -60,
+          -54,
+          -61,
+          68660094
+        ],
+        "slice_N50_bp": 30037343,
+        "slices": 61,
+        "source_bp": 578919898
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "3D_locus_100000-path.json.gz",
+      "path_sha256": "a522de1b5ef8a26898071d0ccbf09bbcd0a13687a72d6b6948d4c068b01dfe3c",
+      "reference_gain_vs_baseline_bp": 421153661,
+      "reference_loss_vs_baseline_bp": 344445,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-069ae528a25b8d2307924cf8",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000664l"
+            ],
+            "source_bp": 965672
+          }
+        ],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_opposite_orientation": 915206,
+          "same_group_same_orientation": 251583956
+        },
+        "source_union_bp": {
+          "same_group_opposite_orientation": 965672,
+          "same_group_same_orientation": 296948774
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 2,
+          "no_legal_join": 3
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 66,
+        "proposal_source_length_weight": 592271576,
+        "score_calls": 64
+      }
+    },
+    "3D_locus_1000000": {
+      "admission_reference_bp": 568277502,
+      "frozen_metrics": {
+        "gap_count": 101,
+        "gap_placeholder_bp": 10100,
+        "max_slice_bp": 66039582,
+        "reference_union_bp": 95634512,
+        "score": [
+          100416624,
+          -101,
+          -101,
+          -106,
+          -108,
+          66039582
+        ],
+        "slice_N50_bp": 66039582,
+        "slices": 108,
+        "source_bp": 100416624
+      },
+      "guard": {
+        "coverage_code_sha256": "fee085d946c89aed2abe9a640955521f655bf858ebe9dec839fe21652914c9aa",
+        "domain_audit": {
+          "actual_anchor_atoms": 5298,
+          "envelope_only_atoms": 2543,
+          "inconsistent_anchor_frame_atoms": 19,
+          "unknown_atoms": 1
+        },
+        "domain_code_sha256": "1ea1d6039b7499582621320a10545eae2b77d04e83b4bad73b42063850f0a47f",
+        "native_ambiguity_exclusions_preserved": true,
+        "native_equivalence_reconstruction_proof": {
+          "ambiguity_ids_equal": true,
+          "atoms_equal": true,
+          "units_equal": true
+        },
+        "native_pair_qualification_unchanged": true,
+        "policy_change": true,
+        "reference_constraint_intersection_propagates_through_unknown_atoms": true,
+        "reference_tolerance_bp": 1000000,
+        "relation_builder_sha256": "2b6a226cf1b2d4ae98a8d6368b23aa10587e84473029c5eb54713b0fcf13de33",
+        "relations": 2659,
+        "union_audit": {
+          "accepted_unions": 1313,
+          "maximum_rejected_map_bp": 4207,
+          "rejected_atom_bp_sum": 315678,
+          "rejected_large_map_unions": 0,
+          "rejected_unions": 2347
+        },
+        "union_order": "native sorted coordinate map order"
+      },
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 59,
+        "gap_placeholder_bp": 5900,
+        "max_slice_bp": 68660094,
+        "reference_union_bp": 515020421,
+        "score": [
+          577062079,
+          -59,
+          -59,
+          -53,
+          -60,
+          68660094
+        ],
+        "slice_N50_bp": 30037343,
+        "slices": 60,
+        "source_bp": 577062079
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "3D_locus_1000000-path.json.gz",
+      "path_sha256": "c4bc50452fb0cb566045b3a4561fb86a7eabfc8bc05951e79bd89e161320e59e",
+      "reference_gain_vs_baseline_bp": 421153661,
+      "reference_loss_vs_baseline_bp": 1767752,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-069ae528a25b8d2307924cf8",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000664l"
+            ],
+            "source_bp": 965672
+          }
+        ],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_opposite_orientation": 915206,
+          "same_group_same_orientation": 251583956
+        },
+        "source_union_bp": {
+          "same_group_opposite_orientation": 965672,
+          "same_group_same_orientation": 296948774
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 3,
+          "no_legal_join": 3
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 66,
+        "proposal_source_length_weight": 592271576,
+        "score_calls": 64
+      }
+    },
+    "3D_native": {
+      "control_only": true,
+      "incumbent_lower_bounds_passed": true,
+      "metrics": {
+        "gap_count": 49,
+        "gap_placeholder_bp": 4900,
+        "max_slice_bp": 68660094,
+        "reference_union_bp": 334630619,
+        "score": [
+          379502634,
+          -49,
+          -49,
+          -43,
+          -50,
+          68660094
+        ],
+        "slice_N50_bp": 32607691,
+        "slices": 50,
+        "source_bp": 379502634
+      },
+      "native_score_and_duplicate_gate_passed": true,
+      "path_file": "3D-top10-native-path.json.gz",
+      "path_sha256": "bbbe13c47d84fa2bc234ef2fa594a6b2e716fde87ff7f4e8fc3841277985ea06",
+      "reference_gain_vs_baseline_bp": 316812388,
+      "reference_loss_vs_baseline_bp": 77816281,
+      "reference_order_flags": [],
+      "risk": {
+        "conflict_flags": [
+          {
+            "category": "same_group_opposite_orientation",
+            "placement_id": "q0-placement-069ae528a25b8d2307924cf8",
+            "source": [
+              "JM19_hifiasm",
+              "ptg000664l"
+            ],
+            "source_bp": 965672
+          }
+        ],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_opposite_orientation": 915206,
+          "same_group_same_orientation": 231110559
+        },
+        "source_union_bp": {
+          "same_group_opposite_orientation": 965672,
+          "same_group_same_orientation": 267662020
+        }
+      },
+      "spine_diagnostics": {
+        "fallback_skips": {
+          "exact_score_or_duplicate_gate": 14,
+          "no_legal_join": 2
+        },
+        "full_proposal_passed": false,
+        "proposal_nodes": 66,
+        "proposal_source_length_weight": 592271576,
+        "score_calls": 65
+      }
+    }
+  },
+  "schema": "wheat_3B_3D_top_chain_locus_cross_v1",
+  "three_group_policy_checks_passed": {
+    "100000": false,
+    "1000000": false
+  }
+}
