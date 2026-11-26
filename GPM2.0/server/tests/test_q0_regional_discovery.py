@@ -45,6 +45,29 @@ class RegionalDiscoveryTests(unittest.TestCase):
         self.assertEqual(tuple(self.observed.cross_coverage[SourceKey('a','q')]),(Interval(100,300),))
         self.assertEqual(tuple(self.observed.cross_coverage[SourceKey('b','t')]),(Interval(200,400),))
 
+    def test_over_budget_keeps_siblings_and_batches_after_the_frontier_gate(self):
+        from server.tools.lgz_core import q0_regional_mapping as mapping
+        index = mock.Mock(); index.parts = self.parts
+        index.regions.return_value = {'chr': (Interval(0, 1000),)}
+        tid = self.ids['t']
+        index.targets.side_effect = [{tid: (Interval(0, 100),)},
+                                     {tid: (Interval(0, 100), Interval(200, 300))}]
+        holes = {self.ids['q']: (Interval(0, 200000),)}
+        target_source = self.parts[tid].source
+        observed = []
+        def mapper(root, catalog, query, targets, tool, **kwargs):
+            observed.append((query.window_id, [t.start for t in targets])); return query.window_id
+        with (mock.patch.object(regional, 'partial_source_intervals', return_value=holes),
+              mock.patch.object(mapping, 'TARGET_BATCH_BASES', 120),
+              mock.patch.object(regional, 'prepare_regional_mapping', side_effect=mapper)):
+            tasks, fallback, report = regional.prepare_partial(
+                self.root, self.catalog, index, self.observed, {}, reference_lengths={'chr': 5_000_000_000},
+                preset='asm10', threads=1, regional_frontier={target_source:(Interval(0, 1),)})
+        self.assertEqual(fallback, [])
+        self.assertEqual(len(tasks), 3); self.assertEqual(tasks[1], tasks[2]); self.assertNotEqual(tasks[0], tasks[1])
+        self.assertEqual(observed[0][1], [0]); self.assertEqual(sorted(x[1][0] for x in observed[1:]), [0, 200])
+        self.assertEqual((report['target_batch_splits'], report['frontier_omitted_windows']), (1, 0))
+
     def test_native_fallback_subsumes_parent_without_launching_earlier_window(self):
         index=mock.Mock();index.parts=self.parts;index.regions.return_value={'chr':(Interval(0,100),)}
         index.targets.side_effect=[{self.ids['t']:(Interval(0,1000),)},{}]

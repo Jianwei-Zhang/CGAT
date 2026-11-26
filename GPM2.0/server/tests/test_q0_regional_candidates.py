@@ -49,6 +49,17 @@ class RegionalCandidatesTests(unittest.TestCase):
         query,targets=windows[0];self.assertEqual(query.cores,((0,1000),))
         self.assertEqual({t.segment_id for t in targets},{self.ids['b']})
 
+    def test_target_total_above_100mb_is_not_a_native_candidate_matrix(self):
+        from server.tools.lgz_core.q0_regional_execution import plan_request
+        from server.tools.lgz_core.q0_regional_mapping import target_batches
+        index=mock.Mock(); index.regions.return_value={'chr':(Interval(0,1000),)}
+        index.parts = {k:SimpleNamespace(interval=Interval(0,100_000_001)) for k in ('t1','t2')}
+        index.targets.return_value={'t1':(Interval(0,60_000_001),),'t2':(Interval(0,40_000_000),)}
+        q=QueryWindow('q',3000,0,1000,((0,1000),))
+        (row,), native, reason=plan_request(ParentRequest('candidate','q',(q,),('chr',),3,0,3),index)
+        self.assertEqual((native,reason),(0,None)); batches=list(target_batches(row[1]))
+        self.assertEqual(len(batches),2); self.assertEqual({t.segment_id for b in batches for t in b},{'t1','t2'})
+
     def test_known_sources_are_excluded_before_paf_decode_and_no_local_targets_is_not_failure(self):
         known={(SourceKey('ds','a'),SourceKey('ds','b'))};plan=self.plan(known)
         _,eligible=plan.eligible(self.ids['a']);original=self.index._hit

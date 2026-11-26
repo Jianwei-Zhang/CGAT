@@ -12,14 +12,14 @@ from .common import stable_id
 from .q0_catalog import _IntervalUnion, DISCOVERY_REFERENCE_IDENTITY
 from .q0_neighbor_requests import known_neighbors
 from .q0_query_windows import WindowPolicy, plan_query_windows, TargetWindow
-from .q0_regional_mapping import BASE_FLAGS, MAX_TARGET_BASES, RegionalWorkLog, prepare_regional_mapping
+from .q0_regional_mapping import BASE_FLAGS, TARGET_BATCH_POLICY, target_batches, RegionalWorkLog, prepare_regional_mapping
 from .q0_frontier_scope import window_touches_frontier
 from .q0_sources import Interval, Q0EvidenceError
 from .q0_regional_execution import ParentRequest, RegionalExecutor, plan_request, completed_result
 from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 
 CANDIDATE_POLICY = {
-    "version": 2, "weak_unroutable_global_profile": WEAK_GLOBAL_SEED_POLICY, "core_bases": 100000, "context_bases": 10000, "query_selection": "exact_legacy_missing_neighbor_and_expanded_split",
+    "version": 3, "target_batching": TARGET_BATCH_POLICY, "weak_unroutable_global_profile": WEAK_GLOBAL_SEED_POLICY, "core_bases": 100000, "context_bases": 10000, "query_selection": "exact_legacy_missing_neighbor_and_expanded_split",
     "query_context": "union_qualified_M_equal_reference_footprints_across_requested_chromosomes",
     "reference_identity": DISCOVERY_REFERENCE_IDENTITY, "minimum_query_footprint_bases": 100,
     "weak_only_alternatives": "keep_input_evidence_without_new_expansion_if_source_has_qualified_anchors",
@@ -52,8 +52,6 @@ def candidate_window_targets(index, key, query, chromosomes, selection):
     regions = {chromosome: intervals for chromosome,intervals in regions.items() if chromosome in chromosomes}
     if not regions: return [], "query_window_without_qualified_reference"
     rows = index.targets(regions,context=10000,exclude=[key],selection=selection)
-    if sum(interval.length for values in rows.values() for interval in values) > MAX_TARGET_BASES:
-        return [], "regional_target_budget"
     return [TargetWindow(pid,index.parts[pid].interval.length,i.start,i.end)
             for pid,values in rows.items() for i in values], None
 
@@ -271,7 +269,7 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
               "approximate_scope_task_ids":planner.approximate_scope_task_ids,"requested_part_pairs":0,
               "reused_part_pairs":0,"regional_windows":0,"fallback_parents":0,"weak_only_parents_not_expanded":0,"weak_only_parent_ids":[],
               "maximum_workers":workers,"mapper_threads":mapper_threads,
-              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0}
+              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0, "target_batch_splits": 0}
     def consume(): tasks.append(completed_result(pending))
     def requests():
         for key in sorted(planner.query_chromosomes):
@@ -306,11 +304,15 @@ def prepare_candidates(root, catalog, index, requests, observed, complete_tasks,
                     work.add("frontier_omitted")
                     continue
                 report["regional_windows"] += 1
-                if len(pending) >= workers: consume()
-                future = pool.submit(work.run, prepare_regional_mapping,root,catalog,query,targets,tool,
-                                     reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
-                pending[future] = (parent_number, window_number)
-                if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
+                # Gate the original window, then dispatch every target of an accepted frame.
+                for batch_number, batch in enumerate(target_batches(targets)):
+                    if batch_number:
+                        report["target_batch_splits"] += 1
+                    if len(pending) >= workers: consume()
+                    future = pool.submit(work.run, prepare_regional_mapping,root,catalog,query,batch,tool,
+                                         reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
+                    pending[future] = (parent_number, window_number, batch_number)
+                    if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
             if number%100 == 0:
                 work.emit("progress")
                 print(f"LGZ q0 candidate regions: eligible_parents_completed={number} requested_parents={report['requested_parents']} completed={len(tasks)} fallback={report['fallback_parents']}",flush=True)

@@ -19,17 +19,17 @@ from .common import sha256_file, stable_id
 from .q0_catalog import ObservedSourcePairs, partial_source_intervals
 from .q0_query_windows import WindowPolicy, TargetWindow, plan_query_windows
 from .q0_reference_index import ReferenceIndex, _signature
-from .q0_regional_mapping import MAX_TARGET_BASES, RegionalWorkLog, prepare_regional_mapping
+from .q0_regional_mapping import TARGET_BATCH_POLICY, target_batches, RegionalWorkLog, prepare_regional_mapping
 from .q0_frontier_scope import window_touches_frontier
 from .q0_regional_execution import ParentRequest, RegionalExecutor, completed_result
 from .q0_sources import Interval, Q0EvidenceError
 
 REGIONAL_POLICY = {
-    "version": 1, "reference_bases_at_least": 5_000_000_000, "preset": "asm10",
+    "version": 2, "reference_bases_at_least": 5_000_000_000, "preset": "asm10",
     "core_bases": 100_000, "query_context_bases": 10_000,
     "minimum_uncovered_bases": 100, "anchor_context_bases": 1_000_000,
     "reference_context_bases": 10_000, "target_context_bases": 10_000,
-    "maximum_target_bases": MAX_TARGET_BASES,
+    "target_batching": TARGET_BATCH_POLICY,
     "covered_cross_bases": "subtract_complete_identity_ge_0.95_paired_ge_100",
     "unroutable": "native_full_source_all_anchors",
     "later_candidate_chr": "regional_execution_with_exact_legacy_query_selection",
@@ -131,9 +131,8 @@ def plan_parent(catalog, index, windows):
         regions = index.regions(query.segment_id, Interval(query.start,query.end),
                                 anchor_context=1_000_000, reference_context=10_000)
         rows = index.targets(regions, context=10_000, exclude=[query.segment_id])
-        bases = sum(i.length for values in rows.values() for i in values)
-        if not rows or bases > MAX_TARGET_BASES:
-            return [], "no_reference_targets" if not rows else "regional_target_budget"
+        if not rows:
+            return [], "no_reference_targets"
         targets = [TargetWindow(key,catalog.parts[key].interval.length,i.start,i.end)
                    for key,values in rows.items() for i in values]
         planned.append((query, targets))
@@ -172,7 +171,7 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
               "approximate_scope_task_ids":native_scopes.approximate_scope_task_ids if native_scopes else [], "residual_bases": sum(i.length for values in holes.values() for i in values),
               "mapper_threads": mapper_threads, "maximum_workers": workers,
               "address_space_bytes_per_mapper": 4*1024**3, "fallback_sources": [],
-              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0}
+              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0, "target_batch_splits": 0}
     def consume():
         ordinal, task = completed_result(pending)
         tasks.append((ordinal, task))
@@ -205,11 +204,15 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                     report["frontier_omitted_windows"] += 1
                     work.add("frontier_omitted")
                     continue
-                if len(pending) >= workers: consume()
-                future = pool.submit(work.run, prepare_regional_mapping, root,catalog,query,targets,tool,
-                                     reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
-                pending[future] = (parent_number, window_number)
-                if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
+                # Gate the original window, then dispatch every target of an accepted frame.
+                for batch_number, batch in enumerate(target_batches(targets)):
+                    if batch_number:
+                        report["target_batch_splits"] += 1
+                    if len(pending) >= workers: consume()
+                    future = pool.submit(work.run, prepare_regional_mapping, root,catalog,query,batch,tool,
+                                         reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
+                    pending[future] = (parent_number, window_number, batch_number)
+                    if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
         while pending: consume()
     report.update(execution.report)
     report["completed_regional_tasks"] = len(tasks)

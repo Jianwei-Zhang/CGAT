@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 import json
+from hashlib import sha256
 import os
 from pathlib import Path
 
@@ -24,7 +25,7 @@ import sys
 import threading
 import uuid
 
-from .common import canonical_json, sha256_bytes, sha256_file, stable_id, write_fasta
+from .common import canonical_json, sha256_bytes, sha256_file, stable_id, write_wrapped_sequence
 from .q0_alignments import read_paf
 from .q0_cigar_policy import ChainWork, CigarWorkPolicy, select_cigar_profile
 from .q0_query_windows import QueryWindow, TargetWindow, project_regional_paf
@@ -39,7 +40,11 @@ BASE_FLAGS = ["-D", "-P", "--dual=yes", "--no-long-join"]
 CONTEXT_SCHEMA = "lgz_q0_regional_context_v1"
 PROJECTION_SCHEMA = "lgz_q0_regional_projection_v1"
 MAX_QUERY_BASES = 120_000
-MAX_TARGET_BASES = 100_000_000
+TARGET_BATCH_BASES = 100_000_000  # Scheduling preference, not a scientific scope limit.
+MAX_TARGET_BASES = TARGET_BATCH_BASES  # Old incident replay tools measure the historical cutoff.
+TARGET_BATCH_POLICY = {"version": 1, "preferred_bases": TARGET_BATCH_BASES,
+                       "order": "target_window_id", "indivisible_target": "intact_guarded_singleton",
+                       "scope": "all_selected_regional_targets_in_independently_bound_batches"}
 _LOCKS = {}; _LOCK_GUARD = threading.Lock()
 
 
@@ -107,15 +112,41 @@ def _source(catalog, segment_id):
     if cache is None:cache=catalog._regional_verified_parts={}
     previous=cache.get(segment_id)
     if previous is None or previous[0] is not sequence or previous[1:]!=(part.interval,part.sequence_sha256):
-        if sha256_bytes(sequence[part.interval.start:part.interval.end].upper().encode("ascii"))!=part.sequence_sha256:
+        content = sha256()
+        for i in range(part.interval.start, part.interval.end, 1 << 20):
+            content.update(sequence[i:min(i + (1 << 20), part.interval.end)].upper().encode("ascii"))
+        if content.hexdigest()!=part.sequence_sha256:
             raise Q0EvidenceError("regional source sequence differs from its catalog identity")
         cache[segment_id]=(sequence,part.interval,part.sequence_sha256)
     return sequence,part
 
 
-def _sequence(catalog, window):
-    sequence,part=_source(catalog,window.segment_id)
-    return sequence[part.interval.start+window.start:part.interval.start+window.end].upper()
+def _write_windows(path, catalog, windows):
+    with path.open("w", encoding="utf-8", newline="") as f:
+        for window in windows:
+            sequence, part = _source(catalog, window.segment_id)
+            f.write(f">{window.window_id}\n")
+            write_wrapped_sequence(f, sequence, part.interval.start + window.start,
+                                   part.interval.start + window.end, uppercase=True)
+
+
+def target_batches(targets):
+    """Keep every target interval intact; unchanged single-batch contexts retain their original identities."""
+    if len(targets) < 2 or sum(t.length for t in targets) <= TARGET_BATCH_BASES:
+        yield targets
+        return
+    ordered = sorted(targets, key=lambda t: t.window_id)
+    # Otherwise duplicate inputs on different sides of a batch boundary could evade _context().
+    if any(a.window_id == b.window_id for a,b in zip(ordered, ordered[1:])):
+        raise Q0EvidenceError("duplicate target window before batching")
+    batch = []; bases = 0
+    for target in ordered:
+        if batch and bases + target.length > TARGET_BATCH_BASES:
+            yield batch
+            batch = []; bases = 0
+        batch.append(target); bases += target.length
+    if batch:
+        yield batch
 
 
 def _lock(path):
@@ -208,8 +239,8 @@ def _context(root, catalog, query, targets, tool, preset):
         return relative,stored
     if directory.exists():directory=_fresh_directory(root,relative)
     else:directory.mkdir(parents=True)
-    write_fasta(directory/"query.fa",[(query.window_id,_sequence(catalog,query))])
-    write_fasta(directory/"target.fa",((w.window_id,_sequence(catalog,w)) for w in sorted(targets,key=lambda w:w.window_id)))
+    _write_windows(directory/"query.fa", catalog, [query])
+    _write_windows(directory/"target.fa", catalog, sorted(targets,key=lambda w:w.window_id))
     record={"spec":spec,"inputs":_outputs(root,[relative+"/query.fa",relative+"/target.fa"]),
             "input_fastas_reconstructible_from_bound_windows":True}
     _ops().atomic_write_json(path,record)
@@ -226,7 +257,7 @@ def _ensure_fastas(root,relative,context,catalog,query,targets):
             if _ops().identity(root,expected["path"]) != expected:
                 raise Q0EvidenceError("existing regional input changed; preserve it for diagnosis")
         else:
-            write_fasta(path,((w.window_id,_sequence(catalog,w)) for w in windows))
+            _write_windows(path, catalog, windows)
             if _ops().identity(root,expected["path"]) != expected:
                 raise Q0EvidenceError("regenerated window FASTA differs from bound input")
 
@@ -410,7 +441,7 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
                              address_space_bytes=4*1024**3, policy=CigarWorkPolicy()):
     root=Path(root).resolve(strict=True)
     if threads<1 or query.length>MAX_QUERY_BASES: raise Q0EvidenceError("uncalibrated regional query/resource budget")
-    if not targets or sum(w.length for w in targets)>MAX_TARGET_BASES:
+    if not targets:
         raise RegionalFallbackRequired("regional target inventory needs declared full fallback")
     # The raw context key excludes cores; complete raw mapping can survive a
     # projection/coverage-selection repair without a new alignment.

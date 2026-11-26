@@ -33,6 +33,28 @@ class RegionalMappingTests(unittest.TestCase):
         return prepare_regional_mapping(self.root,self.catalog,query or self.query,[self.target],self.tool,
                                         reference_bases=5_000_000_000,threads=1,**kwargs)
 
+    def test_target_batches_preserve_scope_order_receipts_and_real_raw_reuse(self):
+        from server.tools.lgz_core import q0_regional_mapping as m
+        target = self.target
+        spans = [TargetWindow(target.segment_id,target.segment_length,0,2600),
+                 TargetWindow(target.segment_id,target.segment_length,2600,5000)]
+        self.assertIs(next(m.target_batches(spans)), spans)
+        with mock.patch.object(m, 'TARGET_BATCH_BASES', 2000):
+            batches = list(m.target_batches(spans))  # Both individual targets exceed the soft preference.
+            self.assertEqual(batches,list(m.target_batches(list(reversed(spans)))))
+            self.assertCountEqual([t for batch in batches for t in batch], spans)
+            with self.assertRaisesRegex(Q0EvidenceError,'duplicate'):
+                list(m.target_batches([spans[0],spans[0]]))
+            def run():
+                return [prepare_regional_mapping(self.root,self.catalog,self.query,b,self.tool,
+                         reference_bases=5_000_000_000,threads=1) for b in batches]
+            tasks=run(); self.assertEqual(len({t['receipt'] for t in tasks}),2)
+            for t in tasks:
+                verify_regional_task(self.root,t)
+                self.assertTrue((self.root/t['paf']).stat().st_size)
+            with mock.patch.object(m, '_execute', side_effect=AssertionError('invalidated a valid raw')):
+                self.assertEqual(run(),tasks)
+
     def test_verified_loader_applies_only_to_new_children_and_preserves_raw_reuse(self):
         from server.tools.lgz_core import q0_regional_mapping as regional
         from server.tools.lgz_core.common import sha256_bytes
