@@ -5697,3 +5697,17 @@ Donau 作业 `43029926` 于 21:07:29 正常结束（退出码 0；总墙钟 26 �
   候选历史告警与新增告警分开；结束后只给`safety_checks_passed`，科学验收仍待逐组审阅，正式Q0/LGZ仍HOLD。
 - 初始资源复核：x86 `agent-X86-34`空闲64CPU/约465GiB，沿用完整PAF输入所需32CPU/320GiB，
   而非把三组80GiB配额错误扩大到全麦。实际jobID/启动状态见后续提交回执；此条本身不代表已经提交。
+
+
+### 2026-11-27 03:00 全麦22组已启动
+
+- Job **43137178**，`jm19_q0_production22_cached`，03:00:24启动，x86 `agent-X86-34`，
+  32CPU/327680MiB；启动回执已验证RUNNING和实际硬内存配额。不要重复提交。
+- 私有owner：`q0-whole-local-maps.production22-20261127.4iGSWNXm`。
+  当前输入整理/历史证据复用尚未产出逐组结果，不能称为22组验收通过。
+- 整套tools取自跟踪分支`b186126e`（引擎提交`2064cb4c`），不混装旧tools；归档SHA
+  `d8a2ba64e8c9f6d02328a87189fea28c92024621669e2fd81d6d6bd9438b6f1d`，
+  selector `q0-selector-4eec44d14ec5dd92e2543f64`。
+- 提交元数据：`incident-tools/wheat-20261119/wheat-production22-submission-20261127.json`。
+  日志`production22_43137178.out`，逐组checkpoint在`selection/`，最终审计在
+  `result/production22-audit.json`。科学结果需看覆盖/连续性/告警及跨组源占用后再决定；正式Q0/LGZ继续HOLD。
