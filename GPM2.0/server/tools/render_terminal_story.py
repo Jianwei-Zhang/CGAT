@@ -51,7 +51,11 @@ TERMINAL_STYLE = """<style>
 .tel-dlg-plot{margin:.5rem 0 0;padding:.45rem .65rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle)}
 .tel-dlg-meta{display:flex;flex-wrap:wrap;gap:.3rem .85rem;margin:.45rem 0 0;font-size:.8rem;color:var(--text-secondary);line-height:1.45}
 .tel-dlg-meta code{font-size:.79rem}
-.tel-dlg-note{margin:.42rem 0 0;font-size:.79rem;color:var(--text-muted);line-height:1.45}
+.tel-motif-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.38rem .6rem;margin:.5rem 0 0;padding:.45rem .65rem;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-subtle);font-size:.8rem;color:var(--text-secondary)}
+.tel-motif-lbl{font-weight:600;color:var(--text-primary)}
+.tel-motif-chip{display:inline-flex;align-items:center;gap:.35rem;flex-wrap:wrap}
+.tel-motif-code{display:inline-block;padding:1px 7px;border:1px solid var(--tone-ok-line);border-radius:4px;background:var(--tone-ok-bg);color:var(--tone-ok-ink);font:700 .79rem/1.35 var(--font-mono);letter-spacing:.03em}
+.tel-dlg-note{margin:.45rem 0 0;font-size:.79rem;color:var(--text-muted);line-height:1.45}
 .tel-dlg-reject{margin:.45rem 0 0;padding:.38rem .6rem;border-radius:var(--radius-sm);background:var(--tone-warn-bg);border:1px solid var(--tone-warn-line);color:var(--tone-warn-ink);font-size:.8rem;line-height:1.45}
 .tel-gate-list{margin:.35rem 0 0;padding-left:1.1rem;font-size:.79rem;color:var(--tone-warn-ink);line-height:1.45}
 .story-zoom-stage .tel-frame{border:0;border-radius:0;padding-bottom:0;overflow:visible;min-width:100%;width:calc(100% * var(--chart-scale, 1))}
@@ -95,13 +99,19 @@ def _zoom(t, cand, side, outsize):
     pad_l = 42 if compact else 96
     plot_w = vb_w - pad_l - (14 if compact else 28)
     qax = _axis(qlo, qhi, pad_l=pad_l, width=plot_w)
-    svg_h = 136 if sel else (92 if cand else 44)
+    svg_h = 136 if sel else (92 if cand else 54)
     svg = [f'<svg class="repair-zoom" viewBox="0 0 {vb_w} {svg_h}" role="img" aria-label="Terminal evidence / 末端证据">']
 
     # Track 1: q2 terminal inspection window
-    svg.append('<text x="6" y="31" font-size="11.5" font-weight="600" fill="var(--text-primary)">q2</text>')
+    svg.append('<text x="6" y="34" font-size="11.5" font-weight="600" fill="var(--text-primary)">q2</text>')
     svg.append(f'<text x="{pad_l}" y="14" font-size="10" fill="var(--text-muted)">{qlo+1:,}</text>')
     svg.append(f'<text x="{pad_l + plot_w}" y="14" text-anchor="end" font-size="10" fill="var(--text-muted)">{qhi:,}</text>')
+    if compact:
+        for i in (1, 2, 3):
+            tx = pad_l + plot_w * i / 4
+            svg.append(f'<line x1="{tx:.1f}" y1="20" x2="{tx:.1f}" y2="41" stroke="var(--border-subtle)" stroke-width="1"/>')
+            tpos = round(qlo + (qhi - qlo) * i / 4)
+            svg.append(f'<text x="{tx:.1f}" y="51" text-anchor="middle" font-size="9" fill="var(--text-muted)">{tpos:,}</text>')
 
     if cand:
         extract = cand["source"][1] - cand["source"][0]
@@ -110,38 +120,77 @@ def _zoom(t, cand, side, outsize):
             a, b = h["q2"]
             u, v = h["extract"] if h["strand"] == "+" else reversed(h["extract"])
             tone = "tone-warn-ink" if h["failed"] else ("ds-0" if h.get("selected") and cand["status"] == "accepted" else "text-muted")
-            svg.append(f'<polygon points="{qax(a):.4f},32 {qax(b):.4f},32 {dax(v):.4f},66 {dax(u):.4f},66" opacity=".26" fill="var(--{tone})"/>')
+            svg.append(f'<polygon points="{qax(a):.4f},35 {qax(b):.4f},35 {dax(v):.4f},68 {dax(u):.4f},68" opacity=".26" fill="var(--{tone})"/>')
         cname = cand["name"] if len(cand["name"]) <= 12 else cand["name"][:11] + "…"
-        svg.append(f'<text x="6" y="74" font-size="11" font-weight="600" fill="var(--text-secondary)"><title>{esc(cand["name"])}</title>{esc(cname)}</text>')
-        svg.append(_rect([0, extract], dax, 66, "var(--border-strong)"))
+        svg.append(f'<text x="6" y="76" font-size="11" font-weight="600" fill="var(--text-secondary)"><title>{esc(cand["name"])}</title>{esc(cname)}</text>')
+        svg.append(_rect([0, extract], dax, 68, "var(--border-strong)"))
         if sel and cand["event"] == sel["event"] and cand["status"] == "accepted" and cand["used"]:
-            svg.append(_rect(cand["used"], dax, 65, "var(--ds-0)", h=11))
+            svg.append(_rect(cand["used"], dax, 67, "var(--ds-0)", h=11))
         for interval in cand["signals"] or []:
-            svg.append(_rect(interval, dax, 61, "var(--gen-tel)", h=5, rx=1))
+            s_a, s_b = interval
+            svg.append(
+                f'<rect x="{min(dax(s_a), dax(s_b)):.5f}" y="63" width="{max(2.5, abs(dax(s_b)-dax(s_a))):.5f}" height="6" rx="1" fill="var(--gen-tel)">'
+                f'<title>Motif · {s_a+1:,}–{s_b:,} ({s_b-s_a:,} bp)</title></rect>'
+            )
 
-    svg.append(_rect([qlo, qhi], qax, 22, "var(--border-default)", h=10))
-    svg.append(_rect(w, qax, 22, "var(--tone-info-line)", h=10))
+    if compact:
+        svg.append(f'<rect x="{pad_l}" y="24" width="{plot_w}" height="12" rx="3" fill="var(--surface-panel)" stroke="var(--border-default)"/>')
+    else:
+        svg.append(_rect([qlo, qhi], qax, 25, "var(--border-default)", h=10))
+        svg.append(_rect(w, qax, 25, "var(--tone-info-line)", h=10))
+    motifs = t.get("matched_motifs") or []
+    motif_lbl = "/".join(m["motif"] for m in motifs) if motifs else "Telomere motif"
+    motif_len = len(motifs[0]["motif"]) if len(motifs) == 1 and motifs[0].get("motif") else 0
     for interval in t["q2_signals"] or []:
-        svg.append(_rect(interval, qax, 20, "var(--gen-tel)", h=14))
+        s_a, s_b = interval
+        bp = s_b - s_a
+        rep_note = f" · ~{bp // motif_len}×" if motif_len else ""
+        sx0, sx1 = sorted((qax(s_a), qax(s_b)))
+        svg.append(
+            f'<rect x="{sx0:.5f}" y="22" width="{max(3.0, sx1 - sx0):.5f}" height="16" rx="2" fill="var(--gen-tel)">'
+            f'<title>{esc(motif_lbl)} · {s_a+1:,}–{s_b:,} ({bp:,} bp{rep_note})</title></rect>'
+        )
 
     if sel:
         cut = qax(sel["cut"])
-        svg.append(f'<path d="M{cut:.4f} 16v22" stroke="var(--gen-patch)" stroke-width="2.2"/>')
+        svg.append(f'<path d="M{cut:.4f} 18v23" stroke="var(--gen-patch)" stroke-width="2.2"/>')
         span = sel["span"]
         lo = max(0, span[0] - (2000 if side == "3prime" else 0))
         hi = min(outsize, span[1] + (2000 if side == "5prime" else 0))
         ax = _axis(lo, hi, pad_l=pad_l, width=plot_w)
-        svg.append('<text x="6" y="116" font-size="11.5" font-weight="600" fill="var(--text-primary)">q3</text>')
-        svg.append(f'<text x="{pad_l}" y="132" font-size="10" fill="var(--text-muted)">{lo+1:,}</text>')
-        svg.append(f'<text x="{pad_l + plot_w}" y="132" text-anchor="end" font-size="10" fill="var(--text-muted)">{hi:,}</text>')
-        svg.append(_rect([lo, hi], ax, 108, "var(--border-strong)"))
-        svg.append(_rect(span, ax, 107, "var(--ds-0)", h=11))
+        svg.append('<text x="6" y="118" font-size="11.5" font-weight="600" fill="var(--text-primary)">q3</text>')
+        svg.append(f'<text x="{pad_l}" y="134" font-size="10" fill="var(--text-muted)">{lo+1:,}</text>')
+        svg.append(f'<text x="{pad_l + plot_w}" y="134" text-anchor="end" font-size="10" fill="var(--text-muted)">{hi:,}</text>')
+        svg.append(_rect([lo, hi], ax, 110, "var(--border-strong)"))
+        svg.append(_rect(span, ax, 109, "var(--ds-0)", h=11))
         for u, v in t["q3_signals"] or []:
             if min(hi, v) > max(lo, u):
-                svg.append(_rect([max(lo, u), min(hi, v)], ax, 103, "var(--gen-tel)", h=5, rx=1))
+                sx0, sx1 = sorted((ax(max(lo, u)), ax(min(hi, v))))
+                svg.append(
+                    f'<rect x="{sx0:.5f}" y="104" width="{max(2.5, sx1 - sx0):.5f}" height="6" rx="1" fill="var(--gen-tel)">'
+                    f'<title>{esc(motif_lbl)} · q3 {u+1:,}–{v:,} ({v-u:,} bp)</title></rect>'
+                )
 
     svg.append("</svg>")
     return f'<div class="tel-dlg-plot">{"".join(svg)}</div>'
+
+
+def _motif_summary_bar(t):
+    motifs = t.get("matched_motifs") or []
+    sigs = t.get("q3_signals") if t.get("selected") and t.get("q3_signals") else t.get("q2_signals")
+    chips = []
+    for m in motifs:
+        strand_txt = bi(f"反向互补（来自 {m['base_motif']}）", f"RC of {m['base_motif']}") if m.get("strand") == "-" else bi("正链", "Forward")
+        rule_txt = f' · <span>{esc(m["rule_name"])}</span>' if m.get("rule_name") else ""
+        chips.append(f'<span class="tel-motif-chip"><span class="tel-motif-code">{esc(m["motif"])}</span><span>{strand_txt}</span>{rule_txt}</span>')
+    if sigs:
+        total_bp = sum(b - a for a, b in sigs)
+        span_preview = ", ".join(f"{a+1:,}–{b:,}" for a, b in sigs[:4]) + (" …" if len(sigs) > 4 else "")
+        dist_txt = bi(f"{len(sigs)} 处重复区 · 共 {total_bp:,} bp（{span_preview}）", f"{len(sigs)} hit span(s) · {total_bp:,} bp ({span_preview})")
+        chips.append(f'<span>{dist_txt}</span>')
+    if not chips:
+        return ""
+    return f'<div class="tel-motif-bar"><span class="tel-motif-lbl">{bi("命中基序", "Matched motif")}</span>{"".join(chips)}</div>'
 
 
 def _inspection(t, side, size):
@@ -168,7 +217,8 @@ def _inspection(t, side, size):
     cs = t["candidates"] or []
 
     def one(c):
-        rows = [_zoom(t, c, side, size)]
+        has_plot_data = bool(c or sel or t["q2_signals"] or t["q3_signals"])
+        rows = [_zoom(t, c, side, size)] if has_plot_data else []
         meta_bits = []
         if c:
             meta_bits.append(
@@ -216,13 +266,16 @@ def _inspection(t, side, size):
 
     primary = next((c for c in cs if sel and c["status"] == "accepted" and c["event"] == sel["event"]), None) or next(iter(cs), None)
     msg.append(one(primary))
+    motif_bar = _motif_summary_bar(t)
+    if motif_bar:
+        msg.append(motif_bar)
     if t["q2_signals"] or t["q3_signals"] or (primary and primary["signals"]):
-        msg.append('<p class="tel-dlg-note"><i class="swatch" style="background:var(--gen-tel);margin-right:.35rem"></i>' + bi("绿色区间：检出的端粒重复序列", "Green: detected telomere repeat intervals") + "</p>")
+        msg.append('<p class="tel-dlg-note"><i class="swatch" style="background:var(--gen-tel);margin-right:.35rem"></i>' + bi("绿色区间：窗口内检出的端粒串联重复分布（悬停查看坐标与重复数）", "Green: detected tandem telomere repeat distribution (hover for coordinates)") + "</p>")
     elif state != "unresolved":
-        msg.append('<p class="tel-dlg-note">' + bi("已检出端粒基序（本快照未保存具体重复坐标）。", "Telomere motif detected (repeat coordinates not stored in this snapshot).") + '</p>')
+        msg.append('<p class="tel-dlg-note">' + bi("本历史快照仅保存了规则命中结果，未记录逐段基序坐标；新版本运行将直接绘制末端基序分布图。", "This earlier snapshot recorded rule hits only; new runs plot per-hit motif positions here.") + '</p>')
     if state == "unresolved" and not cs:
         msg.append('<p class="tel-dlg-note">' + (
-            bi("未找到可用候选供体，保留 q2 原末端。", "No candidate donor found; original q2 end retained.")
+            bi("末端检测窗口内未检出端粒基序，且无可用候选供体，保留 q2 原末端。", "No telomere motif detected in the terminal window and no candidate donor found; original q2 end retained.")
             if count == 0 else bi(f"记录到 {count} 条候选，但缺少位点明细。", f"{count} candidate(s) recorded without locus details.")
         ) + '</p>')
     for c in cs:

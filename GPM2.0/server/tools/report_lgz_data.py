@@ -166,6 +166,7 @@ def extract_input_annotations(facts):
             min_rep = int(raw_rep) if isinstance(raw_rep, int) else None
         rc_val = str(row.get("reverse_complement", "true")).strip().lower()
         tel_items.append({
+            "rule_id": rid,
             "id": str(prov.get("id") or rid or motif),
             "source": str(prov.get("source") or ""),
             "motif": motif,
@@ -524,7 +525,8 @@ def collect(layout):
                     errors.append(f"{unit}: incomplete_output_path")
             if unit == "step3" and rel in stages:
                 try:
-                    out["terminal_scene"] = terminal_scene(facts)
+                    tel_rules = (out["inputs"].get("annotations") or {}).get("telomere_rules", {}).get("items") or []
+                    out["terminal_scene"] = terminal_scene(facts, tel_rules=tel_rules)
                 except failures:
                     errors.append("step3: invalid_terminal_evidence")
             if unit == "step2" and rel in stages:

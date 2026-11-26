@@ -111,7 +111,47 @@ def _project_candidate(c, q2_length):
     return out
 
 
-def terminal_scene(facts):
+_RC_TRANS = str.maketrans("ACGTacgt", "TGCAtgca")
+
+
+def _revcomp(seq):
+    return str(seq).translate(_RC_TRANS)[::-1]
+
+
+def _resolve_matched_motifs(raw_ids, rule_lookup):
+    ids = raw_ids
+    if isinstance(ids, str):
+        try:
+            ids = json.loads(ids)
+        except json.JSONDecodeError:
+            ids = []
+    if not isinstance(ids, list):
+        return []
+    out = []
+    seen = set()
+    for raw in ids:
+        rid = str(raw or "").strip()
+        if not rid:
+            continue
+        is_rc = rid.endswith("-rc")
+        base_id = rid[:-3] if is_rc else rid
+        rule = rule_lookup.get(base_id) or rule_lookup.get(rid)
+        if rule and rule.get("motif"):
+            base_motif = str(rule["motif"]).upper()
+            motif = _revcomp(base_motif) if is_rc else base_motif
+            key = (motif, "-" if is_rc else "+", base_motif)
+            if key not in seen:
+                seen.add(key)
+                out.append({
+                    "motif": motif,
+                    "strand": "-" if is_rc else "+",
+                    "base_motif": base_motif,
+                    "rule_name": str(rule.get("id") or base_id),
+                })
+    return out
+
+
+def terminal_scene(facts, tel_rules=None):
     src=facts.get("result",{}); stats=facts.get("sequence_versions",{})
     if (src.get("stage"),src.get("q_input_version"),src.get("q_output_version"))!=("step3","q2","q3"):return None
     pre,post=stats["q2"],stats["q3"];h0,h1=pre.get("sha256"),post.get("sha256")
@@ -120,6 +160,7 @@ def terminal_scene(facts):
     if lengths.keys()!=outputs.keys():return None
     terms=facts.get("terminal_inventory",src.get("terminal_rows",[]));counts=src.get("report_array_counts",{})
     if counts.get("terminal_rows",len(terms))!=len(terms):return None
+    rule_lookup={str(r["rule_id"]):r for r in (tel_rules or []) if isinstance(r,dict) and r.get("rule_id")}
     signals={(r["chr"],r["terminal"]):r for r in src.get("report_signals",[])}
     events={e["event_id"]:e for e in src.get("events",[])}; candidates=defaultdict(list)
     for c in facts.get("terminal_candidates") or []:
@@ -142,7 +183,9 @@ def terminal_scene(facts):
                     or (span[0]!=0 if k=="5prime" else span[1]!=outputs[c])): raise ValueError("inconsistent terminal cut/source")
             chosen={"span":span,"cut":cut,"event":label(event["event_id"]),"dataset":label(source["dataset"]),"name":label(source["contig"]),"source":[lo,hi],"strand":source["orientation"]}
         count=int(t["candidate_count"]); cs=candidates[c,k,t["object_id"]]; complete=facts.get("terminal_candidates") is not None and count==len(cs)
+        matched_motifs=_resolve_matched_motifs(t.get("matched_rule_ids") or t.get("matched_rule_ids_json"), rule_lookup)
         rows[c]["ends"][k]={"state":state,"reason":label(t["reason"]),"q2_length":lengths[c],"window":[a,b],"selected":chosen,
                     "count":count,"candidates":sorted(cs,key=lambda x:x["rank"]) if complete else None,
+                    "matched_motifs":matched_motifs,
                     "q2_signals":spans(signal.get("q2"),lengths[c]),"q3_signals":spans(signal.get("q3"),outputs[c])}
     return list(rows.values())
