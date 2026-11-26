@@ -1,0 +1,84 @@
+{
+  "schema": "wheat_two_funnel_readonly_launch_v1",
+  "observed_at": "2026-11-26T20:27:26+08:00",
+  "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-two-funnels-20261126.0Pop2292",
+  "jobs": {
+    "43099133": {
+      "purpose": "whole reference-coordinate admission funnel",
+      "status": "RUNNING at observation",
+      "cpus": 16,
+      "memory_mib": 163840,
+      "workers": 8,
+      "started": "2026-11-26T20:17:17+08:00"
+    },
+    "43099137": {
+      "purpose": "1A exact frozen baseline and two search variants",
+      "status": "RUNNING at observation",
+      "cpus": 8,
+      "memory_mib": 65536,
+      "started": "2026-11-26T20:22:14+08:00"
+    }
+  },
+  "formal_Q0_LGZ": "held pending both accounts",
+  "mapper_permitted": false,
+  "formal_workspace_write_permitted": false,
+  "producer_tools_sha256": "19cebdc7667d912f6d3ace4a59783d3e49fbb02e668ff5f5efbb50c618c27ad2",
+  "frozen_summary_sha256": "d23a49af479b6c9b81916518e8034d4044ea31b5c97229c5d0ce1624138fc9d4",
+  "old_q0": {
+    "statistics_receipt_sha256": "63aa6ca7b2467b90986d57224c0b96a36a3764eae02c225d666c35538e353b65",
+    "source": {
+      "path": "grt/q/q0.fa",
+      "sha256": "ce5eae7ab9001e31cae1dcb26a10ee2a555fff0f4b68472f97b4499158911325"
+    },
+    "length_bp": 14097144889,
+    "n_bp": 100300,
+    "sequence_count": 22,
+    "file_bytes_observed": 14273359301,
+    "per_sequence_sum_verified": 14097144889,
+    "input_metadata_same_as_current_snapshot": true,
+    "limitations": "Read existing cached statistics, did not rehash whole old FASTA or compute old reference-coordinate coverage. Length is not proof of correctness or completeness."
+  },
+  "old_input_receipts": [
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-full-v2.0.20-20261117/gpm_server/.run_all/report-statistics/908ce95ed0efa76b246eb22cfa527fb569c99f57b7581a7a410dffdbc44be278.json",
+      "source": {
+        "path": "data/reference/IWGSC.fa",
+        "sha256": "b6cd8e811c13b00684347d7707976dd1a81af32a567d669d4b185db27869ac4f"
+      },
+      "stats_sha256": "24e15b8c074e4023eaa56a38e75d7f48eb0230005e52ead701086c9ce1314401",
+      "sequence_count": 22,
+      "length_bp": 14547261565,
+      "n_bp": 275682678
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-full-v2.0.20-20261117/gpm_server/.run_all/report-statistics/b4f5f10131fcd7ec53a45df251353fbff80d6882b8a09af8c6a15feafa5d8b11.json",
+      "source": {
+        "path": "data/datasets/JM19_hifiasm.fa",
+        "sha256": "e5fda2a4b722332e03ea8306f925505c28074596703a9a895b6041260c8d5c7b"
+      },
+      "stats_sha256": "5886e8c6a1f6b124a4eef0a12f9a676ad8bdec7dd929ecc01c51ce0b0986cf09",
+      "sequence_count": 2377,
+      "length_bp": 14586133267,
+      "n_bp": 0
+    },
+    {
+      "file": "/share/home/xbzhang26/cgat-reads-debug/jm19-full-v2.0.20-20261117/gpm_server/.run_all/report-statistics/b3a781bd11fd623f051eee1a7d7d552e1e68d41aec9cc677f1fdb0d6ca631edc.json",
+      "source": {
+        "path": "data/datasets/JM19_flye_ABD.fa",
+        "sha256": "3e1f5a5831bc0dc83558f465652f7c6d8637bf133a3e2204bde10b184e6d0035"
+      },
+      "stats_sha256": "4f81e606ada63acd31a3758be5dfca994ecb04720726a1ad72ddbb295c96e9be",
+      "sequence_count": 35890,
+      "length_bp": 17119989222,
+      "n_bp": 0
+    }
+  ],
+  "limitations": [
+    "No completed reference funnel or replay result at this observation.",
+    "Baseline full path must equal the frozen result before interpreting variants.",
+    "Reference-first variants preserve 8 slots and total 20000 evaluations; no production threshold change.",
+    "Balanced budget is a diagnostic allocation, not a proven optimized algorithm; join variants can consume within-proposal work beyond phase quotas while global cap remains.",
+    "Graph reuse prewarms caches; timings are not controlled speedup measurements.",
+    "Single-group findings do not establish whole-wheat effect."
+  ]
+}
