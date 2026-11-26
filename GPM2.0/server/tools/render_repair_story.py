@@ -131,7 +131,7 @@ html:has(#path-event-dialog[open]){overflow:hidden}
     let drag=null;
     stage.addEventListener('mousedown',(e)=>{
       if(e.button!==0||steps[idx]<=1||e.target.closest('button,select,a'))return;
-      if(!e.target.closest('.q0-rails,.repair-track-col,.tel-gutter,.preview-rail,.story-ruler'))return;
+      if(!e.target.closest('.q0-rails,.repair-track-col,.tel-gutter,.preview-rail,.gap-track-box,.story-ruler'))return;
       drag={x:e.clientX,y:e.clientY,sl:stage.scrollLeft,st:stage.scrollTop};
       stage.classList.add('is-dragging');
     });
