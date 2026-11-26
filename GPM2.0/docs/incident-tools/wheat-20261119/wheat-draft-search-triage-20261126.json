@@ -1,0 +1,1191 @@
+{
+  "totals": {
+    "unselected": 8027,
+    "unselected_placement_bp_sum": 5281472016,
+    "no_reference_order_slot": 6563,
+    "reference_slot_and_source_free": 1340,
+    "reference_slot_candidate_bp_sum": 585165825,
+    "first_reference_slot_at_index_8_or_later": 1319,
+    "no_direct_reference_blocks": 124
+  },
+  "groups": {
+    "1A": {
+      "counts": {
+        "unselected": 229,
+        "unselected_placement_bp_sum": 118322433,
+        "no_reference_order_slot": 200,
+        "reference_slot_and_source_free": 25,
+        "reference_slot_candidate_bp_sum": 4360714,
+        "first_reference_slot_at_index_8_or_later": 25,
+        "no_direct_reference_blocks": 4
+      },
+      "examples": [
+        {
+          "id": "q0-placement-014ab34941369011df021a79",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_3956"
+          ],
+          "bp": 55371,
+          "first_slot": 39
+        },
+        {
+          "id": "q0-placement-0affb80c9d1740019b9505e0",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2674"
+          ],
+          "bp": 147153,
+          "first_slot": 13
+        },
+        {
+          "id": "q0-placement-17de20d91c301ab01c178fc2",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_13097"
+          ],
+          "bp": 44042,
+          "first_slot": 128
+        },
+        {
+          "id": "q0-placement-2eb073d476a50c3991c1f539",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2647"
+          ],
+          "bp": 2203243,
+          "first_slot": 114
+        }
+      ]
+    },
+    "1B": {
+      "counts": {
+        "unselected": 518,
+        "unselected_placement_bp_sum": 340572570,
+        "reference_slot_and_source_free": 100,
+        "reference_slot_candidate_bp_sum": 49237382,
+        "first_reference_slot_at_index_8_or_later": 99,
+        "no_reference_order_slot": 412,
+        "no_direct_reference_blocks": 6
+      },
+      "examples": [
+        {
+          "id": "q0-placement-00099a96f0881eb5e85ac1f1",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000734l"
+          ],
+          "bp": 1142876,
+          "first_slot": 80
+        },
+        {
+          "id": "q0-placement-061e06f02bc8f88f8f84cb1a",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_8703"
+          ],
+          "bp": 8543,
+          "first_slot": 159
+        },
+        {
+          "id": "q0-placement-08f3cc6e8f9d4a8b99d51f78",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_9895"
+          ],
+          "bp": 14148,
+          "first_slot": 72
+        },
+        {
+          "id": "q0-placement-0a53975e8dd84d6333aea69e",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_1019"
+          ],
+          "bp": 285,
+          "first_slot": 135
+        }
+      ]
+    },
+    "1D": {
+      "counts": {
+        "unselected": 151,
+        "unselected_placement_bp_sum": 115187625,
+        "no_reference_order_slot": 125,
+        "reference_slot_and_source_free": 22,
+        "reference_slot_candidate_bp_sum": 7169260,
+        "first_reference_slot_at_index_8_or_later": 22,
+        "no_direct_reference_blocks": 4
+      },
+      "examples": [
+        {
+          "id": "q0-placement-026511fef14a357cb9d9cd24",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_1286"
+          ],
+          "bp": 11858,
+          "first_slot": 68
+        },
+        {
+          "id": "q0-placement-0889a001cf89a428d3abc3fa",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_9293"
+          ],
+          "bp": 24821,
+          "first_slot": 66
+        },
+        {
+          "id": "q0-placement-117984b21f294a666d1e8e0f",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_15237"
+          ],
+          "bp": 3113203,
+          "first_slot": 80
+        },
+        {
+          "id": "q0-placement-1db916c8077cc1fd76aba876",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_6633"
+          ],
+          "bp": 3591,
+          "first_slot": 75
+        }
+      ]
+    },
+    "2A": {
+      "counts": {
+        "unselected": 358,
+        "unselected_placement_bp_sum": 305709234,
+        "reference_slot_and_source_free": 140,
+        "reference_slot_candidate_bp_sum": 187877069,
+        "first_reference_slot_at_index_8_or_later": 140,
+        "no_reference_order_slot": 213,
+        "no_direct_reference_blocks": 5
+      },
+      "examples": [
+        {
+          "id": "q0-placement-0064a8fbf6ec952a9e7173d0",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_2726"
+          ],
+          "bp": 24239,
+          "first_slot": 204
+        },
+        {
+          "id": "q0-placement-03616a5db6eacb88a2311044",
+          "source": [
+            "JM19_hifiasm",
+            "ptg001640l"
+          ],
+          "bp": 6078,
+          "first_slot": 204
+        },
+        {
+          "id": "q0-placement-074a4dacc4d8e8fb1524b58d",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_3919"
+          ],
+          "bp": 44458,
+          "first_slot": 204
+        },
+        {
+          "id": "q0-placement-0b488f1229539baf4268c856",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_15059"
+          ],
+          "bp": 8315,
+          "first_slot": 204
+        }
+      ]
+    },
+    "2B": {
+      "counts": {
+        "unselected": 390,
+        "unselected_placement_bp_sum": 185731137,
+        "no_reference_order_slot": 339,
+        "reference_slot_and_source_free": 47,
+        "reference_slot_candidate_bp_sum": 16129724,
+        "first_reference_slot_at_index_8_or_later": 47,
+        "no_direct_reference_blocks": 4
+      },
+      "examples": [
+        {
+          "id": "q0-placement-016d362c175f2b33d21cf47c",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_7017"
+          ],
+          "bp": 4528,
+          "first_slot": 186
+        },
+        {
+          "id": "q0-placement-1034da631f5293df5aa7048e",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_11752"
+          ],
+          "bp": 1236,
+          "first_slot": 225
+        },
+        {
+          "id": "q0-placement-1a013e593b4eefb751ec136c",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2856"
+          ],
+          "bp": 27778,
+          "first_slot": 138
+        },
+        {
+          "id": "q0-placement-1f3b6d8171c7c121508e4ce4",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_439"
+          ],
+          "bp": 1260084,
+          "first_slot": 50
+        }
+      ]
+    },
+    "2D": {
+      "counts": {
+        "unselected": 226,
+        "unselected_placement_bp_sum": 305787678,
+        "no_reference_order_slot": 175,
+        "reference_slot_and_source_free": 46,
+        "reference_slot_candidate_bp_sum": 33210313,
+        "first_reference_slot_at_index_8_or_later": 45,
+        "no_direct_reference_blocks": 5
+      },
+      "examples": [
+        {
+          "id": "q0-placement-037fb81573242cbf8ab99495",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_7052"
+          ],
+          "bp": 26108,
+          "first_slot": 65
+        },
+        {
+          "id": "q0-placement-0aff4c61ec1ba97ca74a440f",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_9804"
+          ],
+          "bp": 24384,
+          "first_slot": 70
+        },
+        {
+          "id": "q0-placement-10d9ec4a456b810e2f8ae194",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_8342"
+          ],
+          "bp": 26987,
+          "first_slot": 58
+        },
+        {
+          "id": "q0-placement-173291b10abdd68e7e1ce9b5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_9868"
+          ],
+          "bp": 1602,
+          "first_slot": 59
+        }
+      ]
+    },
+    "3A": {
+      "counts": {
+        "unselected": 247,
+        "unselected_placement_bp_sum": 180420031,
+        "no_reference_order_slot": 212,
+        "reference_slot_and_source_free": 33,
+        "reference_slot_candidate_bp_sum": 6709655,
+        "first_reference_slot_at_index_8_or_later": 33,
+        "no_direct_reference_blocks": 2
+      },
+      "examples": [
+        {
+          "id": "q0-placement-02c54e349c86fc246df6c1df",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_1471"
+          ],
+          "bp": 257138,
+          "first_slot": 148
+        },
+        {
+          "id": "q0-placement-04bb7d184dd9081d7083f2d8",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_9111"
+          ],
+          "bp": 794,
+          "first_slot": 180
+        },
+        {
+          "id": "q0-placement-07ee88ad3f7eb072be29c5bb",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_7902"
+          ],
+          "bp": 21024,
+          "first_slot": 157
+        },
+        {
+          "id": "q0-placement-07fd4397b0890bea20eadbc3",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_6788"
+          ],
+          "bp": 6751,
+          "first_slot": 105
+        }
+      ]
+    },
+    "3B": {
+      "counts": {
+        "unselected": 575,
+        "unselected_placement_bp_sum": 403987540,
+        "no_reference_order_slot": 513,
+        "reference_slot_and_source_free": 61,
+        "reference_slot_candidate_bp_sum": 19789544,
+        "first_reference_slot_at_index_8_or_later": 61,
+        "no_direct_reference_blocks": 1
+      },
+      "examples": [
+        {
+          "id": "q0-placement-031c9275f9394f824ce24f34",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_10165"
+          ],
+          "bp": 1228,
+          "first_slot": 146
+        },
+        {
+          "id": "q0-placement-0613c5ceca3ff35604609575",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_5219"
+          ],
+          "bp": 7752,
+          "first_slot": 200
+        },
+        {
+          "id": "q0-placement-11f684459e18739cb11e4b65",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_3673"
+          ],
+          "bp": 1845,
+          "first_slot": 96
+        },
+        {
+          "id": "q0-placement-17d380f32808a3300ecc3afe",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_3018"
+          ],
+          "bp": 740097,
+          "first_slot": 209
+        }
+      ]
+    },
+    "3D": {
+      "counts": {
+        "unselected": 173,
+        "unselected_placement_bp_sum": 206345495,
+        "no_reference_order_slot": 135,
+        "reference_slot_and_source_free": 37,
+        "reference_slot_candidate_bp_sum": 6532360,
+        "first_reference_slot_at_index_8_or_later": 34,
+        "no_direct_reference_blocks": 1
+      },
+      "examples": [
+        {
+          "id": "q0-placement-0628315da24b758d0e50ffbf",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_7937"
+          ],
+          "bp": 3973,
+          "first_slot": 101
+        },
+        {
+          "id": "q0-placement-067cb43f7118d3066787ccc3",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_10242"
+          ],
+          "bp": 23589,
+          "first_slot": 75
+        },
+        {
+          "id": "q0-placement-08d2771276f7bfb9694a9297",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_1283"
+          ],
+          "bp": 21121,
+          "first_slot": 73
+        },
+        {
+          "id": "q0-placement-0a04df383be8112eb0fb823f",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_16432"
+          ],
+          "bp": 305611,
+          "first_slot": 3
+        }
+      ]
+    },
+    "4A": {
+      "counts": {
+        "unselected": 390,
+        "unselected_placement_bp_sum": 217273323,
+        "reference_slot_and_source_free": 99,
+        "reference_slot_candidate_bp_sum": 10899106,
+        "first_reference_slot_at_index_8_or_later": 97,
+        "no_reference_order_slot": 288,
+        "no_direct_reference_blocks": 3
+      },
+      "examples": [
+        {
+          "id": "q0-placement-00ae937398a83c2701f4812b",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_1555"
+          ],
+          "bp": 283,
+          "first_slot": 20
+        },
+        {
+          "id": "q0-placement-02860462725a04777709eebd",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_3118"
+          ],
+          "bp": 1759,
+          "first_slot": 50
+        },
+        {
+          "id": "q0-placement-04c7047c34748018c8675524",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_12484"
+          ],
+          "bp": 743,
+          "first_slot": 142
+        },
+        {
+          "id": "q0-placement-0659211257b445817a59b978",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_7738"
+          ],
+          "bp": 294,
+          "first_slot": 106
+        }
+      ]
+    },
+    "4B": {
+      "counts": {
+        "unselected": 395,
+        "unselected_placement_bp_sum": 544038555,
+        "no_reference_order_slot": 357,
+        "reference_slot_and_source_free": 31,
+        "reference_slot_candidate_bp_sum": 21041519,
+        "first_reference_slot_at_index_8_or_later": 31,
+        "no_direct_reference_blocks": 7
+      },
+      "examples": [
+        {
+          "id": "q0-placement-02065a71b886358f1b8fc467",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_2305"
+          ],
+          "bp": 2050,
+          "first_slot": 91
+        },
+        {
+          "id": "q0-placement-06c73014539375f30e281440",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_2881"
+          ],
+          "bp": 7144,
+          "first_slot": 157
+        },
+        {
+          "id": "q0-placement-0a2484b6e6b77146b7e5b254",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000138l"
+          ],
+          "bp": 4112347,
+          "first_slot": 91
+        },
+        {
+          "id": "q0-placement-0e583513b7b752b5c6e1c151",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_10245"
+          ],
+          "bp": 135,
+          "first_slot": 23
+        }
+      ]
+    },
+    "4D": {
+      "counts": {
+        "unselected": 119,
+        "unselected_placement_bp_sum": 140094619,
+        "no_reference_order_slot": 94,
+        "reference_slot_and_source_free": 25,
+        "reference_slot_candidate_bp_sum": 18801953,
+        "first_reference_slot_at_index_8_or_later": 23
+      },
+      "examples": [
+        {
+          "id": "q0-placement-0beb9116086cdb2b2f8f9167",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_10057"
+          ],
+          "bp": 177,
+          "first_slot": 50
+        },
+        {
+          "id": "q0-placement-12424f3e2c9bd3e06cd4aead",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_863"
+          ],
+          "bp": 19904,
+          "first_slot": 65
+        },
+        {
+          "id": "q0-placement-1a6f7dae3dc20da567d52dfc",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_15827"
+          ],
+          "bp": 80954,
+          "first_slot": 38
+        },
+        {
+          "id": "q0-placement-3c5177026fc00cc6d0e63fde",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_1510"
+          ],
+          "bp": 22670,
+          "first_slot": 53
+        }
+      ]
+    },
+    "5A": {
+      "counts": {
+        "unselected": 442,
+        "unselected_placement_bp_sum": 162416169,
+        "no_reference_order_slot": 404,
+        "reference_slot_and_source_free": 34,
+        "reference_slot_candidate_bp_sum": 7745876,
+        "first_reference_slot_at_index_8_or_later": 33,
+        "no_direct_reference_blocks": 4
+      },
+      "examples": [
+        {
+          "id": "q0-placement-0204e991c3f854eda6b61249",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_5647"
+          ],
+          "bp": 37258,
+          "first_slot": 127
+        },
+        {
+          "id": "q0-placement-04e893f54c41916fc1b85ffe",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_6299"
+          ],
+          "bp": 54307,
+          "first_slot": 167
+        },
+        {
+          "id": "q0-placement-170fd06e22954136ad1bd706",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_8231"
+          ],
+          "bp": 13540,
+          "first_slot": 131
+        },
+        {
+          "id": "q0-placement-195e8df1d08793137b943450",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_3246"
+          ],
+          "bp": 56054,
+          "first_slot": 62
+        }
+      ]
+    },
+    "5B": {
+      "counts": {
+        "unselected": 593,
+        "unselected_placement_bp_sum": 251879232,
+        "no_reference_order_slot": 518,
+        "reference_slot_and_source_free": 64,
+        "reference_slot_candidate_bp_sum": 19621088,
+        "first_reference_slot_at_index_8_or_later": 63,
+        "no_direct_reference_blocks": 11
+      },
+      "examples": [
+        {
+          "id": "q0-placement-06e93a06f0b937ac819b46d3",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_1007"
+          ],
+          "bp": 48484,
+          "first_slot": 275
+        },
+        {
+          "id": "q0-placement-080e9be021bac99603c378f2",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000462l"
+          ],
+          "bp": 1424773,
+          "first_slot": 79
+        },
+        {
+          "id": "q0-placement-0cc2cd99671ad38a9372ae07",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_9786"
+          ],
+          "bp": 3801,
+          "first_slot": 274
+        },
+        {
+          "id": "q0-placement-0dc54c3c5022d38ed258dccb",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_8707"
+          ],
+          "bp": 1943,
+          "first_slot": 209
+        }
+      ]
+    },
+    "5D": {
+      "counts": {
+        "unselected": 559,
+        "unselected_placement_bp_sum": 231155913,
+        "no_reference_order_slot": 500,
+        "reference_slot_and_source_free": 55,
+        "reference_slot_candidate_bp_sum": 13597366,
+        "first_reference_slot_at_index_8_or_later": 54,
+        "no_direct_reference_blocks": 4
+      },
+      "examples": [
+        {
+          "id": "q0-placement-036bb37bae50fbca8a19535c",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_10376"
+          ],
+          "bp": 20676,
+          "first_slot": 81
+        },
+        {
+          "id": "q0-placement-038b59ad96ca7eba0c9ce87d",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_65"
+          ],
+          "bp": 4027,
+          "first_slot": 81
+        },
+        {
+          "id": "q0-placement-0ac80b4e1dafd453ebea9eee",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_4996"
+          ],
+          "bp": 799033,
+          "first_slot": 74
+        },
+        {
+          "id": "q0-placement-0bf7b3d323fe70fed188deac",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_1238"
+          ],
+          "bp": 23878,
+          "first_slot": 94
+        }
+      ]
+    },
+    "6A": {
+      "counts": {
+        "unselected": 260,
+        "unselected_placement_bp_sum": 180374058,
+        "no_reference_order_slot": 226,
+        "reference_slot_and_source_free": 24,
+        "reference_slot_candidate_bp_sum": 4760631,
+        "first_reference_slot_at_index_8_or_later": 23,
+        "no_direct_reference_blocks": 10
+      },
+      "examples": [
+        {
+          "id": "q0-placement-025fa42526c9669810740880",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_1258"
+          ],
+          "bp": 23050,
+          "first_slot": 133
+        },
+        {
+          "id": "q0-placement-0596b0de8ecc1d1802f18ea0",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_789"
+          ],
+          "bp": 62586,
+          "first_slot": 6
+        },
+        {
+          "id": "q0-placement-0d2f30cc7f0764df20b8c207",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_2069"
+          ],
+          "bp": 5831,
+          "first_slot": 94
+        },
+        {
+          "id": "q0-placement-0ec419503d3154988a43c76f",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_2646"
+          ],
+          "bp": 13050,
+          "first_slot": 70
+        }
+      ]
+    },
+    "6B": {
+      "counts": {
+        "unselected": 508,
+        "unselected_placement_bp_sum": 283965475,
+        "no_reference_order_slot": 436,
+        "no_direct_reference_blocks": 14,
+        "reference_slot_and_source_free": 58,
+        "reference_slot_candidate_bp_sum": 17845216,
+        "first_reference_slot_at_index_8_or_later": 56
+      },
+      "examples": [
+        {
+          "id": "q0-placement-067bc9f211067442ae88dda9",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_6944"
+          ],
+          "bp": 319,
+          "first_slot": 236
+        },
+        {
+          "id": "q0-placement-0a6892c565bb7bfcbd1df9a0",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_5889"
+          ],
+          "bp": 829,
+          "first_slot": 3
+        },
+        {
+          "id": "q0-placement-0a74d238a95213c9a1f12c76",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_7154"
+          ],
+          "bp": 29807,
+          "first_slot": 144
+        },
+        {
+          "id": "q0-placement-0f9682e70a9d22d5ee289258",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_2496"
+          ],
+          "bp": 5484911,
+          "first_slot": 144
+        }
+      ]
+    },
+    "6D": {
+      "counts": {
+        "unselected": 165,
+        "unselected_placement_bp_sum": 212686579,
+        "no_reference_order_slot": 134,
+        "reference_slot_and_source_free": 30,
+        "reference_slot_candidate_bp_sum": 31206664,
+        "first_reference_slot_at_index_8_or_later": 30,
+        "no_direct_reference_blocks": 1
+      },
+      "examples": [
+        {
+          "id": "q0-placement-04463850c46b76cc9cde4835",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_1043"
+          ],
+          "bp": 20509,
+          "first_slot": 62
+        },
+        {
+          "id": "q0-placement-0f3fd980ae0e225759f13df1",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_9600"
+          ],
+          "bp": 962,
+          "first_slot": 66
+        },
+        {
+          "id": "q0-placement-12924c2d3a2152ebc01bc775",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_6054"
+          ],
+          "bp": 43805,
+          "first_slot": 60
+        },
+        {
+          "id": "q0-placement-14ed96745b5e8db116c3daa4",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_5301"
+          ],
+          "bp": 9975,
+          "first_slot": 60
+        }
+      ]
+    },
+    "7A": {
+      "counts": {
+        "unselected": 519,
+        "unselected_placement_bp_sum": 169739162,
+        "reference_slot_and_source_free": 258,
+        "reference_slot_candidate_bp_sum": 39702384,
+        "first_reference_slot_at_index_8_or_later": 253,
+        "no_reference_order_slot": 255,
+        "no_direct_reference_blocks": 6
+      },
+      "examples": [
+        {
+          "id": "q0-placement-0077d40575b5c0709349f994",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_14043"
+          ],
+          "bp": 297,
+          "first_slot": 121
+        },
+        {
+          "id": "q0-placement-0142011f18eed20c7be02440",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_8787"
+          ],
+          "bp": 9868,
+          "first_slot": 126
+        },
+        {
+          "id": "q0-placement-02aa1f8d3e1465457cca2982",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_6825"
+          ],
+          "bp": 2545,
+          "first_slot": 120
+        },
+        {
+          "id": "q0-placement-02f2a6eee65c931f98d8df03",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_2130"
+          ],
+          "bp": 5187,
+          "first_slot": 28
+        }
+      ]
+    },
+    "7B": {
+      "counts": {
+        "unselected": 567,
+        "unselected_placement_bp_sum": 388155430,
+        "no_reference_order_slot": 487,
+        "reference_slot_and_source_free": 65,
+        "reference_slot_candidate_bp_sum": 12879753,
+        "first_reference_slot_at_index_8_or_later": 65,
+        "no_direct_reference_blocks": 15
+      },
+      "examples": [
+        {
+          "id": "q0-placement-02668d270b49f58da5e150a3",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_1970"
+          ],
+          "bp": 52509,
+          "first_slot": 246
+        },
+        {
+          "id": "q0-placement-065b11045d9c6de5af17f95a",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_5411"
+          ],
+          "bp": 58977,
+          "first_slot": 190
+        },
+        {
+          "id": "q0-placement-0731028fa292f3b3e9e038c9",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeD_contig_6802"
+          ],
+          "bp": 37853,
+          "first_slot": 269
+        },
+        {
+          "id": "q0-placement-099a0142c6cdf32281591dec",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_5693"
+          ],
+          "bp": 1466979,
+          "first_slot": 242
+        }
+      ]
+    },
+    "7D": {
+      "counts": {
+        "unselected": 290,
+        "unselected_placement_bp_sum": 324211650,
+        "no_reference_order_slot": 201,
+        "reference_slot_and_source_free": 86,
+        "reference_slot_candidate_bp_sum": 56048248,
+        "first_reference_slot_at_index_8_or_later": 85,
+        "no_direct_reference_blocks": 3
+      },
+      "examples": [
+        {
+          "id": "q0-placement-00ab1a0f483f99c1918e2771",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_9877"
+          ],
+          "bp": 27974,
+          "first_slot": 101
+        },
+        {
+          "id": "q0-placement-061567e82896a66919e64164",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_9973"
+          ],
+          "bp": 17766,
+          "first_slot": 54
+        },
+        {
+          "id": "q0-placement-08b10d57b5449171d149ece5",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeB_contig_8637"
+          ],
+          "bp": 23768,
+          "first_slot": 69
+        },
+        {
+          "id": "q0-placement-08dc986123a77014fdf76f59",
+          "source": [
+            "JM19_flye_ABD",
+            "JM19flyeA_contig_3211"
+          ],
+          "bp": 174,
+          "first_slot": 124
+        }
+      ]
+    },
+    "Un": {
+      "counts": {
+        "unselected": 353,
+        "unselected_placement_bp_sum": 13418108,
+        "no_reference_order_slot": 339,
+        "no_direct_reference_blocks": 14
+      },
+      "examples": []
+    }
+  },
+  "scope": "Necessary reference ordering and source non-overlap only; not proof of full paired-equivalence eligibility, actual proposal pruning, or achievable added coverage. Candidate bp sums may overlap each other.",
+  "schema": "wheat_readonly_search_triage_v1",
+  "new_summary_sha256": "d23a49af479b6c9b81916518e8034d4044ea31b5c97229c5d0ce1624138fc9d4",
+  "ranking_logs": [
+    {
+      "group": "1A",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 58.43
+    },
+    {
+      "group": "1B",
+      "evaluations": 20000,
+      "rounds": 1,
+      "seconds": 102.98
+    },
+    {
+      "group": "1D",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 109.12
+    },
+    {
+      "group": "2A",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 201.89
+    },
+    {
+      "group": "2B",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 106.24
+    },
+    {
+      "group": "2D",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 159.18
+    },
+    {
+      "group": "3A",
+      "evaluations": 20000,
+      "rounds": 1,
+      "seconds": 99.65
+    },
+    {
+      "group": "3B",
+      "evaluations": 20000,
+      "rounds": 1,
+      "seconds": 99.11
+    },
+    {
+      "group": "3D",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 146.86
+    },
+    {
+      "group": "4A",
+      "evaluations": 20000,
+      "rounds": 1,
+      "seconds": 99.58
+    },
+    {
+      "group": "4B",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 203.67
+    },
+    {
+      "group": "4D",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 80.57
+    },
+    {
+      "group": "5A",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 195.73
+    },
+    {
+      "group": "5B",
+      "evaluations": 20000,
+      "rounds": 1,
+      "seconds": 140.38
+    },
+    {
+      "group": "5D",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 96.54
+    },
+    {
+      "group": "6A",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 166.59
+    },
+    {
+      "group": "6B",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 221.02
+    },
+    {
+      "group": "6D",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 73.78
+    },
+    {
+      "group": "7A",
+      "evaluations": 20000,
+      "rounds": 1,
+      "seconds": 91.45
+    },
+    {
+      "group": "7B",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 140.74
+    },
+    {
+      "group": "7D",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 158.1
+    },
+    {
+      "group": "Un",
+      "evaluations": 20000,
+      "rounds": 2,
+      "seconds": 84.8
+    }
+  ],
+  "mapper_calls": 0,
+  "selection_calls": 0,
+  "root_cause_proven": false,
+  "diagnostic_script_sha256": "8ecb0f9fbd9bd80cad5cb70f27b1a69d1a6d7822c9c7e61324f593fd5dbb802a"
+}
