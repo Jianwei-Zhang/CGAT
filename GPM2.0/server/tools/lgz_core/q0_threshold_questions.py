@@ -3,6 +3,7 @@
 Draft routing cannot authorize a placement/cut, convert an unknown join to an exact join,
 or certify search completeness. It consumes the shared selector's winner, not its report.
 """
+from .q0_paths import REFERENCE_ROOT_KINDS, LOCALIZED_ANCHOR_KINDS
 from collections import Counter, defaultdict
 from dataclasses import replace
 
@@ -97,7 +98,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy(), issu
         # expansion and input adjacency inherit an existing chromosome; they cannot name one.
         # Lack of a selected path alone is NOT evidence that a chromosome has no reference root.
         direct = draft.admission if draft is not None else admit_placements(replace(data, pair_links=(), original_adjacencies=()))
-        if not any(p.localization_kind == 'reference' for p in direct.placements):
+        if not any(p.localization_kind in REFERENCE_ROOT_KINDS for p in direct.placements):
             return {}, {'no_reference_seed_no_backbone': 1}
         return None, {'rooted_no_path_full_fallback': 1}
     placed = {p.placement_id: p for p in draft.admission.placements}
@@ -109,7 +110,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy(), issu
             raise Q0EvidenceError('assignment source not in blind draft input')
         if c in data.reference_lengths:
             required[c].add(s)
-    roots = {p.chromosome for p in placed.values() if p.localization_kind == 'reference'}
+    roots = {p.chromosome for p in placed.values() if p.localization_kind in REFERENCE_ROOT_KINDS}
     # A tail split retains its original reference seed; the new tail inherits another
     # existing seed. Seeing any placements off this lineage would invalidate the bound.
     if not {p.chromosome for p in placed.values()} <= roots:
@@ -128,7 +129,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy(), issu
             if p.source != s.source or p.orientation != s.orientation or not p.interval.contains(s.interval):
                 raise Q0EvidenceError('slice differs from admitted placement')
             sides = ends(s.interval, minimum)
-            anchors = merged_intervals(p.anchor_intervals) if p.localization_kind in ('reference', 'pairwise') else ()
+            anchors = merged_intervals(p.anchor_intervals) if p.localization_kind in LOCALIZED_ANCHOR_KINDS else ()
             weak = [v for v in sides if not supported(v, anchors, minimum)] if sides else [s.interval]
             if weak:
                 needed[s.source].extend(weak); stats['weak_placement'] += 1

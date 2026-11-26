@@ -323,7 +323,7 @@ def preliminary_ambiguity(required, relations, *, maximum_boundaries=None, progr
 class CoverageModel:
     def __init__(self, required: Mapping[SourceKey, Iterable[Interval]], relations: Iterable[Equivalence],
                  *, maximum_boundaries: int | None = None, progress: Callable[[str], None] | None = None,
-                 compact_first: bool = False):
+                 compact_first: bool = False, reference_domains=None):
         started = monotonic() if progress else 0.0
         self.required = {key: merged_intervals(value) for key, value in required.items()}
         geometry = attrgetter("left_source", "left", "right_source", "right", "reverse")
@@ -353,6 +353,10 @@ class CoverageModel:
                     self.by_source[source].append(index)
                     self._atom_starts[source].append(a)
                     self._atom_ends[source].append(b)
+        from .q0_reference_locus import intersection
+        feasible = ([reference_domains.atom(source, iv) for source, iv in self.atoms]
+                    if reference_domains is not None else None)
+        self.locus_audit = defaultdict(int)
         parent = list(range(len(self.atoms)))
         parity = [False] * len(parent)
         sizes = [1] * len(parent)
@@ -371,8 +375,19 @@ class CoverageModel:
                 if pa ^ pb != reverse:
                     inconsistent.add(a)
                 return
+            if feasible is not None:
+                common = intersection(feasible[ra], feasible[rb])
+                if common == ():
+                    self.locus_audit["rejected_unions"] += 1
+                    self.locus_audit["rejected_atom_bp_sum"] += self.atoms[a][1].length
+                    self.locus_audit["maximum_rejected_map_bp"] = max(self.locus_audit["maximum_rejected_map_bp"], relation.left.length)
+                    self.locus_audit["rejected_large_map_unions"] += relation.left.length > 100_000
+                    return
+                self.locus_audit["accepted_unions"] += 1
             if sizes[ra] < sizes[rb]:
                 ra, rb = rb, ra
+            if feasible is not None:
+                feasible[ra] = common
             parent[rb] = ra
             parity[rb] = pa ^ pb ^ reverse
             sizes[ra] += sizes[rb]

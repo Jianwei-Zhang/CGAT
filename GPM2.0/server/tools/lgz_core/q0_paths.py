@@ -12,6 +12,9 @@ from bisect import bisect_left, bisect_right
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from functools import cached_property
+from operator import attrgetter
+from .q0_interval_index import IntervalIndex
+from .q0_reference_locus import ReferenceDomains
 from itertools import product
 from time import monotonic
 from typing import Callable, Iterable, Mapping
@@ -22,9 +25,13 @@ from .q0_coverage import CoverageModel, Equivalence, preliminary_ambiguity
 from .q0_sources import Interval, OriginalAdjacency, Q0EvidenceError, SourceKey, merged_intervals
 
 
+REFERENCE_ROOT_KINDS = frozenset(("reference", "continuous_reference"))
+LOCALIZED_ANCHOR_KINDS = REFERENCE_ROOT_KINDS | {"pairwise"}
+
+
 @dataclass(frozen=True)
 class PathPolicy:
-    version: int = 2
+    version: int = 3
     minimum_pair_identity: float = 0.95
     minimum_anchor_bp: int = 100
     unknown_join_n: int = 100
@@ -35,8 +42,14 @@ class PathPolicy:
     maximum_edge_variants: int = 4
     maximum_seed_positions: int = 8
     maximum_coverage_boundaries: int | None = None  # optional diagnostic budget, never a production cutoff
+    reference_locus_padding_bp: int | None = 100_000
+    reference_backbone: bool = True
 
     def __post_init__(self):
+        if self.reference_locus_padding_bp is not None and (type(self.reference_locus_padding_bp) is not int or self.reference_locus_padding_bp < 0):
+            raise Q0EvidenceError("invalid reference-locus padding")
+        if type(self.reference_backbone) is not bool:
+            raise Q0EvidenceError("invalid reference backbone flag")
         if not 0 < self.minimum_pair_identity <= 1:
             raise Q0EvidenceError("q0 pair identity must be in (0, 1]")
         for name in ("version", "minimum_anchor_bp", "unknown_join_n", "beam_width",
@@ -86,6 +99,10 @@ class Placement:
             raise Q0EvidenceError("reference block escapes q0 placement")
         if any(not self.interval.contains(interval) for interval in self.anchor_intervals):
             raise Q0EvidenceError("q0 anchor escapes source placement")
+
+    @cached_property
+    def _local_anchor_index(self):
+        return IntervalIndex(merged_intervals(self.local(iv) for iv in self.anchor_intervals), _identity_interval)
 
     @cached_property
     def _reference_loci(self):
@@ -265,6 +282,52 @@ def _competing_axes(links, left, right, minimum):
     return _CompetingAxis(left_spans), _CompetingAxis(right_spans)
 
 
+def _identity_interval(interval):
+    return interval
+
+
+def _anchor_supported(block, left, right):
+    """Visit intersecting anchors only; preserve the exact supported union."""
+    supported = []
+    for _, a in left._local_anchor_index.overlapping(block.left):
+        clipped = block.clip_left(a)
+        if clipped is None:
+            continue
+        for _, b in right._local_anchor_index.overlapping(clipped.right):
+            overlap = clipped.right.intersection(b)
+            start = clipped.left.start + overlap.start - clipped.right.start
+            supported.append(Interval(start, start + overlap.length))
+    return supported
+
+
+def _incident_placement_pairs(lefts, rights, links):
+    """Exact sparse proposals; every original competitor still qualifies."""
+    if not lefts or not rights:
+        return ()
+    li = IntervalIndex(lefts, attrgetter("interval"))
+    ri = IntervalIndex(rights, attrgetter("interval"))
+    a, b = lefts[0].source, rights[0].source
+    found = set()
+    for link in links:
+        if (link.query_source, link.target_source) == (a, b):
+            swap = False
+        elif (link.query_source, link.target_source) == (b, a):
+            swap = True
+        else:
+            raise Q0EvidenceError("foreign source-pair link")
+        for query, target in link.source_blocks():
+            q, t = (target, query) if swap else (query, target)
+            for i, left in li.overlapping(q):
+                ov = left.interval.intersection(q)
+                start = (t.start + ov.start-q.start if link.hit.strand == "+"
+                         else t.end-(ov.end-q.start))
+                projected = Interval(start, start+ov.length)
+                for j, right in ri.overlapping(projected):
+                    if (link.hit.strand == "+") == (left.orientation == right.orientation):
+                        found.add((i, j))
+    return tuple((lefts[i], rights[j]) for i, j in sorted(found))
+
+
 def qualify_pair_blocks(left: Placement, right: Placement, links: Iterable[PairLink], policy: PathPolicy,
                         *, require_supported: bool = True) -> tuple[tuple[Block, str], ...]:
     """Retain coordinate-unique blocks; all observed loci compete, even outside
@@ -286,14 +349,7 @@ def qualify_pair_blocks(left: Placement, right: Placement, links: Iterable[PairL
             if not require_supported:
                 supported.append(block.left)
                 continue
-            for a in left.anchor_intervals:
-                clipped = block.clip_left(left.local(a))
-                if clipped:
-                    for b in right.anchor_intervals:
-                        overlap = clipped.right.intersection(right.local(b))
-                        if overlap:
-                            start = clipped.left.start + overlap.start - clipped.right.start
-                            supported.append(Interval(start, start + overlap.length))
+            supported.extend(_anchor_supported(block, left, right))
         if _size(supported) < policy.minimum_anchor_bp:
             continue
         for block in blocks:
@@ -427,28 +483,39 @@ class PathGraph:
         if progress:
             progress(f"graph inputs indexed: source_pairs={len(self.links)} setup_s={monotonic()-started:.2f}")
             relations_started = monotonic()
-        for (a, b), links_for_pair in list(self.links.items()):
+        pair_progress_at = monotonic()
+        for pair_number, ((a, b), links_for_pair) in enumerate(list(self.links.items()), 1):
+            if progress and monotonic() - pair_progress_at >= 30:
+                progress(f"graph paired relations: source_pairs={pair_number}/{len(self.links)} evidence_spans={len(relations)}")
+                pair_progress_at = monotonic()
             if a == b:
                 continue  # Distinct loci in one source are not redundant copies.
-            for left in by_source[a]:
-                for right in by_source[b]:
-                    for block, evidence_id in self.homologous_blocks(left, right):
-                        relations.append(Equivalence(left.source, left.source_interval(block.left),
-                                                     right.source, right.source_interval(block.right),
-                                                     left.orientation != right.orientation, evidence_id))
+            for left, right in _incident_placement_pairs(by_source[a], by_source[b], links_for_pair):
+                for block, evidence_id in self.homologous_blocks(left, right):
+                    relations.append(Equivalence(left.source, left.source_interval(block.left),
+                                                 right.source, right.source_interval(block.right),
+                                                 left.orientation != right.orientation, evidence_id))
         if progress:
             progress(f"graph paired relations ready: evidence_spans={len(relations)} "
                      f"relations_s={monotonic()-relations_started:.2f}")
         limit = policy.maximum_coverage_boundaries
+        # Atom granularity affects reference-domain feasibility. Use one exact
+        # compact partition for draft AND formal selection under this policy.
+        compact_coverage = first_request or policy.reference_locus_padding_bp is not None
         self.ambiguous_equivalence_ids = preliminary_ambiguity(
-            self.required, relations, maximum_boundaries=limit, progress=progress, compact_first=first_request)
+            self.required, relations, maximum_boundaries=limit, progress=progress, compact_first=compact_coverage)
         if self.ambiguous_equivalence_ids:
             self._blocks.clear()
             relations = [r for r in relations if r.evidence_id not in self.ambiguous_equivalence_ids]
         # Only the full chromosome model is used to score paths. In particular,
         # the affine proof must NOT erase equivalence among nonambiguous slices.
+        domains = (ReferenceDomains(placements, policy.reference_locus_padding_bp)
+                   if policy.reference_locus_padding_bp is not None else None)
         self.coverage = CoverageModel(self.required, relations, maximum_boundaries=limit,
-                                      progress=progress, compact_first=first_request)
+                                      progress=progress, compact_first=compact_coverage, reference_domains=domains)
+        self.reference_locus_audit = {"padding_bp": policy.reference_locus_padding_bp,
+                                      "domains": dict(domains.stats) if domains else {},
+                                      "unions": dict(self.coverage.locus_audit)}
         if self.coverage.ambiguous_evidence_ids:
             raise Q0EvidenceError("preliminary ambiguity disagrees with the full chromosome coverage model")
 
@@ -472,21 +539,10 @@ class PathGraph:
         # Only supported paired-base coordinates can authorize an overlap cut.
         blocks = self.homologous_blocks(left, right)
         if blocks and (reaches_both := _end_spanning_evidence(blocks, left.interval.length)):
-            anchors_left = tuple(left.local(i) for i in left.anchor_intervals)
-            anchors_right = tuple(right.local(i) for i in right.anchor_intervals)
             for block, evidence_id in blocks:
                 if evidence_id not in reaches_both:
                     continue
-                supported = []
-                for a in anchors_left:
-                    clipped = block.clip_left(a)
-                    if clipped is None:
-                        continue
-                    for b in anchors_right:
-                        overlap = clipped.right.intersection(b)
-                        if overlap is not None:
-                            start = clipped.left.start + overlap.start - clipped.right.start
-                            supported.append(Interval(start, start + overlap.length))
+                supported = _anchor_supported(block, left, right)
                 # The cut needs one continuous anchor; a sum across disjoint runs cannot qualify it.
                 anchor = max(merged_intervals(supported), key=lambda i: (i.length, -i.start), default=None)
                 if anchor is None or anchor.length < self.policy.minimum_anchor_bp:
@@ -610,6 +666,37 @@ def search_request_path(graph: PathGraph, *, progress: Callable[[str], None] | N
     return _search_paths(graph, progress=progress)
 
 
+def _search_reference_backbone(graph, *, progress):
+    from .q0_backbone import reference_spine
+    candidate, audit = reference_spine(graph)
+    if candidate is None:
+        return None  # The original exact-gated search remains the fallback.
+    represented, duplicates, _ = graph.coverage.assess((s.source, s.interval) for s in candidate.slices)
+    if duplicates or represented != candidate.score[0]:
+        raise Q0EvidenceError("reference backbone failed final exact coverage gate")
+    if progress:
+        progress(f"reference backbone: nodes={len(candidate.nodes)} score_calls={audit['score_calls']}")
+    if graph.first_request:
+        return RequestPathResult(candidate)
+    winner = graph._with_missing(candidate)
+    missing = dict(winner.missing)
+    selected = set(winner.nodes)
+    decisions = []
+    for key, p in sorted(graph.placements.items()):
+        if key not in selected:
+            uncovered = [ov for iv in missing[p.source] if (ov := iv.intersection(p.interval)) is not None]
+            decisions.append({"operation": "not_selected", "placement_id": key,
+                              "reason": "represented_by_selected_sources" if not uncovered else "unresolved_or_search_limited",
+                              "unrepresented_intervals": [asdict(iv) for iv in uncovered]})
+    return SearchResult(winner, (), decisions,
+                        {"policy": asdict(graph.policy), "strategy": "reference_backbone",
+                         "backbone": audit, "reference_locus": graph.reference_locus_audit,
+                         "evaluations": audit["score_calls"], "rounds": 0,
+                         "stop_reasons": ["reference_backbone_complete"],
+                         "coverage_atoms": len(graph.coverage.atoms),
+                         "unique_required_bp": graph.coverage.total_bp, "global_optimality_claimed": False})
+
+
 def _search_paths(graph: PathGraph, *, progress) -> SearchResult | RequestPathResult:
     """Length-first seed, then reversible local beam search with explicit limits.
 
@@ -617,6 +704,11 @@ def _search_paths(graph: PathGraph, *, progress) -> SearchResult | RequestPathRe
     not a vote across datasets. Unrepresented source intervals stay visible.
     A reference hull alone never discharges another source's contribution.
     """
+    if graph.policy.reference_backbone and any(
+            p.localization_kind == "continuous_reference" for p in graph.placements.values()):
+        result = _search_reference_backbone(graph, progress=progress)
+        if result is not None:
+            return result
     started = monotonic()
     policy = graph.policy
     ordered = sorted(graph.placements, key=lambda key: (-graph.placements[key].interval.length, graph.source_rank(key), key))

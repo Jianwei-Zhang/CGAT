@@ -30,9 +30,12 @@ from .q0_sources import (Interval, OriginalAdjacency, Q0EvidenceError, SourceKey
                          merged_intervals, split_source, subtract_intervals)
 
 
+from .q0_collinear import ContinuousAdmissionPolicy, continuous_candidates
+
+
 @dataclass(frozen=True)
 class AdmissionPolicy:
-    version: int = 1
+    version: int = 2
     minimum_reference_identity: float = 0.90
     competing_identity_margin: float = 0.02
     minimum_reference_mapq: int = 20
@@ -41,8 +44,11 @@ class AdmissionPolicy:
     kmer_size: int = 15
     minimum_distinct_kmer_fraction: float = 0.50
     minimum_base_entropy: float = 1.20
+    continuous: ContinuousAdmissionPolicy | None = ContinuousAdmissionPolicy()
 
     def __post_init__(self):
+        if self.continuous is not None and not isinstance(self.continuous, ContinuousAdmissionPolicy):
+            raise Q0EvidenceError("invalid continuous reference admission policy")
         for name in ("minimum_reference_identity", "minimum_whole_support_fraction", "minimum_distinct_kmer_fraction"):
             if not 0 < getattr(self, name) <= 1:
                 raise Q0EvidenceError(f"invalid q0 admission fraction: {name}")
@@ -325,7 +331,7 @@ def _possible_support_bp(blocks, masks, minimum):
     return bounds
 
 
-def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy, *, evidence_ids=None):
+def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: AdmissionPolicy, *, evidence_ids=None, high_intervals=False):
     blocks = []
     for hit in data.reference_hits.get(part.source, ()):
         if hit.query.end <= part.interval.start or hit.query.start >= part.interval.end:
@@ -367,12 +373,13 @@ def _reference_groups(data: EvidenceInput, part: SourceSegment, policy: Admissio
                     high[key].append(interval)
     groups = {key: tuple(sorted(set(value), key=lambda a: (a.source, a.reference, a.evidence_id)))
               for key, value in groups.items() if _size(a.source for a in value) >= minimum}
-    return groups, {key for key in groups if _size(high[key]) >= minimum}, ambiguity
+    eligible = {key: merged_intervals(high[key]) for key in groups if _size(high[key]) >= minimum}
+    return groups, eligible if high_intervals else set(eligible), ambiguity
 
 
 def _reference_screen(data, part, policy):
     evidence_ids = []
-    groups, high, ambiguity = _reference_groups(data, part, policy, evidence_ids=evidence_ids)
+    groups, high, ambiguity = _reference_groups(data, part, policy, evidence_ids=evidence_ids, high_intervals=policy.continuous is not None)
     evidence_ids.sort()  # Same report order and multiplicity for serial and worker results.
     return groups, high, ambiguity, evidence_ids
 
@@ -380,7 +387,7 @@ def _reference_screen(data, part, policy):
 def _request_reference_screen(data, part, policy):
     # Keep every ID attached to an actual anchor. Only the report-only list of
     # all intersecting hits (including rejected hits) is not built or sorted.
-    return (*_reference_groups(data, part, policy), ())
+    return (*_reference_groups(data, part, policy, high_intervals=policy.continuous is not None), ())
 
 
 def _ordered(anchors, orientation):
@@ -687,6 +694,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
                             "unique_groups": [{"chromosome": group[0], "orientation": group[1],
                                                "support_bp": _size(a.source for a in anchors)} for group, anchors in sorted(groups[key].items())],
                             "ambiguous_intervals": [asdict(i) for i in mask]})
+        reference_seed = None
         if len(groups[key]) == 1 and high and all(_ordered(anchors, group[1]) for group, anchors in groups[key].items()):
             (chromosome, strand), anchors = next(iter(groups[key].items()))
             support = merged_intervals(a.source for a in anchors)
@@ -694,10 +702,27 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
             placement = _placement(part, chromosome, strand, interval, support, anchors,
                                    (a.evidence_id for a in anchors), kind="reference")
             accepted[placement.placement_id] = placement
+            reference_seed = placement
             if not first_request:
                 records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted",
                                 "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
                                 "qc": "not_measured" if quality_pass is None else "passed"})
+        if policy.continuous is not None:
+            continuous, audit = continuous_candidates(part, groups[key], high, policy, _placement, policy.continuous)
+            existing = ({(reference_seed.interval, reference_seed.chromosome, reference_seed.orientation,
+                          reference_seed.reference_blocks)} if reference_seed is not None else set())
+            for placement in continuous:
+                geometry = (placement.interval, placement.chromosome, placement.orientation, placement.reference_blocks)
+                if geometry in existing:
+                    continue
+                accepted[placement.placement_id] = placement
+                existing.add(geometry)
+                if not first_request:
+                    records.append({"placement_id": placement.placement_id, "segment_id": key,
+                                    "status": "accepted", "reason": "continuous_collinear_chain",
+                                    "qc": "not_measured" if quality_pass is None else "passed"})
+            if audit and not first_request:
+                records.append({"segment_id": key, "status": "continuous_reference_audit", "regions": list(audit)})
     del screened, ordered
     if first_request and not accepted:
         # Pair propagation, tail splits and original-gap neighbors can inherit
@@ -717,8 +742,14 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
     # selection, not a claim that the input assembler made a biological error.
     reference_seeds = tuple(accepted.values())
     seed_neighbors = _PlacementNeighbors(reference_seeds, pair_neighbors)
-    no_tail_room = continuity_stops = 0
+    no_tail_room = continuity_stops = continuous_tail_stops = 0
     for current in phases.items("check cross-chromosome seed tails", reference_seeds):
+        if current.localization_kind == "continuous_reference":
+            # These carriers already passed the scale-aware foreign-chain
+            # barriers. A tiny paired repeat must not cut them a second time
+            # or downgrade their continuous-reference localization identity.
+            continuous_tail_stops += 1
+            continue
         part = data.parts[current.segment_id]
         if current.interval != part.interval:
             continue
@@ -811,6 +842,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
                 records.append({"placement_id": local.placement_id, "segment_id": part.segment_id, "status": "accepted",
                                 "reason": "independently_anchored_cross_chr_tail", "anchor_placement_ids": sorted(value["parents"])})
 
+    screen_progress(f"continuous reference tail decisions: protected_carriers={continuous_tail_stops}")
     if first_request:
         screen_progress(f"request tail decisions: no_disjoint_tail_room={no_tail_room} first_continuity_witness={continuity_stops}")
     rooted_context = _RootedContext(lambda source, _span: data.sources[source], ambiguous, policy)
@@ -1165,7 +1197,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_selection_cache.py", "q0_frontier_scope.py", "common.py")])
+                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_collinear.py", "q0_interval_index.py", "q0_reference_locus.py", "q0_backbone.py", "q0_threshold_questions.py", "q0_junction_review.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_selection_cache.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, screen_threads: int = 1, **kwargs) -> Construction:

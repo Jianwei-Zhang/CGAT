@@ -3,6 +3,7 @@
 Reference co-location is only a routing hint. Never create a join or a placement
 here: only verified, source-projected PAFs can go back to the ordinary selector.
 """
+from .q0_paths import LOCALIZED_ANCHOR_KINDS
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
@@ -133,7 +134,7 @@ class Review:
             if not any(j.join_id in unresolved for j in path.joins[max(0,i-1):i+1]): continue
             p = ps[s.placement_id]; sides = ends(s.interval, minimum)
             anchors = merged_intervals(p.anchor_intervals)
-            if (not sides or p.localization_kind not in ('reference','pairwise') or
+            if (not sides or p.localization_kind not in LOCALIZED_ANCHOR_KINDS or
                     not all(supported(side, anchors, minimum) for side in sides)): continue
             sites[p.placement_id] = (p,s); positions[p.placement_id] = i
         self.counts['supported_at_unproven_join'] += len(sites)
