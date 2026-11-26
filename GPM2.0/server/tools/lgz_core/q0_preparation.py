@@ -14,6 +14,7 @@ except ModuleNotFoundError:
 from collections import defaultdict
 from contextlib import nullcontext, closing
 import csv
+import inspect
 import json
 from pathlib import Path
 import subprocess
@@ -87,10 +88,23 @@ def artifact_path(root: Path, relative: str) -> Path:
     return resolved
 
 
+_IDENTITY_HAS_WITHIN = 'within' in inspect.signature(_file_identity).parameters
+
+
 def identity(root: Path, relative: str) -> dict:
     path = workspace_artifact_path(root, relative)
     try:
-        bound = _file_identity(path, within=root)
+        if _IDENTITY_HAS_WITHIN:
+            bound = _file_identity(path, within=root)
+        else:
+            # Preserve the frozen outer runtime while providing the same
+            # containment + stable-target guarantee required by new Q0.
+            before = file_signature(path)
+            if not Path(before[0]).is_relative_to(root.resolve(strict=True)):
+                raise OrchestrationContractError(f"file escapes workspace: {path}")
+            bound = _file_identity(path)
+            if file_signature(path) != before:
+                raise OrchestrationContractError(f"file changed while binding Q0 identity: {path}")
     except OrchestrationContractError as exc:
         raise Q0EvidenceError(f"cannot bind q0 artifact {relative}: {exc}") from exc
     # Receipt paths are logical workspace names, not resolved target paths.
@@ -123,7 +137,7 @@ def builder_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-evidence-builder", [
         [name, sha256_file(root / name)] for name in (
-            "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "common.py",
+            "q0_preparation.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_selection_cache.py", "common.py",
             "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
             "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_native_frontier.py", "q0_frontier_scope.py", "q0_scope_policy.py",
             "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
@@ -238,6 +252,10 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
         from .q0_threshold_acceptance import validate_catalog
         validate_catalog(root, manifest, catalog)
     expected_outputs = {manifest["catalog"]}
+    from .q0_selection_cache import output_path as accepted_selection_output
+    selection_output = accepted_selection_output(manifest)
+    if selection_output is not None:
+        expected_outputs.add(selection_output)
     inputs = {row["path"] for row in manifest["inputs"]}
     try:
         for row in catalog["base_alignments"]:

@@ -189,9 +189,11 @@ class ThresholdAcceptanceTests(unittest.TestCase):
                 # reads, owner order, publication audit and every evidence ID are real.
                 with (patch.object(lanes,'_lanes',return_value=3),
                       patch.object(lanes,'_weight',side_effect=lambda data,part: bool(data.reference_hits.get(part.source)))):
-                    parallel=adm.build_q0(root,screen_threads=3,progress=logs.append)
+                    parallel=adm.construct_q0(adm.load_evidence_input(root),screen_threads=3,progress=logs.append)
                 self.assertEqual(parallel,serial);self.assertEqual(parallel.records,{'chr1':truth})
                 self.assertGreater(int(next(s for s in logs if s.startswith('reference screen complete:')).rsplit('=',1)[1]),0)
+                with patch.object(adm,'select_q0_paths',side_effect=AssertionError('accepted generation must not rerank')):
+                    self.assertEqual(adm.build_q0(root),serial)
 
     def test_weak_join_does_not_build_a_discarded_catalog_or_reread_the_source_fasta_for_dispatch(self):
         f,_=bridge_fixture(); f.links.clear(); f.raw={k:v for k,v in f.raw.items() if '_vs_ref/' in k}

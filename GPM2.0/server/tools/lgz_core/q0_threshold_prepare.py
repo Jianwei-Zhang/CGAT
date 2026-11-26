@@ -277,7 +277,11 @@ def prepare(root, threads, mapper):
         data = load_evidence_input(root,_draft=receipt)
         scoped = data.catalog['supplement_scope']['effective']=='decision_frontier'
         review = Review() if scoped and not cached else None
-        selection = select_for_audit(data,review)
+        from .q0_selection_cache import load as load_selection, store as store_selection
+        accepted = load_selection(root,receipt,data) if cached else None
+        selection = accepted.selection if accepted is not None else select_for_audit(data,review)
+        if accepted is not None:
+            print('LGZ q0 threshold: reusing accepted same-generation selection', flush=True)
         if review is not None and review.proposals:
             from .q0_catalog import CandidateCatalog
             extra = dispatch(review,selection,root,CandidateCatalog({},data.sources,data.parts),
@@ -315,8 +319,12 @@ def prepare(root, threads, mapper):
             if before != [prep.file_signature(p) for p in output_paths]:
                 raise Q0EvidenceError('threshold output changed during admission')
             snapshot.verify()
-            if not cached:
+            if accepted is None:
+                receipt = store_selection(root,receipt,data,selection)
+                snapshot.verify()
+                prep.load_verified_evidence(root,_draft=receipt)
                 prep.atomic_write_json(prep.workspace_artifact_path(root, prep.MANIFEST), receipt)
+                print('LGZ q0 threshold: accepted selection published for downstream reuse', flush=True)
             return receipt
         del data,selection
         if need is None or n >= MAX_REPAIRS or wanted is None:

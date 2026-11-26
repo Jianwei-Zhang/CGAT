@@ -65,6 +65,7 @@ class EvidenceInput:
     catalog: dict = field(default_factory=dict)
     ready_manifest_identity: str = ""
     threshold_scope: object | None = None
+    verified_manifest: dict | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass
@@ -213,7 +214,7 @@ def load_evidence_input(root: Path, *, _draft=None) -> EvidenceInput:
     if manifest != verified():
         raise Q0EvidenceError("q0 evidence changed during admission loading")
     return EvidenceInput(sources, parts, lengths, dict(reference_hits), tuple(links), tuple(adjacencies),
-                         evidence, manifest["input_fingerprint"], catalog, ready_id, binding)
+                         evidence, manifest["input_fingerprint"], catalog, ready_id, binding, manifest)
 
 
 _DNA = frozenset("ACGT")
@@ -1060,27 +1061,40 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
             if checkpoint is not None and not restored:
                 checkpoint.save_group(index, chromosome, search)
             continue
-        for item in search.path.slices:
-            if item.interval.end > len(data.sources[item.source]):
-                raise Q0EvidenceError("q0 path source exceeds sequence length")
-            if any(item.interval.intersection(previous) for previous in occupied[item.source]):
-                raise Q0EvidenceError("q0 source interval selected on multiple chromosomes")
-            occupied[item.source].append(item.interval)
-        for join in search.path.joins:
-            if join.kind == "input_assembly_gap":
-                if any(join.gap_interval.intersection(previous) for previous in occupied[join.gap_source]):
-                    raise Q0EvidenceError("original N source interval selected more than once")
-                occupied[join.gap_source].append(join.gap_interval)
+        _occupy_path(data, search, occupied)
         if checkpoint is not None and not restored:
             checkpoint.save_group(index, chromosome, search)  # only after canonical occupancy checks
     return FirstRequestSelection(admission, searches) if first_request else PathSelection(admission, searches, occupied)
 
 
+def _occupy_path(data, search, occupied):
+    """The same linear source-occupancy check for fresh and restored paths."""
+    if search.path is None:
+        return
+    for item in search.path.slices:
+        if item.interval.end > len(data.sources[item.source]):
+            raise Q0EvidenceError("q0 path source exceeds sequence length")
+        if any(item.interval.intersection(previous) for previous in occupied.setdefault(item.source, [])):
+            raise Q0EvidenceError("q0 source interval selected on multiple chromosomes")
+        occupied.setdefault(item.source, []).append(item.interval)
+    for join in search.path.joins:
+        if join.kind == "input_assembly_gap":
+            if any(join.gap_interval.intersection(previous) for previous in occupied.setdefault(join.gap_source, [])):
+                raise Q0EvidenceError("original N source interval selected more than once")
+            occupied.setdefault(join.gap_source, []).append(join.gap_interval)
+
 def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
                  path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
-                 progress: Callable[[str], None] = _quiet, screen_threads: int = 1) -> Construction:
-    selection = select_q0_paths(data, admission_policy=admission_policy, path_policy=path_policy,
-                                quality_pass=quality_pass, progress=progress, screen_threads=screen_threads)
+                 progress: Callable[[str], None] = _quiet, screen_threads: int = 1, _accepted=None) -> Construction:
+    if _accepted is None:
+        selection = select_q0_paths(data, admission_policy=admission_policy, path_policy=path_policy,
+                                    quality_pass=quality_pass, progress=progress, screen_threads=screen_threads)
+    else:
+        from .q0_selection_cache import VerifiedSelection
+        if type(_accepted) is not VerifiedSelection:
+            raise Q0EvidenceError('formal Q0 reuse requires a verified accepted selection')
+        selection = _accepted.for_data(data, admission_policy, path_policy, quality_pass)
+        progress('reusing accepted Q0 selection; placement/graph/ranking skipped')
     admission, searches, occupied = selection.admission, selection.paths, selection.occupied
     if not any(search.path is not None for search in searches.values()):
         raise Q0EvidenceError("no chromosome has a trustworthy q0 path")
@@ -1151,7 +1165,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_frontier_scope.py", "common.py")])
+                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_selection_cache.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, screen_threads: int = 1, **kwargs) -> Construction:
@@ -1163,7 +1177,9 @@ def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, screen_thr
     # unpacked alignments; do not set up pools whose packets would all fall back.
     budget = screen_threads if isinstance(data.evidence, EvidenceRows) else 1
     progress(f"Q0 placement thread budget={budget}")
-    result = construct_q0(data, progress=progress, screen_threads=budget, **kwargs)
+    from .q0_selection_cache import load as load_selection
+    accepted = load_selection(root, data.verified_manifest, data) if data.verified_manifest is not None else None
+    result = construct_q0(data, progress=progress, screen_threads=budget, _accepted=accepted, **kwargs)
     if stable_id("q0-ready-evidence", load_verified_evidence(root)) != data.ready_manifest_identity:
         raise Q0EvidenceError("q0 evidence changed while selecting paths")
     if selector_identity() != before:
