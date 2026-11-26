@@ -20,9 +20,13 @@ def installed(ctx):
         raise ValueError('installed q0 reader launcher changed')
 
 
-def execute(path,*,install_runtime=False,threads=32,validate_only=False):
+def execute(path,*,install_runtime=False,threads=32,validate_only=False,install_only=False,validate_unit=None):
+    if install_only and (not install_runtime or validate_only):
+        raise ValueError('install-only requires install-runtime and excludes validate-only')
+    if validate_unit is not None and not validate_only:
+        raise ValueError('selected checkpoint validation requires validate-only')
     if threads not in (16,32):raise ValueError('unmeasured CPU budget')
-    with opened_transition(path,role='entry',caller=__file__,require_installed=not (install_runtime or validate_only)) as ctx:
+    with opened_transition(path,role='entry',caller=__file__,require_installed=validate_unit is not None or not (install_runtime or validate_only)) as ctx:
         owning=ctx.native_bootstrap.module('authentic_initial_alignment_owner',checked(ctx.plan['dependencies']['entry']))
         rr=ctx.base.rr
         if validate_only:
@@ -37,6 +41,7 @@ def execute(path,*,install_runtime=False,threads=32,validate_only=False):
             preceding=[]
             for unit in units:
                 if unit.unit_id=='q0_evidence':break
+                if validate_unit is not None and unit.unit_id != validate_unit:continue
                 prepared=readonly.prepare(unit.unit_id,unit.command_relpath)
                 if prepared is None:raise ValueError('unverifiable preceding unit: '+unit.unit_id)
                 valid,reason=readonly.validate(prepared)
@@ -44,12 +49,16 @@ def execute(path,*,install_runtime=False,threads=32,validate_only=False):
                 preceding.append({'unit_id':unit.unit_id,'input_fingerprint':prepared.input_fingerprint,
                     'checkpoint_sha256':ctx.contract.sha256_file(prepared.path)})
                 print('Q0_ORIGIN_CHECKPOINT_VALID',unit.unit_id,flush=True)
-            if len(preceding)!=25:raise ValueError('unexpected initial alignment checkpoint count')
+            expected = 25 if validate_unit is None else 1
+            if len(preceding)!=expected:raise ValueError('unexpected initial alignment checkpoint count')
             ctx.verify()
-            report={'status':'q0_transition_all_initial_checkpoints_verified_only',
+            report={'status':('q0_transition_all_initial_checkpoints_verified_only' if validate_unit is None
+                              else 'q0_transition_selected_initial_checkpoint_verified_only'),
                 'transition_sha256':ctx.transition_sha,'initial_checkpoints':preceding,
-                'workspace_modified':False,'q0_runtime_installed':False,'main_task_submitted':False}
-            ctx.contract.atomic_write_json(ctx.transition_path.parent/'validation.json',report)
+                'workspace_modified':False,'q0_runtime_installed':validate_unit is not None,
+                'q0_runtime_installed_by_this_probe':False,'main_task_submitted':False}
+            name = 'validation.json' if validate_unit is None else 'validation-selected.json'
+            ctx.contract.atomic_write_json(ctx.transition_path.parent/name,report)
             print(json.dumps(report),flush=True)
             return 0
         run_id=rr.new_run_id();lock=rr.WorkspaceLock(ctx.work,run_id)
@@ -63,7 +72,7 @@ def execute(path,*,install_runtime=False,threads=32,validate_only=False):
             if len(units)!=55 or any(unit.unit_id=='degap_gapfill' for unit in units):
                 raise ValueError('comparison workflow changed')
             available=len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else (os.cpu_count() or 1)
-            if available<threads:raise ValueError('allocated CPU affinity is below the requested budget')
+            if not install_only and available<threads:raise ValueError('allocated CPU affinity is below the requested budget')
             # The old origin verifier may import geometry helpers. Keep those
             # authentic objects untouched; the new declaration and actual q0
             # builder execute in fresh reader processes after installation.
@@ -73,6 +82,14 @@ def execute(path,*,install_runtime=False,threads=32,validate_only=False):
                 def declaration():return reader.describe_in_fresh_process(ctx)
                 stager.install(ctx,lock,declaration)
             installed(ctx)
+            if install_only:
+                report = {'status':'q0_runtime_installed_not_started', 'transition_sha256':ctx.transition_sha,
+                          'q0_supplement_scope':ctx.transition.get('q0_supplement_scope'),
+                          'initial_checkpoints_rewritten':False, 'resources_changed':False,
+                          'main_task_started':False, 'requires_routed_resume':True}
+                ctx.contract.atomic_write_json(ctx.transition_path.parent/'install-only.json', report)
+                print(json.dumps(report), flush=True)
+                return 0
             prior_verify=ctx.verify
             def verify():prior_verify();installed(ctx)
             ctx.verify=verify
@@ -98,4 +115,6 @@ def execute(path,*,install_runtime=False,threads=32,validate_only=False):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--transition',type=Path,required=True)
     p.add_argument('--validate-only',action='store_true');p.add_argument('--install-runtime',action='store_true');p.add_argument('--threads',type=int,choices=(16,32),default=32)
-    a=p.parse_args();raise SystemExit(execute(a.transition,install_runtime=a.install_runtime,threads=a.threads,validate_only=a.validate_only))
+    p.add_argument('--install-only',action='store_true',help='install under the normal lock without running units or changing resources')
+    p.add_argument('--validate-unit',help='validate one original parent after installation; not a full resume preflight')
+    a=p.parse_args();raise SystemExit(execute(a.transition,install_runtime=a.install_runtime,threads=a.threads,validate_only=a.validate_only,install_only=a.install_only,validate_unit=a.validate_unit))

@@ -64,6 +64,25 @@ class ReaderTests(unittest.TestCase):
             self.execute()
         self.assertEqual(len(called), 1)
 
+    def test_explicit_threshold_reaches_genuine_preparer_not_auto_or_full(self):
+        self.ctx.transition['q0_supplement_scope'] = 'positive_threshold'
+        self.module.supplement_policy = lambda scope: {'decision_frontier': {
+            'threshold': {'semantics':'supported_backbone', 'readless_only':True}}}
+        called = []
+        def actual(root, **kwargs):
+            called.append(kwargs)
+            return {'inputs':[{'path':p} for p in self.module._initial_inputs(root)[4]]}
+        self.module.prepare_evidence = actual
+        self.ctx.helper.prepare_with_reader = lambda module,root,*a,**kw: module.prepare_evidence(
+            root, threads=kw['threads'], minimap2=kw['minimap2'])
+        self.execute()
+        self.assertEqual(called, [{'threads':32, 'minimap2':'minimap2', 'supplement_scope':'positive_threshold'}])
+        self.assertIs(self.module.prepare_evidence, actual)
+        self.module.supplement_policy = lambda scope: {'decision_frontier': {}}
+        with self.assertRaisesRegex(ValueError, 'builder contract'):
+            self.execute()
+        self.assertEqual(len(called), 1)
+
     def test_missing_provenance_is_rejected(self):
         self.ctx.helper.prepare_with_reader=lambda *a,**kw:{'inputs':[]}
         with self.assertRaisesRegex(ValueError,'missing'):self.execute()

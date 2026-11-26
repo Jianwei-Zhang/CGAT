@@ -25,10 +25,15 @@ def declaration(ctx, module):
         record['regional_mapper_loader_policy'] = ctx.transition['regional_mapper_loader_policy']
     if 'q0_supplement_scope' in ctx.transition:
         scope = ctx.transition['q0_supplement_scope']
-        if scope != 'decision_frontier_repair' or getattr(module, 'PROOF_REPAIR_SCOPE', None) != scope:
+        if scope not in ('decision_frontier_repair', 'positive_threshold') or (
+                scope == 'decision_frontier_repair' and getattr(module, 'PROOF_REPAIR_SCOPE', None) != scope):
             raise ValueError('unbound q0 supplemental repair scope')
         record['q0_supplement_scope'] = scope
         record['q0_supplement_policy'] = module.supplement_policy(scope)['decision_frontier']
+        if scope == 'positive_threshold':
+            threshold = record['q0_supplement_policy'].get('threshold', {})
+            if not threshold.get('semantics') or threshold.get('readless_only') is not True:
+                raise ValueError('positive-threshold builder contract is missing')
     return record
 
 

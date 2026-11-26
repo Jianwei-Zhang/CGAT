@@ -1151,7 +1151,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_frontier_scope.py", "common.py")])
+                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, screen_threads: int = 1, **kwargs) -> Construction:

@@ -142,7 +142,7 @@ def opened_transition(path,*,role,caller,require_installed):
     repair_package = None
     if 'q0_supplement_scope' in transition or 'proof_repair_package' in transition:
         repair_package = transition.get('proof_repair_package')
-        if (phase != 'prepared' or transition.get('q0_supplement_scope') != 'decision_frontier_repair'
+        if (phase != 'prepared' or transition.get('q0_supplement_scope') not in ('decision_frontier_repair', 'positive_threshold')
                 or not isinstance(repair_package, dict)
                 or checked(repair_package) != work/'metadata/package.tsv'):
             raise ValueError('unbound q0 proof repair package or scope')
@@ -153,7 +153,9 @@ def opened_transition(path,*,role,caller,require_installed):
         for row in runtime:
             relative=Path(row['relative'])
             if (relative.is_absolute() or '..' in relative.parts or '\\' in row['relative']
-                    or relative.parent.as_posix()!='.prepare_lib/tools/lgz_core'
+                    or (relative.parent.as_posix()!='.prepare_lib/tools/lgz_core'
+                        and not (transition.get('q0_supplement_scope') == 'positive_threshold'
+                                 and row['relative'] == '.prepare_lib/tools/workspace_layout.py'))
                     or relative.suffix!='.py' or row['relative'] in seen):
                 raise ValueError('unsafe or duplicate q0 runtime path')
             seen.add(row['relative']);source=checked(row['source'])

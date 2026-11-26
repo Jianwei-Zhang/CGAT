@@ -66,12 +66,44 @@ class OwnerTests(unittest.TestCase):
         self.assertEqual(self.events,[('open',False),'lock','verify','install','installed','resources','configure','run','release'])
         self.assertEqual((self.ctx.transition_path.parent/'resources-before-test.json').read_text(),'{"old":32}')
 
+    def test_install_only_never_runs_units_changes_resources_or_requires_compute_cores(self):
+        self.available = {0}
+        self.assertEqual(owner.execute('plan', install_runtime=True, install_only=True), 0)
+        self.assertEqual(self.events, [('open',False),'lock','verify','install','installed','release'])
+        self.assertEqual((self.ctx.work/'.run_all/resources.json').read_text(), '{"old":32}')
+        report = json.loads((self.ctx.transition_path.parent/'install-only.json').read_text())
+        self.assertFalse(report['main_task_started'])
+        self.assertTrue(report['requires_routed_resume'])
+
+    def test_install_only_rejects_ambiguous_modes_before_opening(self):
+        for kwargs in ({'install_only':True}, {'install_only':True,'install_runtime':True,'validate_only':True}):
+            with self.assertRaisesRegex(ValueError, 'install-only'):
+                owner.execute('plan', **kwargs)
+        self.assertEqual(self.events, [])
+
     def test_readonly_validates_all_initial_units_without_lock_or_install(self):
         self.assertEqual(owner.execute('plan',validate_only=True),0)
         self.assertEqual(self.events,[('open',False),'configure','verify'])
         report=json.loads((self.ctx.transition_path.parent/'validation.json').read_text())
         self.assertEqual(len(report['initial_checkpoints']),25)
         self.assertFalse(report['workspace_modified'])
+
+    def test_selected_checkpoint_uses_installed_context_without_claiming_full_preflight(self):
+        self.assertEqual(owner.execute('plan',validate_only=True,validate_unit='initial:2'),0)
+        self.assertEqual(self.events,[('open',True),'configure','verify'])
+        report=json.loads((self.ctx.transition_path.parent/'validation-selected.json').read_text())
+        self.assertEqual(len(report['initial_checkpoints']),1)
+        self.assertEqual(report['initial_checkpoints'][0]['unit_id'],'initial:2')
+        self.assertEqual(report['status'],'q0_transition_selected_initial_checkpoint_verified_only')
+        self.assertFalse((self.ctx.transition_path.parent/'validation.json').exists())
+
+    def test_selected_checkpoint_cannot_validate_a_missing_or_later_unit(self):
+        for name in ('missing','later:1','q0_evidence'):
+            with self.assertRaisesRegex(ValueError,'checkpoint count'):
+                owner.execute('plan',validate_only=True,validate_unit=name)
+        with self.assertRaisesRegex(ValueError,'requires validate-only'):
+            owner.execute('plan',validate_unit='initial:2')
+        self.assertNotIn('install',self.events);self.assertNotIn('run',self.events)
 
     def test_changed_workflow_is_rejected_before_install(self):
         self.units.pop()
