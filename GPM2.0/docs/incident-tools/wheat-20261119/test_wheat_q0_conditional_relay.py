@@ -88,6 +88,16 @@ class GateTests(unittest.TestCase):
         gate.verify_engineering_binding({"engine_revision":"2064"},{},{})
 
 
+    def test_validation_source_distinguishes_runtime_and_scientific_baseline(self):
+        source={"engine_commit":"new","scientific_baseline_commit":"2064",
+                "path_policy":{"reference_locus_padding_bp":100000}}
+        config={"engine_revision":"2064","runtime_revision":"new"}
+        gate.verify_validation_source(config,source)
+        for wrong in ({"engine_revision":"2064"},{"engine_revision":"other","runtime_revision":"new"}):
+            with self.assertRaises(ValueError):gate.verify_validation_source(wrong,source)
+        source["path_policy"]["reference_locus_padding_bp"]=1000000
+        with self.assertRaisesRegex(ValueError,"engine/padding"):gate.verify_validation_source(config,source)
+
     def test_source_boolean_is_not_a_length(self):
         m = self.metrics(); m["Un"]["selected_source_bp"] = True
         with self.assertRaisesRegex(ValueError, "invalid source"): gate.hard_gates(m, [], [])

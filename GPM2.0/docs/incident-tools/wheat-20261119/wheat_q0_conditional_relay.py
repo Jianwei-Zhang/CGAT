@@ -137,6 +137,15 @@ def inspect_paths(audit, admitted, paths, routes):
     return metrics, conflicts, overlaps
 
 
+def verify_validation_source(config, source):
+    need(source["engine_commit"] == config.get("runtime_revision", config["engine_revision"])
+         and source["path_policy"]["reference_locus_padding_bp"] == 100000,
+         "wrong production validation engine/padding")
+    if "runtime_revision" in config:
+        need(source.get("scientific_baseline_commit") == config["engine_revision"],
+             "wrong qualified scientific baseline")
+
+
 @contextmanager
 def validation_code(config):
     source_path = bound(config["validation_source"])
@@ -144,8 +153,7 @@ def validation_code(config):
     need(bound(config["validation_kit"]) == owner / "kit.sha256", "foreign validation kit")
     verify_kit(owner)
     source = json.loads(source_path.read_text())
-    need(source["engine_commit"] == config["engine_revision"] and source["path_policy"]["reference_locus_padding_bp"] == 100000,
-         "wrong production validation engine/padding")
+    verify_validation_source(config, source)
     archive = owner / "tools.tgz"
     need(digest(archive) == source["tools_sha256"], "validation tools changed")
     with tempfile.TemporaryDirectory(prefix="wheat-relay-code-") as tmp:
