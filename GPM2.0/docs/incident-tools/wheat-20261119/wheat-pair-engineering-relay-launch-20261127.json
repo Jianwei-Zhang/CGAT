@@ -1,0 +1,138 @@
+{
+  "schema": "wheat_pair_engineering_relay_launch_v1",
+  "observed_at": "2026-11-27T10:17:44+08:00",
+  "engine_revision": "e5296065d88976c77b00bf9962737eee68a5c04f",
+  "relay_revision": "edd09536d457266d8604461d39e249a12c626a1a",
+  "retired_jobs_in_order": [
+    43137230,
+    43137178
+  ],
+  "retirement_reason": "explicit user cancellation; Donau FAILED/10003 means terminated by xbzhang26, not algorithm failure",
+  "retirement_receipt": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-exact-20261127.retirement-43137230-43137178.json",
+  "files_deleted": false,
+  "qualification_job": 43138296,
+  "installation": {
+    "continuous_q0_policy_change": {
+      "admission_policy_version": 2,
+      "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+      "path_policy_version": 3,
+      "reference_locus_padding_bp": 100000,
+      "schema": "q0_continuity_2064cb4c_v1"
+    },
+    "status": "continuity_engine_installed_and_one_original_parent_verified",
+    "transition_sha256": "a0ac52d9e238e8d7bf339610c6fa140082fd8f3b42d25e9dc08e1e7edb7d715d",
+    "source_revision": "e5296065d88976c77b00bf9962737eee68a5c04f",
+    "checkpoint_files_unchanged": 25,
+    "protected_control_files_unchanged": true,
+    "representative_parent": {
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+      "input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+      "unit_id": "q0_chr:Un"
+    },
+    "all_25_parent_payloads_revalidated": false,
+    "formal_main_started": false,
+    "mapper_calls": 0,
+    "formal_launch_deferred_to_conditional_relay": true,
+    "reader_declaration_sha256": "71e023c3613f7a653829c122acdff8a73b8c2b74ea82a6e8fe00925b9e2ca4c1",
+    "installation_receipt_sha256": "3b42d2c97f44843582d07478d4b6bf2cac1dc15d67d83fba6a3074fd549a89b3"
+  },
+  "relay_config": {
+    "schema": "wheat_continuity_conditional_relay_v1",
+    "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+    "runtime_revision": "e5296065d88976c77b00bf9962737eee68a5c04f",
+    "validation_job": {
+      "job_id": 43138341,
+      "name": "jm19_q0_production22_cached",
+      "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-pair-20261127.GmsUEBFn"
+    },
+    "install_job": {
+      "job_id": 43138304,
+      "name": "jm19_q0_continuity_install",
+      "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-transition-20261127.WY7Rw2ll"
+    },
+    "transition": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-transition-20261127.WY7Rw2ll/transition.json",
+      "sha256": "a0ac52d9e238e8d7bf339610c6fa140082fd8f3b42d25e9dc08e1e7edb7d715d"
+    },
+    "transition_kit": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-transition-20261127.WY7Rw2ll/kit.sha256",
+      "sha256": "001a1af32baea234e8da7f6bc3813be0c62deb5c859454d58fe64a2ab567ecfa"
+    },
+    "validation_source": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-pair-20261127.GmsUEBFn/production-source.json",
+      "sha256": "69900d68980c352431ac1f4b82a8fa60ed6732658e473aa91de30a6b1ee4dcc4"
+    },
+    "validation_kit": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-pair-20261127.GmsUEBFn/kit.sha256",
+      "sha256": "1305569646ac603ce88239acb4ff328560541549bccae8a02ea2f0fa7c74f0d7"
+    }
+  },
+  "relay_kit_sha256": "4526ddc91be638f3c059d3b071e862a640bc578e703f77f410668c25c6101a9d",
+  "live_checks": {
+    "verified_jobs": {
+      "43138304": {
+        "state": "SUCCEEDED",
+        "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-transition-20261127.WY7Rw2ll",
+        "start_time": "2026-11-27T02:07:12Z",
+        "nodes": "agent-X86-45",
+        "resources": {
+          "cpu": 1,
+          "mem": 4096,
+          "gpu": {
+            "amount": 0,
+            "type": "nvidia"
+          },
+          "npu": {
+            "count": 0,
+            "name": "npu"
+          },
+          "sdrReqs": {},
+          "license": {}
+        }
+      },
+      "43138341": {
+        "state": "RUNNING",
+        "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-pair-20261127.GmsUEBFn",
+        "start_time": "2026-11-27T02:14:08Z",
+        "nodes": "agent-X86-34",
+        "resources": {
+          "cpu": 32,
+          "mem": 327680,
+          "gpu": {
+            "amount": 0,
+            "type": "nvidia"
+          },
+          "npu": {
+            "count": 0,
+            "name": "npu"
+          },
+          "sdrReqs": {},
+          "license": {}
+        }
+      },
+      "43138343": {
+        "state": "WAITING",
+        "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-relay-20261127.dKNh0GKv",
+        "start_time": "-",
+        "nodes": null,
+        "resources": null
+      }
+    },
+    "dependencies": [
+      "43138304",
+      "43138341"
+    ],
+    "relay_jobid_bytes": "'43138343\\n'",
+    "installed_files_verified": 41,
+    "formal_not_started": true
+  },
+  "current_validation_phase": "frozen input staging/reuse; WHOLE_CORE_PLAN_READY 61000; not yet measured whole-wheat pair steady-state",
+  "required_gates": {
+    "all_21_main_chromosomes_have_anchored_paths": true,
+    "minimum_selected_source_bp": 11000000000,
+    "maximum_duplicate_source_occupancy": 0,
+    "maximum_new_cross_chromosome_old_q0_conflicts": 0,
+    "failure_action": "HOLD; preserve artifacts; no automatic retry"
+  },
+  "master_modified_or_merged": false
+}
