@@ -8,6 +8,7 @@ pairwise-derived placement.
 """
 from __future__ import annotations
 
+from array import array
 from bisect import bisect_right
 from collections import Counter, OrderedDict, defaultdict
 from dataclasses import asdict, dataclass, field, replace
@@ -536,11 +537,100 @@ def _clean_source_intervals(sequence, mask, intervals, policy):
                             for piece in _complex_intervals(sequence, unique, policy))
 
 
+class _PackedIntervals:
+    """Lossless source-coordinate runs: bounded by bytes, not Python objects."""
+    def __init__(self, spans):
+        self.coordinates = array("Q", (n for iv in spans for n in (iv.start, iv.end)))
+
+    def __len__(self):
+        return len(self.coordinates) // 2
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return tuple(self[i] for i in range(*index.indices(len(self))))
+        if index < 0:
+            index += len(self)
+        if not 0 <= index < len(self):
+            raise IndexError(index)
+        return Interval(self.coordinates[2 * index], self.coordinates[2 * index + 1])
+
+    @property
+    def nbytes(self):
+        return len(self.coordinates) * self.coordinates.itemsize
+
+
+class _ComplexityCache:
+    """Exact original windows, including their phase and short end window.
+
+    A window starting at 101 is NOT interchangeable with one starting at 100.
+    Byte-packed blocks avoid millions of Python tuple keys. Cache eviction only
+    repeats computation; it never changes thresholds, mask edges, or the grid.
+    """
+    BLOCK_WINDOWS = 4096
+    MAX_BLOCKS = 16384  # 64 MiB of verdict bytes, plus bounded index overhead
+    MAX_SHORT = 4096
+
+    def __init__(self, policy):
+        self.policy = policy
+        self.blocks, self.short = OrderedDict(), OrderedDict()
+        self.hits = self.misses = 0
+
+    def passes(self, sequence, source, start, end):
+        width = self.policy.minimum_anchor_bp
+        if end - start == width:
+            block, offset = divmod(start // width, self.BLOCK_WINDOWS)
+            key = source, start % width, block
+            data = self.blocks.get(key)
+            if data is None:
+                if len(self.blocks) >= self.MAX_BLOCKS:
+                    self.blocks.popitem(last=False)
+                data = self.blocks[key] = bytearray(self.BLOCK_WINDOWS)
+            else:
+                self.blocks.move_to_end(key)
+            value = data[offset]
+            if value:
+                self.hits += 1
+                return value == 1
+            value = _passes_complexity(sequence[start:end].upper(), self.policy)
+            data[offset] = 1 if value else 2
+        else:
+            key = source, start, end
+            if key in self.short:
+                self.hits += 1
+                self.short.move_to_end(key)
+                return self.short[key]
+            value = _passes_complexity(sequence[start:end].upper(), self.policy)
+            if len(self.short) >= self.MAX_SHORT:
+                self.short.popitem(last=False)
+            self.short[key] = value
+        self.misses += 1
+        return value
+
+    def intervals(self, sequence, source, interval):
+        result, run = [], None
+        minimum = min(self.policy.kmer_size, len(sequence))
+        for start in range(interval.start, interval.end, self.policy.minimum_anchor_bp):
+            end = min(interval.end, start + self.policy.minimum_anchor_bp)
+            if end - start >= minimum and self.passes(sequence, source, start, end):
+                if run is None:
+                    run = start
+            elif run is not None:
+                result.append(Interval(run, start)); run = None
+        if run is not None:
+            result.append(Interval(run, interval.end))
+        return tuple(result)
+
+    def clear(self):
+        self.blocks.clear(); self.short.clear()
+
+
 class _RootedContext:
     """Exact grid: retain cheap whole-anchor summaries, screen sparse long anchors on demand."""
     def __init__(self, sequence_for, masks, policy):
         self.width = 8 * policy.minimum_anchor_bp
-        self.cached_spans = 0
+        self.cached_spans = self.cached_bytes = 0
+        self.complexity = complexity = _ComplexityCache(policy)
+        self.sequence_for, self.masks = sequence_for, masks
         self.screened_bp = screened_bp = [0, 0]  # whole, tiled; closures do not retain the context
         # Results are passing runs, not DNA. Bound fragmentation as well as number
         # of anchors; the previous 128-anchor count alone caused avoidable evictions.
@@ -549,16 +639,16 @@ class _RootedContext:
             legs = unmasked(source, parent)
             screened_bp[0] += sum(i.length for i in legs)
             return tuple(piece for leg in legs
-                         for piece in _complex_intervals(sequence_for(source, parent), leg, policy))
+                         for piece in complexity.intervals(sequence_for(source, parent), source, leg))
 
-        @lru_cache(maxsize=128)
+        @lru_cache(maxsize=8192)
         def unmasked(source, parent):
             return tuple(_outside_merged_mask(parent, masks.get(source, ())))
 
-        @lru_cache(maxsize=4096)
+        @lru_cache(maxsize=65536)
         def tile(source, parent, start, end):
             screened_bp[1] += end - start
-            return _complex_intervals(sequence_for(source, parent), Interval(start, end), policy)
+            return complexity.intervals(sequence_for(source, parent), source, Interval(start, end))
 
         self._full, self._unmasked, self._tile = full, unmasked, tile
 
@@ -573,11 +663,12 @@ class _RootedContext:
         # Only a long, sparsely contacted parent benefits from localized evaluation.
         # This changes evaluation cost, never the grid or the numerical thresholds.
         if parent.length <= 1024**2 or 8 * sum(i.length for i in targets) >= parent.length:
-            whole = self._full(source, parent)
-            if len(whole) <= 131072:
-                while self.whole and (len(self.whole) >= 8192 or self.cached_spans + len(whole) > 131072):
-                    self.cached_spans -= len(self.whole.popitem(last=False)[1])
-                self.whole[key] = whole; self.cached_spans += len(whole)
+            whole = _PackedIntervals(self._full(source, parent))
+            if whole.nbytes <= 128 * 1024**2:
+                while self.whole and (len(self.whole) >= 8192 or self.cached_bytes + whole.nbytes > 128 * 1024**2):
+                    previous = self.whole.popitem(last=False)[1]
+                    self.cached_spans -= len(previous); self.cached_bytes -= previous.nbytes
+                self.whole[key] = whole; self.cached_spans += len(whole); self.cached_bytes += whole.nbytes
             return whole
         legs = self._unmasked(source, parent); pieces = []
         for target in targets:
@@ -593,9 +684,17 @@ class _RootedContext:
         # here would shift the separate candidate-side complexity grid downstream.
         return merged_intervals(pieces)
 
-    def clear(self):
+    def clean(self, source, parent, intervals):
+        sequence = self.sequence_for(source, parent)
+        return merged_intervals(piece for iv in intervals
+                                for unique in _outside_merged_mask(iv, self.masks.get(source, ()))
+                                for piece in self.complexity.intervals(sequence, source, unique))
+
+    def clear(self, *, keep_complexity=False):
         self._tile.cache_clear(); self._unmasked.cache_clear(); self.whole.clear()
-        self.cached_spans = 0
+        self.cached_spans = self.cached_bytes = 0
+        if not keep_complexity:
+            self.complexity.clear()
 
 
 def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_context):
@@ -734,8 +833,10 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
     ambiguous = {key: merged_intervals(value) for key, value in ambiguous.items()}
     pair_neighbors = _pair_neighbors(data.pair_links)
 
+    rooted_context = _RootedContext(lambda source, _span: data.sources[source], ambiguous, policy)
+
     def clean_intervals(part, intervals):
-        return _clean_source_intervals(data.sources[part.source], ambiguous.get(part.source, ()), intervals, policy)
+        return rooted_context.clean(part.source, part.interval, intervals)
 
     # Revisit a reference seed when independently ref-anchored sequence on
     # another chr supports a previously unlocalized tail. This is local source
@@ -845,7 +946,6 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
     screen_progress(f"continuous reference tail decisions: protected_carriers={continuous_tail_stops}")
     if first_request:
         screen_progress(f"request tail decisions: no_disjoint_tail_room={no_tail_room} first_continuity_witness={continuity_stops}")
-    rooted_context = _RootedContext(lambda source, _span: data.sources[source], ambiguous, policy)
 
     # Anchors are immutable until the extension phase below. Accumulate each
     # candidate/anchor contribution exactly once, but resolve at the original round
@@ -934,7 +1034,9 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
         frontier = next_frontier
 
     proposed.clear()
-    rooted_context.clear()
+    # Extension has its OWN interval-origin grids. Reuse only exact same
+    # 100bp windows/short tails, never clip a different grid's whole result.
+    rooted_context.clear(keep_complexity=True)
 
     # Extend supported anchors into non-ref sequence only with a noncompeting,
     # high-complexity pair match between already localized sources. Direct ref
@@ -1197,7 +1299,7 @@ def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = Adm
 def selector_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-selector", [(name, sha256_file(root / name)) for name in
-                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_paths.py", "q0_coverage.py", "q0_collinear.py", "q0_interval_index.py", "q0_reference_locus.py", "q0_backbone.py", "q0_threshold_questions.py", "q0_junction_review.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_selection_cache.py", "q0_frontier_scope.py", "common.py")])
+                                    ("q0_admission.py", "q0_reference_competition.py", "q0_source_screen.py", "q0_pair_lanes.py", "q0_pair_transport.py", "q0_paths.py", "q0_coverage.py", "q0_collinear.py", "q0_interval_index.py", "q0_reference_locus.py", "q0_backbone.py", "q0_threshold_questions.py", "q0_junction_review.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_selection_cache.py", "q0_frontier_scope.py", "common.py")])
 
 
 def build_q0(root: Path, *, progress: Callable[[str], None] = _quiet, screen_threads: int = 1, **kwargs) -> Construction:

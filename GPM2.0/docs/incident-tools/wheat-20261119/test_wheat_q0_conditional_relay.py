@@ -67,6 +67,27 @@ class GateTests(unittest.TestCase):
             gate.write_once(root/"intent.json", {"once": True})
             with self.assertRaises(FileExistsError): gate.write_once(root/"intent.json", {"twice": True})
 
+    def test_engineering_relay_requires_the_qualified_installed_revision(self):
+        config={"engine_revision":"2064", "runtime_revision":"new"}
+        transition={"exact_engineering_change":{"schema":"q0_exact_pair_engineering_v1",
+            "baseline_revision":"2064", "runtime_revision":"new", "qualification":{}}}
+        report={"field_exact_equal":True,"real_worker_dispatch_verified":True,"baseline_revision":"2064",
+                "candidate_output_sha256":"a"*64,"baseline_output_sha256":"a"*64,
+                "mapper_calls":0,"formal_workspace_modified":False}
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/"report.json";p.write_text(json.dumps(report))
+            with patch.object(gate,"bound",return_value=p):
+                gate.verify_engineering_binding(config,transition,{"source_revision":"new"})
+                with self.assertRaisesRegex(ValueError,"revision differs"):
+                    gate.verify_engineering_binding(config,transition,{"source_revision":"old"})
+                report["field_exact_equal"]=False;p.write_text(json.dumps(report))
+                with self.assertRaisesRegex(ValueError,"equivalence gate"):
+                    gate.verify_engineering_binding(config,transition,{"source_revision":"new"})
+        with self.assertRaisesRegex(ValueError,"unqualified"):
+            gate.verify_engineering_binding(config,{}, {})
+        gate.verify_engineering_binding({"engine_revision":"2064"},{},{})
+
+
     def test_source_boolean_is_not_a_length(self):
         m = self.metrics(); m["Un"]["selected_source_bp"] = True
         with self.assertRaisesRegex(ValueError, "invalid source"): gate.hard_gates(m, [], [])

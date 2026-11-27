@@ -1,5 +1,6 @@
 """Bounded spawn lanes for independent candidates of one immutable placement round."""
 from collections import deque
+from dataclasses import fields
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 import multiprocessing
@@ -8,6 +9,13 @@ import sys
 from time import monotonic, process_time
 
 from . import q0_source_screen as transport
+from .q0_pair_transport import SequenceStore, SharedValue, _OBJECTS
+
+MAX_PAIR_LANES = 32
+_WORKER_CONTEXT = None
+_WORKER_GENERATION = None
+_WORKER_REGIONS = {}
+_WORKER_MASKS = {}
 
 
 def _lanes(n, threads):
@@ -19,7 +27,7 @@ def _lanes(n, threads):
     r = transport.resources.resource
     peak = r.getrusage(r.RUSAGE_SELF).ru_maxrss * 1024
     free = limit - peak - max(2 * 1024**3, peak // 2)
-    return max(1, min(threads, transport.MAX_LANES, 1 + free // (transport.CHILD_AS + 6 * transport.WIRE_LIMIT)))
+    return max(1, min(threads, MAX_PAIR_LANES, 1 + free // (transport.CHILD_AS + 6 * transport.WIRE_LIMIT)))
 
 
 class _Slice:
@@ -36,16 +44,26 @@ class _Slice:
         return self.text[key.start-self.start:key.stop-self.start]
 
 
-def _packet(part, groups, linked, data, masks, policy, path_policy):
+def _wire_placement(anchor):
+    # This is an already validated immutable Placement from this owner. Copy
+    # its declared fields only; dataclasses.replace would rerun the expensive
+    # reference-footprint validation for every candidate/anchor relationship.
+    clean = object.__new__(type(anchor))
+    clean.__dict__.update((f.name, getattr(anchor, f.name)) for f in fields(anchor))
+    return clean
+
+
+def _packet(part, groups, linked, data, masks, policy, path_policy, store=None):
     # Bound both the bytes copied and pickle bookkeeping before touching DNA. An
     # oversized/unsupported candidate stays on the owner, with ALL of its links.
-    refs = sum(map(len, groups.values())); size = part.interval.length + 128 * refs
+    refs = sum(map(len, groups.values())); size = part.interval.length + 128 * refs if store is None else 512
     spans = {(part.source, part.interval)}; distinct_links = set()
     for anchor, links in linked:
         span = anchor.source, anchor.interval
         if span not in spans:
-            spans.add(span); size += anchor.interval.length
-        size += 128 * (len(anchor.evidence_ids) + len(anchor.reference_blocks) + len(anchor.anchor_intervals))
+            spans.add(span); size += anchor.interval.length if store is None else 256
+        size += (128 * (len(anchor.evidence_ids) + len(anchor.reference_blocks) + len(anchor.anchor_intervals))
+                 if store is None else 256)
         if id(links) not in distinct_links:
             distinct_links.add(id(links)); size += len(links) * 512
             if size > transport.WIRE_LIMIT:
@@ -57,29 +75,60 @@ def _packet(part, groups, linked, data, masks, policy, path_policy):
                 size += len(h._packed) + len(h._optional_fields)
         if size > transport.WIRE_LIMIT:
             return None
+    masks = masks if store is None else store.masks
     relevant = {src: masks.get(src, ()) for src, _ in spans}
-    if size + 64 * sum(map(len, relevant.values())) > transport.WIRE_LIMIT:
+    if size + (64 * sum(map(len, relevant.values())) if store is None else 256 * len(relevant)) > transport.WIRE_LIMIT:
         return None
-    regions = {(src, span): _Slice(data.sources[src], span) for src, span in spans}
-    return transport._pack((part, groups, linked, regions, relevant, policy, path_policy))
+    if store is None:
+        regions = {(src, span): _Slice(data.sources[src], span) for src, span in spans}
+    else:
+        regions = {(src, span): store.region(src, span) for src, span in spans}
+        if any(value is None for value in regions.values()):
+            return None
+    # Cached indexes on Placements are accelerators, not scientific fields.
+    # Do not serialize them repeatedly with the same immutable anchor.
+    if store is None:
+        linked = [(_wire_placement(anchor), links) for anchor, links in linked]
+    else:
+        linked = [(store.metadata(("anchor", anchor.placement_id), _wire_placement(anchor)), links)
+                  for anchor, links in linked]
+        groups = store.metadata(("groups", part.segment_id), groups)
+        relevant = {src: store.metadata(("mask", src), value) for src, value in relevant.items()}
+        if groups is None or any(a is None for a, _ in linked) or any(v is None for v in relevant.values()):
+            return None
+    return transport._pack((part, groups, linked, regions, relevant, policy, path_policy,
+                            None if store is None else str(store.root)))
 
 
 def _work(raw):
-    from .q0_admission import _candidate_delta, _clean_source_intervals, _RootedContext
+    from .q0_admission import _candidate_delta, _RootedContext
+    global _WORKER_CONTEXT, _WORKER_GENERATION
     try:
-        part, groups, linked, regions, masks, policy, path_policy = pickle.loads(raw)
-        def clean(src, span, intervals):
-            return _clean_source_intervals(regions[src, span], masks[src], intervals, policy)
-        context = _RootedContext(lambda src, span: regions[src, span], masks, policy)
+        part, groups, linked, regions, masks, policy, path_policy, epoch = pickle.loads(raw)
+        if isinstance(groups, SharedValue):
+            groups = groups.load()
+            linked = [(anchor.load(), links) for anchor, links in linked]
+            masks = {src: value.load() for src, value in masks.items()}
+        generation = epoch, policy
+        if epoch is None or generation != _WORKER_GENERATION:
+            _WORKER_CONTEXT = None
+            _WORKER_GENERATION = generation
+        _WORKER_REGIONS.clear(); _WORKER_REGIONS.update(regions)
+        _WORKER_MASKS.clear(); _WORKER_MASKS.update(masks)
+        if _WORKER_CONTEXT is None:
+            _WORKER_CONTEXT = _RootedContext(lambda src, span: _WORKER_REGIONS[src, span], _WORKER_MASKS, policy)
+        context = _WORKER_CONTEXT
         return transport._pack(_candidate_delta(part, groups, linked, policy, path_policy,
-                               lambda spans: clean(part.source, part.interval, spans), context))
+                               lambda spans: context.clean(part.source, part.interval, spans), context))
     except MemoryError:
+        _WORKER_CONTEXT = None
+        _OBJECTS.clear()
         return None
 
 
 def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, threads, owner, log, round_number, *, time_phases=False):
     """Compute out of process, consume only in candidate order; fallback never means no evidence."""
-    lanes = _lanes(len(keys), threads); pool = None; pending = deque(); ix = inflight = 0
+    lanes = _lanes(len(keys), threads); pool = store = None; pending = deque(); ix = inflight = 0
     workers = local = relations = whole_bp = tile_bp = 0; geo = rooted = candidate = 0.0; started = reported = monotonic()
     # Elapsed time on the coordinator, not worker CPU. Include candidate transport and
     # the time the generator is suspended in its caller; neither appears in the task counters.
@@ -96,6 +145,7 @@ def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, th
     try:
         if lanes > 1:
             try:
+                store = SequenceStore(data.sources, masks)
                 pool = ProcessPoolExecutor(lanes-1, mp_context=multiprocessing.get_context("spawn"),
                                            initializer=transport._limit_child)
             except (OSError, MemoryError):
@@ -110,7 +160,7 @@ def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, th
                 future = value = None; relations += len(linked)
                 if usable and inflight < lanes-1 and linked:
                     try:
-                        raw = _packet(part, groups.get(key, {}), linked, data, masks, policy, path_policy)
+                        raw = _packet(part, groups.get(key, {}), linked, data, masks, policy, path_policy, store)
                         if raw is not None:
                             future = pool.submit(_work, raw); inflight += 1
                         del raw
@@ -155,4 +205,7 @@ def ordered_deltas(keys, data, groups, masks, neighbors, policy, path_policy, th
     finally:
         if pool is not None:
             pool.shutdown(wait=True, cancel_futures=True)
+        if store is not None:
+            log(f"placement pair shared DNA round={round_number}: sources={len(store.rows)} bytes_written={store.written_bytes} metadata_objects={len(store.values)}")
+            store.close()
     report()

@@ -208,7 +208,13 @@ class CandidatePreparationTests(unittest.TestCase):
         manifest = {'git_revision': prep.CONTINUITY_CHANGE['engine_revision'],
                     'q0_supplement_scope': prep.THRESHOLD_PROFILE,
                     'continuous_q0_policy_change': dict(prep.CONTINUITY_CHANGE)}
-        self.assertEqual(prep.validate_continuity_change(self.bundle, manifest), prep.CONTINUITY_CHANGE)
+        # The working tree is now an engineering successor, not the byte-pinned
+        # original. It MUST NOT pass using the old scientific declaration alone.
+        with self.assertRaisesRegex(ValueError, 'differs from reviewed'):
+            prep.validate_continuity_change(self.bundle, manifest)
+        for name, expected in prep.CONTINUITY_FILES.items():
+            if name != 'q0_admission.py':
+                self.assertEqual(prep.digest(core/name), expected)
         manifest['continuous_q0_policy_change']['reference_locus_padding_bp'] = 1000000
         with self.assertRaisesRegex(ValueError, 'authorization'):
             prep.validate_continuity_change(self.bundle, manifest)

@@ -34,7 +34,7 @@ else:
             'checkpoint_files_unchanged':len([n for n in before if n.startswith('.run_all/checkpoints/')]),
             'protected_control_files_unchanged':True,'representative_parent':selected['initial_checkpoints'][0],
             'all_25_parent_payloads_revalidated':False,'formal_main_started':False,'mapper_calls':0,
-            'validation_job_untouched':43137178,
+            'formal_launch_deferred_to_conditional_relay':True,
             'reader_declaration_sha256':digest(root/'installed-reader.json'),'installation_receipt_sha256':digest(root/'installation/receipt.json')}
     with (root/'entry-repair.json').open('x') as stream:json.dump(report,stream,indent=2);stream.write('\n')
     print(json.dumps(report),flush=True)

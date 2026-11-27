@@ -125,11 +125,16 @@ class Q0AdmissionTests(unittest.TestCase):
             child = fixture.source(name, source[start:start + 2000])
             for offset in range(0, 2000, 200):
                 fixture.pair(child, anchor, (offset, offset + 200), (start + offset, start + offset + 200))
-        with patch.object(q0_admission, "_complex_intervals", wraps=q0_admission._complex_intervals) as check:
+        calls = []
+        original = q0_admission._ComplexityCache.intervals
+        def screen(cache, sequence, key, interval):
+            calls.append((sequence, interval))
+            return original(cache, sequence, key, interval)
+        with patch.object(q0_admission._ComplexityCache, "intervals", screen):
             admission = admit_placements(fixture.data())
         self.assertEqual({p.source.contig for p in admission.placements if p.localization_kind == "pairwise"},
                          {"off_ref", "off_ref_second"})
-        self.assertEqual(sum(args[:2] == (source, Interval(0, len(source))) for args, _ in check.call_args_list), 1)
+        self.assertEqual(sum(args == (source, Interval(0, len(source))) for args in calls), 1)
 
     def test_reference_block_index_is_complete_for_nested_touching_and_random_intervals(self):
         rng = random.Random(9)

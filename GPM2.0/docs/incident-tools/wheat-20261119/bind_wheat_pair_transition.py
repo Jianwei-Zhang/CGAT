@@ -1,0 +1,33 @@
+"""Bind the qualified engineering packet to the installed continuity engine."""
+import json
+from pathlib import Path
+import prepare_q0_runtime_transition as p
+root=Path(__file__).resolve().parent
+base=root.parent; work=base/'gpm_server'
+previous=base/'q0-continuity-transition-20261127.bs5d44Do/transition.json'
+if p.digest(previous)!='248ee1e7a93edc6e5c1e14199d1e8c7f0b7e4fed04f2d1d5e3518da4fb631941':
+    raise ValueError('retired transition changed; inspect instead of restaging')
+journal=json.loads((previous.parent/'installation/receipt.json').read_text())
+installed={r['relative']:r['sha256'] for r in journal['installed']}
+names=p.threshold_runtime_names(root/'runtime'); prefix='.prepare_lib/tools/lgz_core/'
+prior={prefix+n:p.digest(work/prefix/n) for n in names if prefix+n not in installed and (work/prefix/n).is_file()}
+changes={}
+for name in sorted(p.THRESHOLD_POLICY_CHANGES):
+    symbol=p.POLICIES.get(name) or p.SELECTOR_POLICIES[name]
+    get=p.policy_ast if name in p.POLICIES else p.selector_policy_ast
+    old=get(work/prefix/name,symbol);new=get(root/'runtime'/name,symbol)
+    if old!=new:changes[name]=p.policy_change(old,new)
+manifest={'schema':p.SOURCE_SCHEMA,'workspace':str(work),'git_revision':(root/'source-revision.txt').read_text().strip(),
+          'previous_transition':p.record(previous),'previous_job':43137228,'protected_baseline':43061436,
+          'continuous_q0_policy_change':dict(p.CONTINUITY_CHANGE),
+          'exact_engineering_change':json.loads((root/'engineering-authorization.json').read_text()),
+          'q0_supplement_scope':'positive_threshold','proof_repair_package':p.record(work/'metadata/package.tsv'),
+          'prior_selector_files':prior,'positive_threshold_policy_changes':changes,
+          'regional_mapper_loader_policy':'clear_same_dependencies_v1',
+          'files':json.loads((root/'source-files.json').read_text())}
+if manifest['git_revision'] != manifest['exact_engineering_change']['runtime_revision']:
+    raise ValueError('wrong qualified engineering revision')
+if changes:
+    raise ValueError('engineering successor cannot change any scientific policy')
+p.write_new(root/'candidate-source.json',manifest)
+print(json.dumps(p.prepare(root)),flush=True)

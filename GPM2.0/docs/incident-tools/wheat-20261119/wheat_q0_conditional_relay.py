@@ -178,9 +178,10 @@ def verify(config, root):
     transition = json.loads(transition_path.read_text())
     need(transition["continuous_q0_policy_change"]["engine_revision"] == config["engine_revision"], "wrong installed scientific policy")
     install = json.loads((troot / "entry-repair.json").read_text())
+    verify_engineering_binding(config, transition, install)
     need(install["status"] == "continuity_engine_installed_and_one_original_parent_verified"
          and install["transition_sha256"] == config["transition"]["sha256"]
-         and install["source_revision"] == config["engine_revision"]
+         and install["source_revision"] == config.get("runtime_revision", config["engine_revision"])
          and install["checkpoint_files_unchanged"] == 25 and install["protected_control_files_unchanged"] is True
          and install["formal_main_started"] is False, "installation is not accepted")
     preflight = json.loads((troot / "validation-selected.json").read_text())
@@ -225,8 +226,27 @@ def verify(config, root):
     return {"status": "GO", "hard_gates": verdict, "validation_report_sha256": report_sha,
             "validation_job": validation["jobId"], "install_job": installation["jobId"],
             "transition_sha256": config["transition"]["sha256"], "engine_revision": config["engine_revision"],
+            "runtime_revision": config.get("runtime_revision", config["engine_revision"]),
             "current_cross_conflict_rows": sum(r["category"] == "other_chromosome" for r in conflicts),
             "baseline_cross_conflict_rows": sum(r["category"] == "other_chromosome" for r in prior_conflicts)}, allocation
+
+
+def verify_engineering_binding(config, transition, install):
+    engineering = transition.get("exact_engineering_change")
+    revision = config.get("runtime_revision")
+    if engineering is None:
+        need(revision is None, "unqualified engineering runtime")
+        return
+    need(engineering.get("schema") == "q0_exact_pair_engineering_v1"
+         and engineering.get("baseline_revision") == config["engine_revision"]
+         and engineering.get("runtime_revision") == revision == install.get("source_revision"),
+         "installed engineering revision differs from qualified relay")
+    report = json.loads(bound(engineering["qualification"]).read_text())
+    need(report.get("field_exact_equal") is True and report.get("real_worker_dispatch_verified") is True
+         and report.get("baseline_revision") == config["engine_revision"]
+         and report.get("candidate_output_sha256") == report.get("baseline_output_sha256")
+         and report.get("mapper_calls") == 0 and report.get("formal_workspace_modified") is False,
+         "engineering field equivalence gate failed")
 
 
 def main():

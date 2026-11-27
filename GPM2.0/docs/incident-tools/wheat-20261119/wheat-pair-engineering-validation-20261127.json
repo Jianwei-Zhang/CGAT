@@ -1,0 +1,60 @@
+{
+  "schema": "wheat_pair_engineering_validation_v1",
+  "date": "2026-11-27",
+  "job_id": 43138296,
+  "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-exact-20261127.GIqRs517",
+  "qualification_sha256": "e735d986c1a5d9ff13fcd0270d6d6fbc5b76c462c43ac5b127d1225bf60700be",
+  "qualification": {
+    "baseline_output_sha256": "eb50499368308cef375a82619bb043a8d679b9a17238582c75c2556bee7f9a47",
+    "baseline_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+    "baseline_seconds": 75.6125725209713,
+    "baseline_tools_sha256": "4252ccb4ad2040f045efc73c1ba82aa8b05b1a340096c97b997d0c2d3588c57c",
+    "candidate_output_sha256": "eb50499368308cef375a82619bb043a8d679b9a17238582c75c2556bee7f9a47",
+    "candidate_seconds": 82.7364564165473,
+    "candidate_selector_identity": "q0-selector-8d2577306ea0003b7a9a07e1",
+    "candidate_tools_sha256": "39bbbc9546dcf699fe6fb5f0a0e060043263ebd6e8c7db45b1bcae2926acd417",
+    "field_exact_equal": true,
+    "formal_workspace_modified": false,
+    "input_sha256": "ff00e2329fc9d1b8f60c9ed0d1fdb6e19faf4cf19d961d73475b697a45324aee",
+    "mapper_calls": 0,
+    "real_worker_dispatch_verified": true,
+    "schema": "wheat_pair_engineering_qualification_v1",
+    "speedup": 0.9138966762159852
+  },
+  "subset": {
+    "source_bp": 307942608,
+    "parts": 65,
+    "pair_links": 7118,
+    "reference_hits": 62771,
+    "input_sha256": "ff00e2329fc9d1b8f60c9ed0d1fdb6e19faf4cf19d961d73475b697a45324aee"
+  },
+  "placements": 25,
+  "records": 162,
+  "canonical_output_bytes": 44439406,
+  "pair_lane_observation": {
+    "cpu_budget": 32,
+    "lanes": 32,
+    "owner_parts": 1,
+    "worker_parts": 53,
+    "baseline_owner_parts": 54,
+    "baseline_worker_parts": 0
+  },
+  "tests": {
+    "production_targeted": 167,
+    "engineering_targeted": 10,
+    "transition_relay_and_audit": 113,
+    "all_passed": true,
+    "excluded_real_mapper_integration": 1
+  },
+  "limitations": [
+    "Small sparse subset is an equivalence/dispatch qualification, not a whole-wheat speedup measurement.",
+    "Total replay 75.61s baseline versus 82.74s candidate; cold shared metadata/spawn overhead dominates the subsecond pair task.",
+    "Whole-wheat performance and biological hard gates must be measured by the replacement isolated 22-group job before formal relay."
+  ],
+  "prior_attempts": {
+    "43138272": "baseline completed but verifier asdict could not encode dataclass map keys; no engine failure",
+    "43138284": "field equality only; NOT deployment qualification: pair worker count was zero and broad witness matched reference screen; superseded by strict pair-only check"
+  },
+  "formal_workspace_modified": false,
+  "mapper_calls": 0
+}

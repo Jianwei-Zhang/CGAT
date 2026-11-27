@@ -57,11 +57,20 @@ CONTINUITY_FILES = {'q0_admission.py': 'd5058d6669c44d027e93312c423d74a5e8a8a7a3
 def validate_continuity_change(bundle, manifest):
     declaration = manifest.get('continuous_q0_policy_change')
     if declaration is None:
+        if manifest.get('exact_engineering_change') is not None:
+            raise ValueError('exact engineering requires reviewed continuity baseline')
         return None
+    engineering = None
+    if manifest.get('exact_engineering_change') is not None:
+        from q0_exact_engineering_transition import validate
+        engineering = validate(bundle, manifest)
     if (declaration != CONTINUITY_CHANGE or manifest.get('q0_supplement_scope') != THRESHOLD_PROFILE
-            or manifest.get('git_revision') != CONTINUITY_CHANGE['engine_revision']):
+            or engineering is None and manifest.get('git_revision') != CONTINUITY_CHANGE['engine_revision']):
         raise ValueError('invalid explicit continuous Q0 policy authorization')
     for name, expected in CONTINUITY_FILES.items():
+        if engineering is not None and name == 'q0_admission.py':
+            from q0_exact_engineering_transition import ENGINEERING_FILES
+            expected = ENGINEERING_FILES[name]
         if digest(child(bundle, 'runtime/' + name)) != expected:
             raise ValueError('continuous Q0 engine differs from reviewed 2064cb4c: ' + name)
     return declaration
@@ -248,6 +257,8 @@ def prepare(bundle):
     required = {'runtime/'+name for name in names} | set(HELPERS.values()) | {'q0_science_handoff_gate.py', 'prepare_q0_runtime_transition.py'}
     if supplement == THRESHOLD_PROFILE:
         required.add('support/workspace_layout.py')
+    if manifest.get('exact_engineering_change') is not None:
+        required.add('q0_exact_engineering_transition.py')
     if set(sources) != required:
         raise ValueError('candidate source closure differs from builder/entry inventory')
     runtime = []; policy_checks = []
@@ -314,6 +325,8 @@ def prepare(bundle):
         transition['positive_threshold_policy_changes'] = declared_changes
     if continuity_change is not None:
         transition['continuous_q0_policy_change'] = continuity_change
+    if manifest.get('exact_engineering_change') is not None:
+        transition['exact_engineering_change'] = manifest['exact_engineering_change']
     write_new(transition_path, transition)
     checked(manifest_before); checked(journal_before); checked(manifest['previous_transition'])
     for relative, expected in installed.items():
@@ -336,6 +349,8 @@ def prepare(bundle):
         report['q0_supplement_scope'] = supplement
     if continuity_change is not None:
         report['continuous_q0_policy_change'] = continuity_change
+    if manifest.get('exact_engineering_change') is not None:
+        report['exact_engineering_change'] = manifest['exact_engineering_change']
     write_new(bundle/'candidate-prepared.json', report)
     return report
 
