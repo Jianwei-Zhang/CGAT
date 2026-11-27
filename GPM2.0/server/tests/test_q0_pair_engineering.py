@@ -116,81 +116,29 @@ class SharedDNATests(unittest.TestCase):
             finally: store.close()
 
 
-def fixture():
-    f=EvidenceFixture({"chr1": 30_000_000})
-    # Long anchor used sparsely. DNA exceeds old WIRE_LIMIT; contact complexity
-    # is nontrivial and kept at original (nonzero phase) coordinates.
-    seq="A"*15_000_000 + dna(5000) + "A"*1_000_000
-    root=f.source("root",seq)
-    f.ref(root,(15_000_013,15_004_913),(100,5000))
-    for i in range(20):
-        child=f.source("child%02d"%i,dna(2000,i+1))
-        f.pair(child,root,(13,1013),(15_000_113,15_001_113),strand="-" if i%2 else "+")
-    data=f.data()
-    data=replace(data,pair_links=tuple(PairLink(RetainedHit.from_validated(l.hit,l.hit.query_name,l.hit.target_name),
-                                              l.query_source,l.target_source) for l in data.pair_links))
-    return data,root
-
-
 class PairSchedulingTests(unittest.TestCase):
-    def test_large_anchor_descriptor_matches_owner_delta_both_strands(self):
-        data,root=fixture(); policy=adm.AdmissionPolicy(); path_policy=PathPolicy()
-        part=next(p for p in data.parts.values() if p.source==root)
-        anchor=adm._placement(part,"chr1","+",part.interval,(part.interval,),(),("anchor",),kind="reference")
-        store=transport.SequenceStore(data.sources,{root:(Interval(15_000_267,15_000_319),)})
-        try:
-            for candidate in list(data.parts.values())[1:4]:
-                linked=[(anchor,[l for l in data.pair_links if l.query_source==candidate.source])]
-                self.assertIsNone(lanes._packet(candidate,{},linked,data,store.masks,policy,path_policy))
-                # Serialization must not revalidate giant reference footprints.
-                with patch.object(type(anchor), "__post_init__", side_effect=AssertionError("revalidated immutable anchor")):
-                    raw=lanes._packet(candidate,{},linked,data,store.masks,policy,path_policy,store)
-                self.assertIsNotNone(raw); self.assertLess(len(raw),20000)
-                ctx=adm._RootedContext(lambda s,_:data.sources[s],store.masks,policy)
-                expected=adm._candidate_delta(candidate,{},linked,policy,path_policy,
-                    lambda spans:adm._clean_source_intervals(data.sources[candidate.source],(),spans,policy),ctx)
-                self.assertEqual(pickle.loads(lanes._work(raw))[0],expected[0])
-        finally:
-            store.close();transport._READS.clear()
+    def test_order_and_round_completion_without_pool_or_store(self):
+        from unittest.mock import Mock
+        keys = [13, 2, 8] * 20
+        data = SimpleNamespace(parts={k: SimpleNamespace(source=k) for k in keys})
+        neighbors = Mock(); neighbors.for_source.side_effect = lambda key: [key]
+        calls = []; logs = []
+        def owner(key, linked):
+            calls.append((key, linked)); return key, 0, 0, 0, 0, 0
+        with patch("concurrent.futures.ProcessPoolExecutor", side_effect=AssertionError), \
+             patch.object(transport, "SequenceStore", side_effect=AssertionError):
+            result = list(lanes.ordered_deltas(keys, data, {}, {}, neighbors, None, None,
+                                               32, owner, logs.append, 1, time_phases=True))
+        self.assertEqual(result, list(zip(keys, keys)))
+        self.assertEqual(calls, [(key, [key]) for key in keys]); self.assertEqual(neighbors.for_source.call_count,len(keys))
+        self.assertIn("owner_parts=60 worker_parts=0", logs[-1])
 
-    def test_large_mask_metadata_does_not_force_owner_lane(self):
-        data,root=fixture(); policy=adm.AdmissionPolicy(); path_policy=PathPolicy()
-        part=next(p for p in data.parts.values() if p.source==root)
-        anchor=adm._placement(part,"chr1","+",part.interval,(part.interval,),(),("anchor",),kind="reference")
-        masks={root:tuple(Interval(i*50,i*50+1) for i in range(210000))}
-        store=transport.SequenceStore(data.sources,masks)
-        try:
-            candidate=list(data.parts.values())[1]
-            linked=[(anchor,[l for l in data.pair_links if l.query_source==candidate.source])]
-            raw=lanes._packet(candidate,{},linked,data,masks,policy,path_policy,store)
-            self.assertIsNotNone(raw);self.assertLess(len(raw),20000)
-            result=pickle.loads(lanes._work(raw))[0]
-            ctx=adm._RootedContext(lambda s,_:data.sources[s],masks,policy)
-            expected=adm._candidate_delta(candidate,{},linked,policy,path_policy,
-                lambda spans:adm._clean_source_intervals(data.sources[candidate.source],(),spans,policy),ctx)
-            self.assertEqual(result,expected[0])
-        finally:
-            store.close();transport._READS.clear();transport._OBJECTS.clear()
-
-    def test_real_spawn_and_exact_fallback_preserve_every_admission_field(self):
-        # Use small full-reference root for complete round/extension replay;
-        # the separate large-anchor test exercises the old 12MiB cliff.
+    def test_all_admission_fields_independent_of_thread_budget(self):
         f=EvidenceFixture();seq=dna(6000);root=f.source("root",seq);f.ref(root,(0,3000),(0,3000))
         for i in range(20):
             child=f.source("child%02d"%i,seq[3000:5000])
             f.pair(child,root,(0,2000),(3000,5000))
         data=f.data();data=replace(data,pair_links=tuple(PairLink(RetainedHit.from_validated(l.hit,l.hit.query_name,l.hit.target_name),l.query_source,l.target_source) for l in data.pair_links))
-        baseline=adm.admit_placements(data);logs=[]
-        with patch.object(lanes,"_lanes",return_value=4):
-            parallel=adm.admit_placements(data,screen_threads=4,screen_progress=logs.append)
-        self.assertEqual(parallel,baseline)
-        self.assertTrue(any("worker_parts=" in l and "worker_parts=0 " not in l for l in logs))
-        with patch.object(lanes,"_lanes",return_value=4), patch.object(lanes,"SequenceStore",side_effect=OSError("no space")):
-            self.assertEqual(adm.admit_placements(data,screen_threads=4),baseline)
-
-    def test_32_lanes_requires_real_resource_proof(self):
-        with patch.object(lanes.transport.resources,"execution_memory_limit",return_value=None):
-            self.assertEqual(lanes._lanes(100,32),1)
-        with patch.object(lanes.transport.resources,"execution_memory_limit",return_value=512*1024**3):
-            self.assertEqual(lanes._lanes(100,32),32)
-            self.assertEqual(lanes._lanes(100,4),4)
+        baseline = adm.admit_placements(data); logs = []
+        self.assertEqual(adm.admit_placements(data, screen_threads=32, screen_progress=logs.append), baseline)
+        self.assertTrue(any("lanes=1 mode=owner_only" in row for row in logs))

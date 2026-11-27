@@ -245,12 +245,19 @@ def verify_engineering_binding(config, transition, install):
     if engineering is None:
         need(revision is None, "unqualified engineering runtime")
         return
-    need(engineering.get("schema") == "q0_exact_pair_engineering_v1"
+    need(engineering.get("schema") in ("q0_exact_pair_engineering_v1", "q0_exact_owner_pair_v1")
          and engineering.get("baseline_revision") == config["engine_revision"]
          and engineering.get("runtime_revision") == revision == install.get("source_revision"),
          "installed engineering revision differs from qualified relay")
     report = json.loads(bound(engineering["qualification"]).read_text())
-    need(report.get("field_exact_equal") is True and report.get("real_worker_dispatch_verified") is True
+    if engineering["schema"] == "q0_exact_owner_pair_v1":
+        need(report.get("schema") == "wheat_owner_pair_qualification_v1" and report.get("owner_only_verified") is True
+             and report.get("checkpoint_output_sha256") == "99f36fc6fc16535e315aa4d6d0511b2c0028789bc00f3293d9e4a8af1d199b2a"
+             and report.get("candidate_output_sha256") == "eb50499368308cef375a82619bb043a8d679b9a17238582c75c2556bee7f9a47",
+             "owner-only qualification differs")
+    else:
+        need(report.get("real_worker_dispatch_verified") is True, "engineering field equivalence gate failed")
+    need(report.get("field_exact_equal") is True
          and report.get("baseline_revision") == config["engine_revision"]
          and report.get("candidate_output_sha256") == report.get("baseline_output_sha256")
          and report.get("mapper_calls") == 0 and report.get("formal_workspace_modified") is False,

@@ -49,6 +49,19 @@ class ExactTransitionTests(unittest.TestCase):
         self.manifest["exact_engineering_change"]["qualification"]=self.record(p)
     def test_qualified_whole_tree_and_unchanged_policies(self):
         self.assertEqual(exact.validate(self.root,self.manifest),self.manifest["exact_engineering_change"])
+    def test_owner_mode_requires_its_own_byte_exact_checkpoint_and_admission(self):
+        from wheat_owner_pair_qualification import INPUT, FULL, CHECKPOINT
+        self.manifest['exact_engineering_change']['schema']='q0_exact_owner_pair_v1'
+        self.report.update(schema='wheat_owner_pair_qualification_v1', owner_only_verified=True,
+                           input_sha256=INPUT, candidate_output_sha256=FULL, baseline_output_sha256=FULL,
+                           checkpoint_output_sha256=CHECKPOINT, real_worker_dispatch_verified=False)
+        with patch.object(exact,'OWNER_FILES',self.pins):
+            self.bind_report(); exact.validate(self.root,self.manifest)
+            for key,bad in [('owner_only_verified',False),('checkpoint_output_sha256','0'*64),('input_sha256','1'*64)]:
+                original=self.report[key]; self.report[key]=bad; self.bind_report()
+                with self.assertRaisesRegex(ValueError,'not qualified'): exact.validate(self.root,self.manifest)
+                self.report[key]=original
+
     def test_mismatch_or_no_real_workers_is_not_authorization(self):
         for key,value in [("field_exact_equal",False),("real_worker_dispatch_verified",False),
                           ("candidate_output_sha256","d"*64),("mapper_calls",1),("formal_workspace_modified",True)]:
@@ -80,4 +93,4 @@ class ExactTransitionTests(unittest.TestCase):
 class ReviewedBytesTests(unittest.TestCase):
     def test_pins_bind_the_actual_reviewed_engine(self):
         core=Path(__file__).resolve().parents[3]/"server/tools/lgz_core"
-        for name,pin in exact.ENGINEERING_FILES.items():self.assertEqual(exact.digest(core/name),pin)
+        for name,pin in exact.OWNER_FILES.items():self.assertEqual(exact.digest(core/name),pin)
