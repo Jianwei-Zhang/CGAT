@@ -156,7 +156,10 @@ test("splitter CSS keeps a generous hit area on the existing border and hides it
   const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
   assert.match(css, /grid-template-columns: var\(--project-sidebar-width, var\(--project-sidebar-default\)\) 0 minmax\(0, 1fr\)/);
   assert.match(css, /\.project-browser\.is-sidebar-collapsed \{ grid-template-columns: 48px minmax\(0, 1fr\); \}/);
-  assert.match(css, /\.project-browser\.is-sidebar-collapsed \.library-search,/);
+  assert.match(css, /\.project-browser\.is-sidebar-collapsed \.project-library-panel \{ display: none; \}/);
+  assert.match(css, /\.project-browser\.is-sidebar-collapsed\.is-sidebar-flyout-open \.project-library-panel \{[\s\S]*position: fixed;/);
+  assert.match(css, /\.projects-page \.project-header-actions \.final-path-export-toggle \{[\s\S]*height: 36px;/);
+  assert.match(css, /\.projects-page \.button\.project-enter-assembly \{[\s\S]*height: 36px;/);
   assert.match(css, /\.project-sidebar-splitter \{[^}]*width: 10px;[^}]*cursor: col-resize;[^}]*touch-action: none;/);
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.project-sidebar-splitter \{ display: none; \}/);
   assert.match(css, /\.project-sidebar-splitter:focus-visible/);
@@ -165,30 +168,43 @@ test("splitter CSS keeps a generous hit area on the existing border and hides it
   assert.match(css, /\.project-dataset-table \.numeric \{[^}]*text-align: left;/);
 });
 
-test("sidebar collapse toggle switches to the narrow icon rail, persists state, and restores width on expand", () => {
+test("sidebar collapse toggle switches to the narrow icon rail, opens a quick-switch flyout without uncollapsing, and restores width on expand", () => {
   const storeMap = new Map();
   const classes = new Set();
   const style = new Map();
+  const docListeners = new Map();
   const makeNode = (dataset = {}, attrs = {}) => {
     const listeners = new Map();
     const map = new Map(Object.entries(attrs));
-    return {
+    const node = {
       dataset,
       innerHTML: "",
+      style: {},
+      focused: false,
       addEventListener: (type, fn) => listeners.set(type, fn),
       removeEventListener: type => listeners.delete(type),
       setAttribute: (k, v) => map.set(k, v),
       getAttribute: k => map.get(k) || "",
       removeAttribute: k => map.delete(k),
+      focus: () => { node.focused = true; },
+      contains: target => target === node,
       attrs: map,
-      click: () => listeners.get("click")?.({}),
+      click: (event = {}) => listeners.get("click")?.(event),
     };
+    return node;
   };
   const toggleBtn = makeNode({ collapseLabel: "Collapse library", expandLabel: "Expand library" });
-  const expandRailBtn = makeNode();
+  const switcherBtn = makeNode({}, { "aria-expanded": "false" });
+  const searchInput = makeNode();
+  const flyoutPanel = makeNode();
+  flyoutPanel.querySelector = selector => selector.includes(".library-search-input") ? searchInput : null;
+  const recents = { getBoundingClientRect: () => ({ top: 48, right: 48 }) };
   const importBtn = makeNode({}, { "aria-label": "Import" });
   const openBtn = makeNode({}, { "aria-label": "Open" });
   const view = {
+    innerHeight: 800,
+    addEventListener() {},
+    removeEventListener() {},
     getComputedStyle: () => ({ getPropertyValue: () => "280px" }),
     localStorage: {
       getItem: key => storeMap.get(key) ?? null,
@@ -196,15 +212,23 @@ test("sidebar collapse toggle switches to the narrow icon rail, persists state, 
       removeItem: key => storeMap.delete(key),
     },
   };
+  const ownerDocument = {
+    defaultView: view,
+    addEventListener: (type, fn) => docListeners.set(type, fn),
+    removeEventListener: type => docListeners.delete(type),
+    querySelector: () => null,
+  };
   const browser = {
-    ownerDocument: { defaultView: view },
+    ownerDocument,
     isConnected: true,
-    getBoundingClientRect: () => ({ width: 1200 }),
+    getBoundingClientRect: () => ({ width: 1200, top: 48, right: 48 }),
     style: { setProperty: (key, value) => style.set(key, value) },
     classList: { add: name => classes.add(name), remove: name => classes.delete(name) },
     querySelector(selector) {
       if (selector === "[data-project-sidebar-toggle]") return toggleBtn;
-      if (selector === "[data-project-sidebar-expand]") return expandRailBtn;
+      if (selector === "[data-project-sidebar-switcher]") return switcherBtn;
+      if (selector === ".project-library-panel") return flyoutPanel;
+      if (selector === ".project-recents") return recents;
       if (selector === "#project-import-button") return importBtn;
       if (selector === "#project-open-button") return openBtn;
       return null;
@@ -225,9 +249,28 @@ test("sidebar collapse toggle switches to the narrow icon rail, persists state, 
   assert.equal(importBtn.attrs.get("data-app-tooltip"), "Import");
   assert.equal(openBtn.attrs.get("data-app-tooltip"), "Open");
 
-  expandRailBtn.click();
+  // Clicking the rail switcher opens the floating project switcher while keeping the rail collapsed.
+  switcherBtn.click();
+  assert.equal(classes.has("is-sidebar-collapsed"), true);
+  assert.equal(classes.has("is-sidebar-flyout-open"), true);
+  assert.equal(switcherBtn.attrs.get("aria-expanded"), "true");
+  assert.equal(flyoutPanel.style.left, "54px");
+  assert.equal(searchInput.focused, true);
+
+  // Selecting a project inside the flyout closes the flyout but stays collapsed.
+  flyoutPanel.click({ target: { closest: selector => selector === "[data-recent-path]" ? {} : null } });
+  assert.equal(classes.has("is-sidebar-flyout-open"), false);
+  assert.equal(classes.has("is-sidebar-collapsed"), true);
+  assert.equal(switcherBtn.attrs.get("aria-expanded"), "false");
+
+  // Re-opening and expanding via the top toggle closes the flyout and restores the sidebar.
+  switcherBtn.click();
+  assert.equal(classes.has("is-sidebar-flyout-open"), true);
+  toggleBtn.click();
   assert.equal(classes.has("is-sidebar-collapsed"), false);
+  assert.equal(classes.has("is-sidebar-flyout-open"), false);
   assert.equal(storeMap.has(SIDEBAR_COLLAPSED_KEY), false);
   assert.equal(toggleBtn.attrs.get("aria-expanded"), "true");
   assert.equal(importBtn.attrs.has("data-app-tooltip"), false);
+  assert.equal(style.get("--project-sidebar-width"), "280px");
 });

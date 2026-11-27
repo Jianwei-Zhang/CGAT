@@ -502,25 +502,46 @@
 .project-recents .project-entry-actions .project-sidebar-toggle { width: 36px; padding: 0; color: var(--text-muted, #64748b); }
 .project-recents .project-entry-actions .project-sidebar-toggle:hover:not(:disabled) { color: var(--text-primary, #1e293b); }
 .project-entry-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-library-panel { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; }
 .project-sidebar-rail-count { display: none; }
 .project-browser.is-sidebar-collapsed .project-recents { padding: 12px 6px; align-items: center; overflow: hidden; }
 .project-browser.is-sidebar-collapsed .project-entry-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; margin-bottom: 8px; }
 .project-browser.is-sidebar-collapsed .project-entry-actions .button { width: 34px; height: 34px; min-height: 34px; padding: 0; justify-content: center; }
 .project-browser.is-sidebar-collapsed .project-entry-actions .project-sidebar-toggle { order: -1; }
 .project-browser.is-sidebar-collapsed .project-entry-label { display: none; }
-.project-browser.is-sidebar-collapsed .project-recents-header,
-.project-browser.is-sidebar-collapsed .library-search,
-.project-browser.is-sidebar-collapsed .project-recent-list { display: none; }
+.project-browser.is-sidebar-collapsed .project-library-panel { display: none; }
+.project-browser.is-sidebar-collapsed.is-sidebar-flyout-open .project-library-panel {
+  display: flex;
+  position: fixed;
+  top: 56px;
+  left: 54px;
+  z-index: 40;
+  width: min(304px, calc(100vw - 72px));
+  max-height: calc(100dvh - 72px);
+  padding: 12px 12px 10px;
+  border: 1px solid var(--border-subtle, #dbe3ec);
+  border-radius: var(--dialog-radius, 10px);
+  background: var(--surface-panel, #fff);
+  box-shadow: var(--shadow-lg);
+}
+.project-browser.is-sidebar-collapsed.is-sidebar-flyout-open .project-library-panel .project-recent-list {
+  max-height: none;
+}
 .project-browser.is-sidebar-collapsed .project-sidebar-rail-count {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   width: 34px; min-height: 44px; padding: 6px 2px; margin-top: 2px;
-  border: 0; border-top: 1px solid var(--border-subtle, #dbe3ec); border-radius: 6px;
+  border: 1px solid transparent; border-top-color: var(--border-subtle, #dbe3ec); border-radius: 6px;
   background: transparent; color: var(--text-muted, #64748b);
   font-size: var(--font-caption); font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 .project-browser.is-sidebar-collapsed .project-sidebar-rail-count:hover {
   background: var(--surface-muted, #eef2f6); color: var(--text-primary, #1e293b);
+}
+.project-browser.is-sidebar-collapsed.is-sidebar-flyout-open .project-sidebar-rail-count {
+  border-color: var(--theme-blue-line, #b6cde4);
+  background: var(--theme-blue-surface, #eff6ff);
+  color: var(--theme-blue-ink, #1e3a5f);
 }
 .project-browser.is-sidebar-collapsed .project-sidebar-rail-count .project-icon { width: 16px; height: 16px; }
 .project-recents-header { position: relative; margin-bottom: 8px; padding: 2px 4px; border-radius: 6px; transition: background-color 120ms ease; }
@@ -568,7 +589,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .projects-page .project-header-actions .final-path-export-toggle {
@@ -577,32 +598,45 @@
   justify-content: center;
   gap: 8px;
   width: auto;
+  height: 36px;
   min-height: 36px;
-  padding: 7px 10px;
+  box-sizing: border-box;
+  padding: 0 12px;
   white-space: nowrap;
   border: 1px solid var(--border-default, #cbd5e1);
+  border-radius: var(--control-radius, 5px);
   background: var(--surface-panel, #ffffff);
   color: var(--text-primary, #1e293b);
   font-size: var(--font-body);
   font-weight: 500;
 }
 .projects-page .project-header-actions .final-path-export-toggle:hover:not(:disabled) {
-  border-color: var(--theme-strong-line, #64748b);
+  border-color: var(--border-strong, #94a3b8);
   background: var(--surface-subtle, #f8fafc);
 }
 .projects-page .project-header-actions .final-path-export-item {
   font-size: var(--font-body);
 }
 .projects-page .button.project-enter-assembly {
-  min-width: 156px;
-  min-height: 44px;
-  justify-content: space-between;
-  padding: 10px 18px;
+  height: 36px;
+  min-height: 36px;
+  box-sizing: border-box;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 15px;
   border-color: var(--action-primary-border, #1d3f63);
+  border-radius: var(--control-radius, 5px);
   background: var(--action-primary-bg, #234b76);
-  color: #ffffff;
+  color: var(--action-primary-text, #ffffff);
   font-weight: 600;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.12);
+  white-space: nowrap;
+  box-shadow: var(--shadow-xs);
+}
+
+.projects-page .button.project-enter-assembly .project-icon {
+  width: 15px;
+  height: 15px;
+  transition: transform 140ms ease;
 }
 
 .projects-page .button.project-enter-assembly:hover:not(:disabled) {
@@ -610,9 +644,17 @@
   background: var(--action-primary-hover, #1b3c60);
 }
 
+.projects-page .button.project-enter-assembly:hover:not(:disabled) .project-icon {
+  transform: translateX(2px);
+}
+
 .projects-page .button.project-enter-assembly:active:not(:disabled) {
-  background: #163250;
+  filter: brightness(0.95);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+@media (prefers-reduced-motion: reduce) {
+  .projects-page .button.project-enter-assembly .project-icon { transition: none; }
+  .projects-page .button.project-enter-assembly:hover:not(:disabled) .project-icon { transform: none; }
 }
 .project-metadata { margin-top: 20px; }
 .project-current .workspace-recipe-summary { margin: 0; border: 0; border-radius: 0; background: none; overflow: visible; }
@@ -757,9 +799,18 @@
   .project-browser.is-sidebar-collapsed .project-entry-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: auto; margin-bottom: 14px; }
   .project-browser.is-sidebar-collapsed .project-entry-actions .button { width: auto; height: auto; min-height: 36px; padding: 7px 10px; }
   .project-browser.is-sidebar-collapsed .project-entry-label { display: inline; }
-  .project-browser.is-sidebar-collapsed .project-recents-header { display: grid; }
-  .project-browser.is-sidebar-collapsed .library-search { display: flex; }
-  .project-browser.is-sidebar-collapsed .project-recent-list { display: block; }
+  .project-browser.is-sidebar-collapsed .project-library-panel,
+  .project-browser.is-sidebar-collapsed.is-sidebar-flyout-open .project-library-panel {
+    position: static;
+    display: flex;
+    width: auto;
+    max-height: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
   .project-recents { border-right: 0; border-bottom: 1px solid var(--theme-line, #e6e6e6); }
   .project-recents .project-entry-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 320px; }
   .project-current { padding: 24px 20px 28px; }
