@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { bindProjectSidebarResize, projectSidebarBounds, SIDEBAR_COLLAPSED_KEY } from "../project-sidebar-resize.js";
+import { bindProjectSidebarResize, isProjectSidebarFlyoutOpen, projectSidebarBounds, resetProjectSidebarFlyout, SIDEBAR_COLLAPSED_KEY } from "../project-sidebar-resize.js";
 import { renderProjectsBody } from "../projects-view.js";
 import { getMessages } from "../../i18n/index.js";
 
@@ -168,7 +168,8 @@ test("splitter CSS keeps a generous hit area on the existing border and hides it
   assert.match(css, /\.project-dataset-table \.numeric \{[^}]*text-align: left;/);
 });
 
-test("sidebar collapse toggle switches to the narrow icon rail, opens a quick-switch flyout without uncollapsing, and restores width on expand", () => {
+test("sidebar collapse toggle switches to the narrow icon rail, keeps quick-switch flyout steady across project switches, and closes on pointer leave", async () => {
+  resetProjectSidebarFlyout();
   const storeMap = new Map();
   const classes = new Set();
   const style = new Map();
@@ -190,6 +191,7 @@ test("sidebar collapse toggle switches to the narrow icon rail, opens a quick-sw
       contains: target => target === node,
       attrs: map,
       click: (event = {}) => listeners.get("click")?.(event),
+      emit: (type, event = {}) => listeners.get(type)?.(event),
     };
     return node;
   };
@@ -253,13 +255,24 @@ test("sidebar collapse toggle switches to the narrow icon rail, opens a quick-sw
   switcherBtn.click();
   assert.equal(classes.has("is-sidebar-collapsed"), true);
   assert.equal(classes.has("is-sidebar-flyout-open"), true);
+  assert.equal(isProjectSidebarFlyoutOpen(), true);
   assert.equal(switcherBtn.attrs.get("aria-expanded"), "true");
   assert.equal(flyoutPanel.style.left, "54px");
   assert.equal(searchInput.focused, true);
 
-  // Selecting a project inside the flyout closes the flyout but stays collapsed.
+  // Selecting a project inside the flyout keeps it open and steady (even across rerender rebind).
   flyoutPanel.click({ target: { closest: selector => selector === "[data-recent-path]" ? {} : null } });
+  assert.equal(classes.has("is-sidebar-flyout-open"), true);
+  assert.equal(isProjectSidebarFlyoutOpen(), true);
+  bindProjectSidebarResize(host);
+  assert.equal(classes.has("is-sidebar-flyout-open"), true);
+  assert.equal(flyoutPanel.style.left, "54px");
+
+  // Moving pointer away closes the flyout after the short leave grace delay.
+  flyoutPanel.emit("pointerleave", { relatedTarget: null });
+  await new Promise(resolve => setTimeout(resolve, 220));
   assert.equal(classes.has("is-sidebar-flyout-open"), false);
+  assert.equal(isProjectSidebarFlyoutOpen(), false);
   assert.equal(classes.has("is-sidebar-collapsed"), true);
   assert.equal(switcherBtn.attrs.get("aria-expanded"), "false");
 

@@ -524,6 +524,14 @@
   background: var(--surface-panel, #fff);
   box-shadow: var(--shadow-lg);
 }
+.project-browser.is-sidebar-collapsed.is-sidebar-flyout-open .project-library-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10px;
+  width: 10px;
+}
 .project-browser.is-sidebar-collapsed.is-sidebar-flyout-open .project-library-panel .project-recent-list {
   max-height: none;
 }

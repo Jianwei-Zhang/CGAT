@@ -4,7 +4,7 @@ import { projectImportName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImportParserWorkers } from "../../services/import-parallelism.js";
-import { readProjectSidebarCollapsed } from "./project-sidebar-resize.js";
+import { isProjectSidebarFlyoutOpen, readProjectSidebarCollapsed } from "./project-sidebar-resize.js";
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
@@ -148,6 +148,7 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   const disabled = busy ? "disabled" : "";
   const empty = !records.length && !state.session?.workspacePath;
   const collapsed = readProjectSidebarCollapsed();
+  const flyoutOpen = collapsed && isProjectSidebarFlyoutOpen();
   const toggleLabel = collapsed ? labels.expandSidebar : labels.collapseSidebar;
   const railTooltip = labels.switchSidebarCount.replace("{count}", records.length);
   const actions = `<div class="project-entry-actions">
@@ -155,14 +156,14 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
     <button id="project-open-button" class="button ghost"${collapsed ? ` data-app-tooltip="${html(labels.open)}"` : ""} aria-label="${html(labels.open)}" ${disabled}>${projectIcon("open")}<span class="project-entry-label">${labels.open}</span></button>
     <button type="button" class="button ghost project-sidebar-toggle" data-project-sidebar-toggle data-collapse-label="${html(labels.collapseSidebar)}" data-expand-label="${html(labels.expandSidebar)}" data-app-tooltip="${html(toggleLabel)}" aria-label="${html(toggleLabel)}" aria-controls="project-recents" aria-expanded="${!collapsed}">${projectIcon(collapsed ? "sidebarExpand" : "sidebarCollapse")}</button>
   </div>
-  <button type="button" class="project-sidebar-rail-count" data-project-sidebar-switcher aria-haspopup="dialog" aria-expanded="false" aria-controls="project-sidebar-flyout" data-app-tooltip="${html(railTooltip)}" aria-label="${html(railTooltip)}">${projectIcon("project")}<span>${records.length}</span></button>`;
+  <button type="button" class="project-sidebar-rail-count" data-project-sidebar-switcher aria-haspopup="dialog" aria-expanded="${flyoutOpen}" aria-controls="project-sidebar-flyout" data-app-tooltip="${html(railTooltip)}" aria-label="${html(railTooltip)}">${projectIcon("project")}<span>${records.length}</span></button>`;
   const validation = projectValidationView(state, records);
   const library = libraryLabels(state);
   const rows = renderLibraryTree(state, records);
   return `${importer.pendingProjectPath ? `<section class="project-pending">
     <strong>${labels.pending}</strong><span class="project-path">${html(importer.pendingProjectPath)}</span>
     <button id="project-retry-button" class="button" ${disabled}>${labels.retry}</button></section>` : ""}
-  <div class="project-browser${collapsed ? " is-sidebar-collapsed" : ""}">
+  <div class="project-browser${collapsed ? " is-sidebar-collapsed" : ""}${flyoutOpen ? " is-sidebar-flyout-open" : ""}">
     <section class="project-recents" id="project-recents" aria-labelledby="project-recents-title">
       ${actions}
       <div class="project-library-panel" id="project-sidebar-flyout">

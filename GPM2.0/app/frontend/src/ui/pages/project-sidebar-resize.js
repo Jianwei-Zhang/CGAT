@@ -7,6 +7,16 @@ const bindings = new WeakMap();
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 560;
 const DETAIL_MIN_WIDTH = 400;
+const FLYOUT_LEAVE_DELAY_MS = 180;
+let persistedFlyoutOpen = false;
+
+export function isProjectSidebarFlyoutOpen() {
+  return persistedFlyoutOpen;
+}
+
+export function resetProjectSidebarFlyout() {
+  persistedFlyoutOpen = false;
+}
 
 export function readProjectSidebarCollapsed(storage = globalThis.window?.localStorage) {
   try {
@@ -44,7 +54,8 @@ export function bindProjectSidebarResize(host) {
   } catch { /* Storage can be unavailable; resizing still works for this binding. */ }
   let width = 280;
   let drag = null;
-  let flyoutOpen = false;
+  let flyoutOpen = collapsed && persistedFlyoutOpen;
+  let flyoutLeaveTimer = null;
   let observer;
   let disposed = false;
   let containerWidth = browser.getBoundingClientRect().width;
@@ -63,6 +74,15 @@ export function bindProjectSidebarResize(host) {
     handle.setAttribute("aria-valuemax", String(max));
     handle.setAttribute("aria-valuenow", String(width));
   };
+  const cancelFlyoutLeave = () => {
+    if (flyoutLeaveTimer !== null) {
+      clearTimeout(flyoutLeaveTimer);
+      flyoutLeaveTimer = null;
+    }
+  };
+  const hasBlockingOverlay = () => Boolean(
+    doc?.querySelector?.("[data-library-menu], [data-workspace-history-context-menu], .modal-overlay, dialog[open]"),
+  );
   const positionFlyout = () => {
     if (!flyoutPanel?.style || !flyoutOpen || !collapsed) return;
     const rect = recents?.getBoundingClientRect?.() || browser.getBoundingClientRect?.();
@@ -75,10 +95,16 @@ export function bindProjectSidebarResize(host) {
     flyoutPanel.style.top = `${top}px`;
     flyoutPanel.style.maxHeight = `${maxHeight}px`;
   };
-  const setFlyoutOpen = (next, { focusReturn = false } = {}) => {
+  const setFlyoutOpen = (next, { focusReturn = false, focusInput = true } = {}) => {
+    cancelFlyoutLeave();
     const target = Boolean(next) && collapsed;
+    persistedFlyoutOpen = target;
     if (flyoutOpen === target) {
-      if (target) positionFlyout();
+      if (target) {
+        browser.classList.add("is-sidebar-flyout-open");
+        switcherBtn?.setAttribute?.("aria-expanded", "true");
+        positionFlyout();
+      }
       return;
     }
     flyoutOpen = target;
@@ -87,8 +113,10 @@ export function bindProjectSidebarResize(host) {
     switcherBtn?.setAttribute?.("aria-expanded", String(flyoutOpen));
     if (flyoutOpen) {
       positionFlyout();
-      const focusTarget = flyoutPanel?.querySelector?.(".library-search-input, [data-recent-path]");
-      focusTarget?.focus?.({ preventScroll: true });
+      if (focusInput) {
+        const focusTarget = flyoutPanel?.querySelector?.(".library-search-input, [data-recent-path]");
+        focusTarget?.focus?.({ preventScroll: true });
+      }
     } else if (flyoutPanel?.style) {
       flyoutPanel.style.left = "";
       flyoutPanel.style.top = "";
@@ -96,10 +124,20 @@ export function bindProjectSidebarResize(host) {
       if (focusReturn) switcherBtn?.focus?.({ preventScroll: true });
     }
   };
+  const scheduleFlyoutLeave = () => {
+    cancelFlyoutLeave();
+    if (!flyoutOpen || !collapsed) return;
+    flyoutLeaveTimer = setTimeout(() => {
+      flyoutLeaveTimer = null;
+      if (disposed || !flyoutOpen || !collapsed || hasBlockingOverlay()) return;
+      setFlyoutOpen(false);
+    }, FLYOUT_LEAVE_DELAY_MS);
+  };
   const syncCollapsed = () => {
     if (collapsed) browser.classList.add("is-sidebar-collapsed");
     else browser.classList.remove("is-sidebar-collapsed");
     if (!collapsed) setFlyoutOpen(false);
+    else if (flyoutOpen) setFlyoutOpen(true, { focusInput: false });
     const toggleBtn = browser.querySelector?.("[data-project-sidebar-toggle]");
     if (toggleBtn) {
       const label = collapsed ? (toggleBtn.dataset?.expandLabel || "") : (toggleBtn.dataset?.collapseLabel || "");
@@ -157,11 +195,19 @@ export function bindProjectSidebarResize(host) {
   onNode(switcherBtn, "click", () => {
     if (collapsed) setFlyoutOpen(!flyoutOpen);
   });
-  onNode(flyoutPanel, "click", event => {
+  onNode(switcherBtn, "pointerenter", cancelFlyoutLeave);
+  onNode(switcherBtn, "pointerleave", event => {
     if (!flyoutOpen || !collapsed) return;
-    if (event.target?.closest?.("[data-recent-path]")) {
-      setFlyoutOpen(false);
-    }
+    const next = event?.relatedTarget;
+    if (next && flyoutPanel?.contains?.(next)) return;
+    scheduleFlyoutLeave();
+  });
+  onNode(flyoutPanel, "pointerenter", cancelFlyoutLeave);
+  onNode(flyoutPanel, "pointerleave", event => {
+    if (!flyoutOpen || !collapsed) return;
+    const next = event?.relatedTarget;
+    if (next && switcherBtn?.contains?.(next)) return;
+    scheduleFlyoutLeave();
   });
   onNode(doc, "pointerdown", event => {
     if (!flyoutOpen || !collapsed) return;
@@ -172,7 +218,7 @@ export function bindProjectSidebarResize(host) {
   }, true);
   onNode(doc, "keydown", event => {
     if (!flyoutOpen || !collapsed || event.key !== "Escape") return;
-    if (doc?.querySelector?.("[data-library-menu], [data-workspace-history-context-menu], .modal-overlay, dialog[open]")) return;
+    if (hasBlockingOverlay()) return;
     event.preventDefault();
     setFlyoutOpen(false, { focusReturn: true });
   });
@@ -217,6 +263,7 @@ export function bindProjectSidebarResize(host) {
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    cancelFlyoutLeave();
     finish();
     observer?.disconnect();
     listeners.splice(0).forEach(remove => remove());

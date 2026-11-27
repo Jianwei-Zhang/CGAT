@@ -2542,7 +2542,7 @@ function rerender(host, store, { preserveWorkspaceDetail = false } = {}) {
     routeHost.innerHTML = renderImporterPage(store.getState());
     bindImporterPage(routeHost, store);
   }
-  if (preserveWorkspaceDetail) {
+  if (scrollTop > 0) {
     const list = routeHost.querySelector(".project-recent-list");
     if (list) list.scrollTop = scrollTop;
   }
