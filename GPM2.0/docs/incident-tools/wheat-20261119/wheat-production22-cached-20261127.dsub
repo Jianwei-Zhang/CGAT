@@ -26,7 +26,12 @@ trap 'rm -rf -- "$code"' EXIT
 stage="/tmp/$(basename "$owner")-$(sha256sum kit.sha256 | cut -c1-12)"
 tar -xzf tools.tgz -C "$code"
 export PYTHONPATH="$code/tools:$owner"
-python3 -Bu wheat_production22_cached.py "$base" "$stage" "$owner"
+if [[ -f baseline-owner ]]; then
+    python3 -Bu wheat_source_collision_controls.py full "$base" "$stage" "$owner"
+    sha256sum result/source-control-audit.json
+else
+    python3 -Bu wheat_production22_cached.py "$base" "$stage" "$owner"
+fi
 sha256sum result/summary.json result/production22-audit.json
 # Keep the isolated node-local staged inputs for bounded restart/review. Never
 # remove or modify the formal workspace or any completed original evidence.

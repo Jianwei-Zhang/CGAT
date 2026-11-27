@@ -1,4 +1,4 @@
-"""Fresh full-cohort admission and production paths through 3D, never a formal Q0 run."""
+"""Fresh full-cohort admission and production paths with either a diagnostic prefix or a full 22-group release audit."""
 from collections import Counter, defaultdict
 import json
 import os
@@ -41,6 +41,8 @@ def metrics(owner, kit):
     for i,k in enumerate(GROUPS,1):
         path=store.load_group(i,k).path
         if k in CONTROLS: out[k]=whole.group_metrics(by_chr[k],path)
+    if kit == OLD_KIT:
+        whole.require(store.previous == OLD_GROUP_009, "changed baseline through 3D")
     return dict(placements=len(rows),counts=dict(Counter(p.chromosome for p in rows)),groups=out)
 
 def seed_readonly_inputs(base, stage, owner):
@@ -62,8 +64,48 @@ def seed_readonly_inputs(base, stage, owner):
         dest.parent.mkdir(parents=True,exist_ok=True);os.link(source,dest);linked+=1
     print('REUSED_READONLY_BASE_INPUTS',linked,flush=True)
 
+OLD_GROUP_009 = "4526c992c919a4d9a49d62add2d2c60a86f74d8be13e2053fb054683971f56d5"
+OLD_OWNER = "q0-whole-local-maps.production22-owner.Jww3W4bC"
+FIELDS = ("selected_reference_bp", "source_slice_n50", "slices")
+
+
+def compare(baseline, candidate):
+    """No degradation per control; do not average across chromosomes."""
+    by_group = {}
+    for group in CONTROLS:
+        a, b = baseline[group], candidate[group]
+        for row in (a, b):
+            whole.require(row["has_path"] is True and all(type(row[k]) is int and row[k] > 0 for k in FIELDS),
+                          "invalid control data: " + group)
+        by_group[group] = {"baseline": {k: a[k] for k in FIELDS}, "candidate": {k: b[k] for k in FIELDS},
+                           "passed": all(b[k] >= a[k] for k in FIELDS[:2]) and b["slices"] <= a["slices"]}
+    return {"baseline_job": 43225037, "baseline_group_009": OLD_GROUP_009, "groups": by_group,
+            "passed": all(row["passed"] for row in by_group.values())}
+
+
+def control_audit(owner, candidate):
+    old = Path((owner/"baseline-owner").read_text().strip())
+    whole.require(old == owner.parent/OLD_OWNER and old.resolve() == old and old != owner, "wrong control owner")
+    return compare(metrics(old, OLD_KIT)["groups"], candidate)
+
+
+def full():
+    del sys.argv[1]
+    base, stage, owner = map(Path, sys.argv[1:])
+    whole.require(not (owner/"selection").exists() and not (owner/"result").exists(), "fresh selection required")
+    seed_readonly_inputs(base, stage, owner)
+    whole.main()  # No FreshStore patch: select through Un and audit all 22 groups.
+    report = json.loads((owner/"result/production22-audit.json").read_text())
+    result = control_audit(owner, report["groups"])
+    with (owner/"result/source-control-audit.json").open("x") as stream:
+        json.dump(result, stream, indent=2)
+    print("SOURCE_CONTROL_AUDIT", json.dumps(result), flush=True)
+
+
 if __name__=='__main__':
-    if sys.argv[1]=='compare':
+    if sys.argv[1] == 'full':
+        full()
+    elif sys.argv[1]=='compare':
         owner=Path.cwd(); old=Path((owner/'baseline-owner').read_text().strip()); old_metrics=metrics(old,OLD_KIT)
         new_metrics=metrics(owner,whole.sha256_file(owner/'kit.sha256'))
         stable=all(old_metrics['groups'][k]==new_metrics['groups'][k] for k in CONTROLS)

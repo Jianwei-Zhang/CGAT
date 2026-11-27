@@ -18,6 +18,9 @@ import sys
 import tarfile
 import tempfile
 
+SOURCE_REVISION = "adfe5e31831bc995aaec127a5ab98c1b65a37567"
+SOURCE_PARENT = "9291117613910937da5f4f9c3c57beadb7885254"
+SOURCE_ARCHIVE = "36c1573bf59a8fa6427fbb8e71d6c3a963ee9b821b16666dd2b27b3800daa560"
 MINIMUM_SOURCE_BP = 11_000_000_000
 MAIN_GROUPS = {str(n) + genome for n in range(1, 8) for genome in "ABD"}
 GROUPS = MAIN_GROUPS | {"Un"}
@@ -141,7 +144,11 @@ def verify_validation_source(config, source):
     need(source["engine_commit"] == config.get("runtime_revision", config["engine_revision"])
          and source["path_policy"]["reference_locus_padding_bp"] == 100000,
          "wrong production validation engine/padding")
-    if "runtime_revision" in config:
+    if config.get("runtime_revision") == SOURCE_REVISION:
+        need(source.get("scientific_baseline_commit") == SOURCE_PARENT
+             and source.get("tools_sha256") == SOURCE_ARCHIVE
+             and source.get("selector_identity") == "q0-selector-37bb033a42a3772eae997621", "wrong source-ownership validation")
+    elif "runtime_revision" in config:
         need(source.get("scientific_baseline_commit") == config["engine_revision"],
              "wrong qualified scientific baseline")
 
@@ -230,6 +237,14 @@ def verify(config, root):
             need(all(report["groups"][name][k] == v for k, v in values.items()), "report differs from sealed paths: " + name)
         new_conflicts = new_cross_conflicts(conflicts, prior_conflicts)
         verdict = hard_gates(metrics, overlaps, new_conflicts)
+        if config.get("runtime_revision") == SOURCE_REVISION:
+            from wheat_source_collision_controls import control_audit, validate_admission_occupancy
+            validate_admission_occupancy(admitted.placements)
+            controls = control_audit(owner, metrics)
+            need(controls == json.loads((owner/"result/source-control-audit.json").read_text()), "control report mismatch")
+            need(controls["passed"], "control regression: " + json.dumps(controls["groups"]))
+            verdict["source_controls"] = controls
+            verdict["cross_chromosome_admission_overlaps"] = 0
         need(digest(report_path) == report_sha, "validation report changed during gate")
     return {"status": "GO", "hard_gates": verdict, "validation_report_sha256": report_sha,
             "validation_job": validation["jobId"], "install_job": installation["jobId"],
@@ -242,6 +257,15 @@ def verify(config, root):
 def verify_engineering_binding(config, transition, install):
     engineering = transition.get("exact_engineering_change")
     revision = config.get("runtime_revision")
+    ownership = transition.get("source_occupancy_change")
+    if revision == SOURCE_REVISION or ownership is not None:
+        need(engineering is None and isinstance(ownership, dict)
+             and ownership.get("schema") == "q0_cross_chromosome_source_occupancy_v1"
+             and ownership.get("runtime_revision") == revision == install.get("source_revision") == SOURCE_REVISION
+             and ownership.get("baseline_revision") == SOURCE_PARENT
+             and ownership["candidate_archive"]["sha256"] == SOURCE_ARCHIVE, "wrong installed source-occupancy transition")
+        bound(ownership["candidate_archive"])
+        return
     if engineering is None:
         need(revision is None, "unqualified engineering runtime")
         return
