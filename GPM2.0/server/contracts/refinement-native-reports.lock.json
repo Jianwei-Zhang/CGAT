@@ -1,6 +1,6 @@
 {
   "basis": "The pinned family overview and detail use inline CSS/SVG/JS without an external script.",
-  "degap_revision": "c06fa1e0b0e28df31847eb1a30d72027fcd4234c",
+  "degap_revision": "ee378649de25e09a28cae6e713d75487948f7c9f",
   "inline_data_images": [
     "data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%228%22%20viewBox%3D%220%200%2014%208%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L7%207L13%201%22%20stroke%3D%22%23495057%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E",
     "data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2212%22%20height%3D%227%22%20viewBox%3D%220%200%2012%207%22%20fill%3D%22none%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M1%201L6%206L11%201%22%20stroke%3D%22%23334155%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E"
@@ -22,11 +22,11 @@
     "https://cdn.jsdelivr.net/npm/chart.js"
   ],
   "visualizer_files_sha256": {
-    "AutoGapfillerVisualizer.py": "be8b6332113d2f4c5798b17406e77579797a919e511cc46c18f6a2917714c695",
-    "FamilyReport.py": "b6c31b6cc5fb6c43a47658998f88b416cf878aef5b61ddbd289a611f3b046cdc",
-    "FamilyReportStyle.py": "ecd5e91419dd48744af4c5d975612acc798ad33b1063abdbf8a6865c0a70e02b",
-    "FamilyResult.py": "08a60b0be2fc087ccfeb2ad17eb498da4d8f9e9bab6e7baf39cc55e664fa5df0",
-    "JunctionReport.py": "e85e541ee53fc2789e1c35c2251b4f55cbec130b3c4c531a5fccdc6f46ed2393",
-    "ReportStyle.py": "a719af0f07b516d430f5bb8cc99979056a9d2ba6357e843ecdaef231cd4fb539"
+    "AutoGapfillerVisualizer.py": "8348de3a6617f6dff54cd497e264d3a54aa1ed7790ecf59a44d064a470fb80b1",
+    "FamilyReport.py": "665f1e4c14483bdebde6b1ecb92250d5f34875056cf36b17fd038616825f5ba7",
+    "FamilyReportStyle.py": "00847ffa3f468592b624cb46da66883cbbc3a044c57caacbeaabcd00ae925d1f",
+    "FamilyResult.py": "93d7788439b5660977202f2e03fd201fc3360f890deccce62619354d510b18be",
+    "JunctionReport.py": "d1ab35e0ef4308b00f6fe280815f3fb70cef7e4ff2ae59ae0f610d7e2322eec8",
+    "ReportStyle.py": "8c6f26c420637e87b22f29f69312717ca1daba6af5ed6fac86138005a83500f8"
   }
 }

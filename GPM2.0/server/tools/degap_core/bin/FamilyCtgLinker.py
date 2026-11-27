@@ -549,7 +549,7 @@ def render_ctg_report(result):
 
     css = report_css(".fold-body > .jr-root { border: 0; margin: 0; } .fold-body > .jr-root > .section-header { display: none; } .fold-body > .jr-root > .section-body { padding: 4px 0 0; }")
     return f'''<!doctype html>
-<html lang="en" data-lang="en">
+<html lang="en" data-lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

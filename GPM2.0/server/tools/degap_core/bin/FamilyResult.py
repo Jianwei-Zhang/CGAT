@@ -1061,7 +1061,7 @@ def render_report(search, result):
     title_label = esc(result["final_sequence"].removesuffix(".final.fa")) if isinstance(result.get("final_sequence"), str) else "DEGAP"
 
     return f'''<!doctype html>
-<html lang="en" data-lang="en">
+<html lang="en" data-lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

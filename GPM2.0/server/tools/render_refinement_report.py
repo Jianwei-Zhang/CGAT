@@ -451,14 +451,14 @@ WORKBENCH_JS = r"""
 (()=>{
   const root=document.documentElement;
   const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(_){return null;}};
-  const isDark=()=>root.dataset.theme==='dark'||(!root.dataset.theme&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isDark=()=>root.dataset.theme==='dark';
   const syncThemeBtn=()=>{
-    const dark=isDark(),en=root.dataset.lang==='en';
+    const dark=isDark(),en=root.dataset.lang!=='zh';
     const lbl=dark?(en?'Switch to light theme':'切换为浅色主题'):(en?'Switch to dark theme':'切换为深色主题');
     document.querySelectorAll('[data-theme-toggle]').forEach(b=>{b.title=lbl;b.setAttribute('aria-label',lbl);b.setAttribute('aria-pressed',String(dark));});
   };
   const setLang=(lang)=>{
-    lang=(lang==='en')?'en':'zh';
+    lang=(lang==='zh')?'zh':'en';
     root.dataset.lang=lang;
     root.lang=(lang==='en')?'en':'zh-CN';
     document.querySelectorAll('[data-lang-btn]').forEach(b=>b.classList.toggle('is-active',b.dataset.langBtn===lang));
@@ -983,10 +983,10 @@ def _header_controls_html(header_time_html="", *, time_raw=False):
         '<div class="wb-controls">'
         + time_part
         + '<div class="seg-ctrl" role="group" aria-label="Language">'
-        '<button type="button" class="ctrl-btn is-active" data-lang-btn="zh" aria-label="切换中文">中文</button>'
-        '<button type="button" class="ctrl-btn" data-lang-btn="en" aria-label="Switch to English">EN</button>'
+        '<button type="button" class="ctrl-btn" data-lang-btn="zh" aria-label="切换中文">中文</button>'
+        '<button type="button" class="ctrl-btn is-active" data-lang-btn="en" aria-label="Switch to English">EN</button>'
         '</div>'
-        '<button type="button" class="ctrl-btn theme-btn" data-theme-toggle="1" title="切换为深色主题" aria-label="切换为深色主题">'
+        '<button type="button" class="ctrl-btn theme-btn" data-theme-toggle="1" title="Switch to dark theme" aria-label="Switch to dark theme">'
         '<svg class="ico-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>'
         '<svg class="ico-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-14.93 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
         '</button>'
@@ -1051,9 +1051,9 @@ def workbench_page(
         )
     else:
         shell_cls = "wb-shell no-sidebar"
-    doc_title = page_title_plain or f"{title_zh}"
+    doc_title = page_title_plain or f"{title_en or title_zh}"
     return (
-        '<!doctype html><html lang="zh-CN" data-lang="zh"><head><meta charset="utf-8">'
+        '<!doctype html><html lang="en" data-lang="en" data-theme="light"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="Content-Security-Policy" content="' + esc(REPORT_CSP) + '">'
         '<title>' + esc(doc_title) + '</title><style>' + CSS + '</style></head>'

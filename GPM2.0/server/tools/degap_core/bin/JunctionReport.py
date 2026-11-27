@@ -52,26 +52,26 @@ _JUNCTION_CSS = """
 .jr-root {
     --jr-bg: var(--surface, #ffffff);
     --jr-subtle: var(--surface-subtle, #f8fafc);
-    --jr-ink: var(--ink, #111827);
-    --jr-ink-2: var(--ink-secondary, #374151);
-    --jr-muted: var(--ink-muted, #6b7280);
-    --jr-border: var(--border, #e5e7eb);
-    --jr-border-strong: var(--border-strong, #d1d5db);
-    --jr-accent: var(--accent, #0f6d74);
-    --jr-accent-soft: var(--accent-soft, #eef7f7);
-    --jr-accent-border: var(--accent-border, #b8dce0);
-    --jr-ok-ink: var(--ok-ink, #1b5e3c);
-    --jr-ok-bg: var(--ok-bg, #f0f8f4);
-    --jr-ok-border: var(--ok-border, #b7dfc9);
-    --jr-warn-ink: var(--warn-ink, #854d0e);
-    --jr-warn-bg: var(--warn-bg, #fdf9ed);
-    --jr-warn-border: var(--warn-border, #e5cc85);
+    --jr-ink: var(--ink, #0f172a);
+    --jr-ink-2: var(--ink-secondary, #334155);
+    --jr-muted: var(--ink-muted, #64748b);
+    --jr-border: var(--border, #e2e8f0);
+    --jr-border-strong: var(--border-strong, #cbd5e1);
+    --jr-accent: var(--accent, #2563eb);
+    --jr-accent-soft: var(--accent-soft, #eff6ff);
+    --jr-accent-border: var(--accent-border, #bfdbfe);
+    --jr-ok-ink: var(--ok-ink, #166534);
+    --jr-ok-bg: var(--ok-bg, #ecfdf5);
+    --jr-ok-border: var(--ok-border, #86efac);
+    --jr-warn-ink: var(--warn-ink, #92400e);
+    --jr-warn-bg: var(--warn-bg, #fffbeb);
+    --jr-warn-border: var(--warn-border, #fcd34d);
     --jr-err-ink: var(--err-ink, #991b1b);
-    --jr-err-bg: var(--err-bg, #fdf2f2);
-    --jr-err-border: var(--err-border, #eab3b3);
-    --jr-muted-ink: var(--muted-ink, #4b5563);
-    --jr-muted-bg: var(--muted-bg, #f3f4f6);
-    --jr-muted-border: var(--muted-border, #d1d5db);
+    --jr-err-bg: var(--err-bg, #fef2f2);
+    --jr-err-border: var(--err-border, #fca5a5);
+    --jr-muted-ink: var(--muted-ink, #475569);
+    --jr-muted-bg: var(--muted-bg, #f1f5f9);
+    --jr-muted-border: var(--muted-border, #cbd5e1);
     --jr-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
     font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
     color: var(--jr-ink);
@@ -889,8 +889,16 @@ def _event_status_badge(status) -> str:
         return '<span class="muted">—</span>'
     text = str(status)
     norm = text.strip().lower()
-    if norm == "closed":
-        return badge_html(text, "ok")
+    if norm in ("closed", "filled"):
+        return badge_bi(text, "已填补" if norm == "filled" else "已闭合", "ok")
+    if norm in ("unfilled", "unclosed"):
+        return badge_bi(text, "未填补" if norm == "unfilled" else "未闭合", "err")
+    if norm == "exhausted":
+        return badge_bi(text, "延伸耗尽", "warn")
+    if norm == "round_limit":
+        return badge_bi(text, "轮次上限", "warn")
+    if norm == "length_limit":
+        return badge_bi(text, "长度上限", "warn")
     tone = status_tone(text)
     if norm != "closed" and tone == "info":
         tone = "warn"
@@ -1027,10 +1035,13 @@ def render_project_junctions(result, *, include_event_details: bool = True, even
             label_html = esc(label)
         delta_td = f'<td class="num">{esc(delta_display)}</td>' if has_any_flank_delta else ""
         trim_td = f'<td class="num">{esc(trim_display)}</td>' if has_any_overlap_trim else ""
+        ev_status = event.get("status")
+        if ev_status in (None, "") and "filled" in event:
+            ev_status = "filled" if event.get("filled") else "unfilled"
         summary_rows.append(
             "<tr>"
             f'<td class="mono">{label_html}</td>'
-            f'<td>{_event_status_badge(event.get("status"))}</td>'
+            f'<td>{_event_status_badge(ev_status)}</td>'
             f'<td>{mode_display}</td>'
             f'<td class="num">{esc(gap_len_display)}</td>'
             f'{delta_td}'
@@ -1077,21 +1088,21 @@ def render_project_junctions(result, *, include_event_details: bool = True, even
     if anchor_retry_total:
         strip_items.append((
             bi("Anchor backoff", "末端回退"),
-            esc(f"{anchor_retry_total:,} ({anchor_retry_events:,} evt)"),
+            bi(f"{anchor_retry_total:,} ({anchor_retry_events:,} evt)", f"{anchor_retry_total:,} 次（{anchor_retry_events:,} 缺口）"),
             "warn",
         ))
 
     footnote_parts = [
         bi(
             "Gap-only lengths, overlap trims (deliberate deduplication, not silent polishing), and flank deltas are separate; retained edits were not applied.",
-            "纯缺口长度、重叠裁剪（明确去重非静默修饰）与末端变化独立列出；retained 修订未应用。",
+            "纯缺口长度、重叠裁剪（去重而非静默修饰）与末端变化分开统计；保留项未修改原序列。",
         )
     ]
     if anchor_retry_total:
         footnote_parts.append(
             bi(
                 "Anchor backoff retries count in the shared round budget — not free hidden retries and not proven corrections.",
-                "末端回退重试计入共享轮次预算，非免费重试，不视为已证实校正。",
+                "末端回退计入共享轮次预算，不视为已证实校正。",
             )
         )
 
@@ -1131,7 +1142,7 @@ def render_project_junctions(result, *, include_event_details: bool = True, even
         f'{delta_th}'
         f'{trim_th}'
         f'<th scope="col">{bi("Flanks", "末端")}</th>'
-        '<th scope="col">A/R/P</th>'
+        f'<th scope="col" title="Accepted / Retained / Protected">{bi("A/R/P", "采用/保留/保护")}</th>'
         f'<th scope="col">{bi("Diagnostics", "诊断")}</th>'
         f'{retry_th}'
         f'</tr></thead><tbody>{"".join(summary_rows)}</tbody></table></div>'

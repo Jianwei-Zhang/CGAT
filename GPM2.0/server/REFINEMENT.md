@@ -55,7 +55,7 @@ Use exactly the lowercase comma-separated identifiers shown above, without dupli
 
 | Order / identifier | Both technologies supplied | Pinned source/distribution |
 | --- | --- | --- |
-| `01_degap` / `degap` | One native mixed-input run | DEGAP 2.0, revision `c06fa1e0b0e28df31847eb1a30d72027fcd4234c` |
+| `01_degap` / `degap` | One native mixed-input run | DEGAP 2.0, revision `ee378649de25e09a28cae6e713d75487948f7c9f` |
 | `02_tgsgapcloser` / `tgsgapcloser` | HiFi only; otherwise ONT | TGS-GapCloser `1.2.1`, distribution variant `1.2.1_ml`, build 4; revision `52818b3e464209477baec506ade3240be43b4fa8` |
 | `03_quartet` / `quartet` | One GapFiller run consuming both groups | quarTeT `1.3.1`, revision `a44d8c87e3f4bcefaf43dc4134e88b6a21890265` |
 | `04_lrgapcloser` / `lrgapcloser` | HiFi only; otherwise ONT | LR_Gapcloser `1.0`, build `pl5321hdfd78af_0`; revision `156381adec01a5c664edbf5df1d866b5c70e82a1` |
