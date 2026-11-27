@@ -1,6 +1,6 @@
-import { ArrowRight, ShieldCheck, ChevronsDownUp, ChevronsUpDown, ChevronRight, ExternalLink, FileBox, FolderPlus, Inbox, MoreHorizontal, Check, Copy, Folder, FolderOpen, FolderInput, Download, PackagePlus, Pencil, Plus, RefreshCw, Search, Sun, Moon, Trash2, X } from "lucide";
+import { ArrowRight, ShieldCheck, ChevronsDownUp, ChevronsUpDown, ChevronRight, ExternalLink, FileBox, FolderPlus, Inbox, MoreHorizontal, Check, Copy, Folder, FolderOpen, FolderInput, Download, PackagePlus, Pencil, Plus, RefreshCw, Search, Settings, Sun, Moon, Trash2, X } from "lucide";
 
-const icons = { validate: ShieldCheck, collapse: ChevronsDownUp, expand: ChevronsUpDown, chevron: ChevronRight, externalLink: ExternalLink, project: FileBox, newPartition: FolderPlus, inbox: Inbox, more: MoreHorizontal, arrow: ArrowRight, check: Check, copy: Copy, folder: Folder, open: FolderOpen, import: FolderInput, addPackage: PackagePlus, delete: Trash2, rename: Pencil, plus: Plus, close: X, refresh: RefreshCw, search: Search, export: Download, sun: Sun, moon: Moon };
+const icons = { validate: ShieldCheck, collapse: ChevronsDownUp, expand: ChevronsUpDown, chevron: ChevronRight, externalLink: ExternalLink, project: FileBox, newPartition: FolderPlus, inbox: Inbox, more: MoreHorizontal, arrow: ArrowRight, check: Check, copy: Copy, folder: Folder, open: FolderOpen, import: FolderInput, addPackage: PackagePlus, delete: Trash2, rename: Pencil, plus: Plus, close: X, refresh: RefreshCw, search: Search, settings: Settings, export: Download, sun: Sun, moon: Moon };
 
 // Lucide's static icon nodes also render in the DOM-free page tests.
 export function projectIcon(name, extraClass = "") {

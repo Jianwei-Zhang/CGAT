@@ -47,7 +47,7 @@
 .nav-session-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   min-width: 0;
   margin-left: auto;
 }
@@ -78,9 +78,10 @@
 .nav-session-field-language select { max-width: none; }
 
 
-/* Compact appearance shortcut beside Settings; the full system preference
-   remains in the Settings dialog. */
+/* Compact appearance and settings icon actions in the top-right shell bar. */
+.app-shell-icon-button,
 .app-theme-toggle {
+  position: relative;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
@@ -88,6 +89,27 @@
   height: 30px;
   min-height: 30px;
   padding: 0;
+}
+
+.app-shell-icon-button .project-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.app-settings-update-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent, #2563eb);
+  box-shadow: 0 0 0 1.5px var(--surface-panel, #ffffff);
+  pointer-events: none;
+}
+
+.app-settings-update-dot[hidden] {
+  display: none;
 }
 
 

@@ -5,6 +5,7 @@ import { normalizeSubviewHistoryByKey, normalizeSubviewCompositionViewport } fro
 import { normalizeSubviewAnchorStateByKey } from "./subview-anchor-state.js";
 import { resolveTrackPrefs } from "./track-prefs.js";
 import { normalizeViewportScrollState } from "./scroll-position-state.js";
+import { getAppSettings } from "../../../services/app-settings.js";
 
 export const SUBVIEW_TASK_VERSION = 1;
 export const taskProjectKey = state => JSON.stringify([state.session?.workspacePath, state.session?.projectId]);
@@ -107,8 +108,9 @@ export function updateSubviewTasks(document, assembly) {
 }
 
 export function restoredSubviewWindows(document, assembly) {
+  const pinned = getAppSettings().localViewDefaultPinned !== false;
   return (document?.scopes?.[taskScopeKey(assembly)] || []).map((task, index) => ({
-    ...task, number: index + 1, floating: false, opened: false, minimized: false, pinned: true,
+    ...task, number: index + 1, floating: false, opened: false, minimized: false, pinned,
     x: 80, y: 100, z: 0,
     snapshot: { ...task.snapshot, subviewRestoring: false,
       subviewRestoringSummary: null, subviewRestoreError: "" },

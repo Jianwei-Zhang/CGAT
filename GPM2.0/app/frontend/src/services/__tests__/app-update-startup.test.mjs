@@ -12,7 +12,7 @@ const end = mainSource.indexOf("\n});", start);
 assert.notEqual(end, -1);
 const startupSource = mainSource.slice(start, end + "\n});".length);
 
-function fixture({ enabled = true } = {}) {
+function fixture({ enabled = true, autoCheckUpdates = true } = {}) {
   let now = 0;
   let nextId = 0;
   let finishInitialization;
@@ -34,6 +34,7 @@ function fixture({ enabled = true } = {}) {
   };
   runInNewContext(startupSource, {
     updater,
+    getAppSettings: () => ({ autoCheckUpdates }),
     setTimeout: (callback, delay) => schedule(callback, delay, false),
     setInterval: (callback, delay) => schedule(callback, delay, true),
   });
@@ -104,4 +105,12 @@ test("thirty-second offer retries do not perform another update check, even afte
   assert.deepEqual(f.checks, [0]);
   assert.equal(f.notices.length, 1440);
   assert.equal(f.notices.at(-1), 43200000);
+});
+
+test("autoCheckUpdates=false skips automatic startup check without disabling manual checks", async () => {
+  const f = fixture({ autoCheckUpdates: false });
+  await f.initialize();
+  assert.deepEqual(f.checks, []);
+  f.advance(60000);
+  assert.deepEqual(f.checks, []);
 });

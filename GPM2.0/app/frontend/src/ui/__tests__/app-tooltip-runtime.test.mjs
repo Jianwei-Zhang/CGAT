@@ -325,11 +325,10 @@ test("export clone restores title information while live SVG stays app-owned", (
   restoreSvgTooltipTitles(clone); assert.equal(clone.querySelectorAll("title").length, 1);
 });
 
-test("settings hover uses shared tooltip but click expansion remains a separate shared-style note", () => {
+test("settings uses inline field descriptions while runtime still suppresses hover tooltip inside open settings-help notes", () => {
   const html = renderSettingsContent("en");
-  assert.match(html, /settings-help-button[^>]*data-app-tooltip=/);
-  assert.match(html, /aria-controls="settings-graph-help"/);
-  assert.match(html, /role="note" class="settings-tooltip app-tooltip-surface/);
+  assert.match(html, /class="settings-row-desc"/);
+  assert.doesNotMatch(html, /settings-help-button/);
   const h = tooltipFixture(), wrapper = h.create("span", { class: "settings-help is-open" }), button = target(h); wrapper.append(button);
   h.fire("pointerover", button); assert.equal(hidden(h), true);
 });

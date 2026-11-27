@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { renderUpdateSettings, updateStatusText, openUpdateDialog } from "../app-update-panel.js";
+import { buildDiagnosticSummary, renderUpdateSettings, updateStatusText, openUpdateDialog } from "../app-update-panel.js";
 import { renderSettingsContent } from "../app-settings-panel.js";
 
 for (const locale of ["en", "zh"]) {
@@ -44,4 +44,19 @@ test("downloading disables another check but keeps the progress-dialog entry", (
   const html = renderUpdateSettings("en", { phase: "downloading", enabled: true, version: "2.0.13", downloaded: 3, total: 10 });
   assert.match(html, /data-update-check disabled/); assert.match(html, /data-update-view/);
   assert.match(html, /30%/);
+});
+
+test("update settings expose auto-check toggle, active snooze reset, and about diagnostics", () => {
+  const html = renderUpdateSettings("zh", {
+    phase: "available", enabled: true, currentVersion: "2.0.21", version: "2.0.22", snoozeUntil: Date.now() + 3600_000,
+  }, { autoCheckUpdates: false, runtimeMode: "Tauri Desktop", platform: "Win32" });
+  assert.match(html, /name="autoCheckUpdates"/);
+  assert.doesNotMatch(html, /name="autoCheckUpdates" checked/);
+  assert.match(html, /data-update-clear-snooze/);
+  assert.match(html, /Genome Puzzle Master/);
+  assert.match(html, /Tauri Desktop/);
+  assert.match(html, /data-settings-copy-diagnostics/);
+  const summary = buildDiagnosticSummary({ version: "2.0.21", runtimeMode: "Tauri Desktop", platform: "Win32", locale: "zh", settings: { theme: "dark", fontSize: 16 } });
+  assert.match(summary, /Version: 2\.0\.21/);
+  assert.match(summary, /Theme: dark/);
 });

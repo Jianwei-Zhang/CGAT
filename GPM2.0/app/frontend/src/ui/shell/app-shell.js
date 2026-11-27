@@ -1,5 +1,4 @@
 import { renderAssemblyNavigation } from "./assembly-navigation.js";
-import { renderShellSelect } from "./shell-select-runtime.js";
 import { getMessages } from "../i18n/index.js";
 import { getAppliedAppTheme, getAppSettings, resolveAppTheme, setAppSettings, subscribeAppTheme } from "../../services/app-settings.js";
 import { projectIcon } from "../pages/project-icons.js";
@@ -8,6 +7,15 @@ import { requestAppNotice } from "./app-dialog.js";
 function isDarkTheme() {
   return (getAppliedAppTheme() || resolveAppTheme(getAppSettings().theme,
     globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches)) === "dark";
+}
+
+function isMacPlatform() {
+  const platform = String(globalThis.navigator?.platform || globalThis.navigator?.userAgent || "");
+  return /mac/i.test(platform);
+}
+
+export function settingsShortcutLabel() {
+  return isMacPlatform() ? "⌘," : "Ctrl+,";
 }
 
 function themeToggleLabel(labels, dark) {
@@ -43,10 +51,25 @@ export function bindAppThemeToggle(root, { getLocale }) {
   sync();
 }
 
+const updateDotBindings = new WeakMap();
+export function bindAppShellUpdateIndicator(root, updater) {
+  updateDotBindings.get(root)?.();
+  const dot = root.querySelector("[data-shell-update-dot]");
+  if (!dot || !updater) return;
+  const sync = () => {
+    const state = updater.getState?.();
+    dot.hidden = !(state?.version && !["checking", "installing"].includes(state.phase));
+  };
+  const unsubscribe = updater.subscribe?.(sync);
+  updateDotBindings.set(root, () => unsubscribe?.());
+  sync();
+}
+
 export function renderAppShell(state) {
   const locale = state.locale === "en" ? "en" : "zh";
   const labels = getMessages(locale, "shell");
   const dark = isDarkTheme(), themeLabel = themeToggleLabel(labels, dark);
+  const settingsTooltip = labels.settingsShortcut.replace("{shortcut}", settingsShortcutLabel());
 
   return `
     <div class="desktop-shell">
@@ -57,13 +80,8 @@ export function renderAppShell(state) {
         </nav>
         ${renderAssemblyNavigation(state)}
         <div class="nav-session-controls">
-          <label class="nav-session-field nav-session-field-language" for="app-language-select-toggle">
-            <span>${labels.language}</span>
-            ${renderShellSelect("app-language-select", labels.language,
-              [{ value: "zh", label: "中文", selected: locale === "zh" }, { value: "en", label: "English", selected: locale === "en" }], { nameTooltips: false })}
-          </label>
-          <button type="button" class="button app-theme-toggle" data-app-theme-toggle data-app-tooltip="${themeLabel}" aria-label="${themeLabel}" aria-pressed="${dark}">${projectIcon(dark ? "sun" : "moon")}</button>
-          <button type="button" class="button app-settings-button" data-app-settings aria-haspopup="dialog">⚙ ${locale === "en" ? "Settings" : "设置"}</button>
+          <button type="button" class="button app-shell-icon-button app-theme-toggle" data-app-theme-toggle data-app-tooltip="${themeLabel}" aria-label="${themeLabel}" aria-pressed="${dark}">${projectIcon(dark ? "sun" : "moon")}</button>
+          <button type="button" class="button app-shell-icon-button app-settings-button" data-app-settings data-app-tooltip="${settingsTooltip}" aria-label="${labels.settings}" aria-haspopup="dialog">${projectIcon("settings")}<span class="app-settings-update-dot" data-shell-update-dot hidden aria-hidden="true"></span></button>
         </div>
       </nav>
       <main class="main-stage">

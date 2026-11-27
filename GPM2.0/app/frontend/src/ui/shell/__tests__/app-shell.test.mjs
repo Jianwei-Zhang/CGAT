@@ -1,7 +1,7 @@
 import { applyAppTheme, DEFAULT_APP_SETTINGS, getAppSettings, setAppSettings, APP_SETTINGS_KEY } from "../../../services/app-settings.js";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bindAppThemeToggle, renderAppShell } from "../app-shell.js";
+import { bindAppShellUpdateIndicator, bindAppThemeToggle, renderAppShell } from "../app-shell.js";
 
 test("app shell omits the former top card", () => {
   const html = renderAppShell({
@@ -17,17 +17,20 @@ test("app shell omits the former top card", () => {
   assert.doesNotMatch(html, />概览</);
 });
 
-test("app shell renders scope navigation before separate language and settings controls", () => {
+test("app shell renders scope navigation before compact icon theme and settings controls without a header language select", () => {
   const html = renderAppShell({
     runtime: { mode: "Tauri Runtime" },
     locale: "zh",
   });
 
-  assert.match(html, /id="app-language-select"/);
+  assert.doesNotMatch(html, /id="app-language-select"/);
   assert.match(
     html,
-    /data-assembly-navigation[\s\S]*id="assembly-partition-select"[\s\S]*id="session-workspace-select"[\s\S]*id="assembly-chromosome-select"[\s\S]*class="nav-session-controls"[\s\S]*id="app-language-select"[\s\S]*data-app-settings/,
+    /data-assembly-navigation[\s\S]*id="assembly-partition-select"[\s\S]*id="session-workspace-select"[\s\S]*id="assembly-chromosome-select"[\s\S]*class="nav-session-controls"[\s\S]*data-app-theme-toggle[\s\S]*data-app-settings/,
   );
+  assert.match(html, /data-app-settings[^>]*aria-label="设置"/);
+  assert.match(html, /data-app-settings[^>]*data-app-tooltip="设置 \((?:Ctrl\+,|⌘,)\)"/);
+  assert.match(html, /data-app-settings[^>]*>[\s\S]*?<svg[\s\S]*?data-shell-update-dot hidden/);
 });
 
 test("app shell renders english labels when locale is en", () => {
@@ -42,13 +45,10 @@ test("app shell renders english labels when locale is en", () => {
   assert.match(html, />Assembly</);
   assert.doesNotMatch(html, />Overview</);
   assert.doesNotMatch(html, />Records</);
-  assert.doesNotMatch(html, />Settings</);
-  assert.match(html, />Home</);
-  assert.match(html, />中文</);
-  assert.match(html, />English</);
-  assert.doesNotMatch(html, />Chinese</);
+  assert.doesNotMatch(html, /id="app-language-select"/);
+  assert.match(html, /data-app-settings[^>]*aria-label="Settings"/);
+  assert.match(html, /data-app-settings[^>]*data-app-tooltip="Settings \((?:Ctrl\+,|⌘,)\)"/);
 });
-
 
 test("navigation has only Home and Assembly in the approved order in both languages", () => {
   for (const locale of ["zh", "en"]) {
@@ -62,13 +62,12 @@ test("navigation has only Home and Assembly in the approved order in both langua
   }
 });
 
-
-test("theme shortcut sits between language and Settings and labels the next action", () => {
+test("theme shortcut sits directly beside the Settings icon button and labels the next action", () => {
   try {
     for (const [theme, action] of [["dark", "light"], ["light", "dark"]]) {
       setAppSettings({ theme }, { persist: false });
       const html = renderAppShell({ locale: "en" });
-      assert.match(html, /id="app-language-select"[\s\S]*data-app-theme-toggle[\s\S]*data-app-settings/);
+      assert.match(html, /data-app-theme-toggle[\s\S]*data-app-settings/);
       assert.ok(html.includes(`aria-label="Switch to ${action} mode"`));
       assert.ok(html.includes(`aria-pressed="${theme === "dark"}"`));
       assert.match(html, /data-app-theme-toggle[^>]*>[\s\S]*?<svg/);
@@ -127,12 +126,33 @@ test("theme shortcut persists light/dark, preserves other settings, follows sett
   }
 });
 
+test("shell update indicator dot mirrors available update state and cleans up previous subscription", () => {
+  const dot = { hidden: true };
+  const root = { querySelector: selector => selector === "[data-shell-update-dot]" ? dot : null };
+  let state = { phase: "idle", version: null };
+  let subscriber = null;
+  let unsubscribed = 0;
+  const updater = {
+    getState: () => state,
+    subscribe(fn) { subscriber = fn; return () => { unsubscribed++; }; },
+  };
+  bindAppShellUpdateIndicator(root, updater);
+  assert.equal(dot.hidden, true);
+  state = { phase: "available", version: "2.0.22" };
+  subscriber();
+  assert.equal(dot.hidden, false);
+  state = { phase: "installing", version: "2.0.22" };
+  subscriber();
+  assert.equal(dot.hidden, true);
+  bindAppShellUpdateIndicator(root, updater);
+  assert.equal(unsubscribed, 1);
+});
 
-for (const locale of ["zh", "en"]) test(`${locale} project page initially hides the workspace shortcut while keeping language and settings`, () => {
+for (const locale of ["zh", "en"]) test(`${locale} project page initially hides the workspace shortcut while keeping settings`, () => {
   const markup = renderAppShell({ locale, activeRoute: "importer", runtime: {} });
   assert.match(markup, /data-assembly-navigation hidden/);
   assert.doesNotMatch(markup, /data-session-workspace-field/);
-  assert.match(markup, /id="app-language-select"/);
+  assert.doesNotMatch(markup, /id="app-language-select"/);
   assert.match(markup, /data-app-settings/);
   const assembly = renderAppShell({ locale, activeRoute: "assembly", runtime: {} });
   assert.doesNotMatch(assembly, /data-assembly-navigation hidden|data-session-workspace-field/);

@@ -1,4 +1,4 @@
-import { resolveAppTheme, initializeAppTheme, applyAppTheme } from "../app-settings.js";
+import { resolveAppTheme, initializeAppTheme, applyAppTheme, resetAppLayoutPreferences, PROJECT_SIDEBAR_WIDTH_KEY, SUBVIEW_TOOLS_PREFS_KEY } from "../app-settings.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeAppSettings, setAppSettings, getAppSettings, DEFAULT_APP_SETTINGS, getGraphFontSize, estimateGraphTextWidth, APP_SETTINGS_KEY } from "../app-settings.js";
@@ -6,11 +6,46 @@ import { normalizeAppSettings, setAppSettings, getAppSettings, DEFAULT_APP_SETTI
 test("invalid or older stored settings migrate to readable defaults", () => {
   assert.equal(DEFAULT_APP_SETTINGS.historyCapacity, 0);
   assert.deepEqual(normalizeAppSettings(null), DEFAULT_APP_SETTINGS);
-  assert.deepEqual(normalizeAppSettings({fontSize:999, graphFontSize:-1, historyCapacity:-1}), DEFAULT_APP_SETTINGS);
+  assert.deepEqual(normalizeAppSettings({
+    fontSize: 999,
+    graphFontSize: -1,
+    historyCapacity: -1,
+    restoreLastWorkspace: "yes",
+    defaultWorkspaceRoot: 42,
+    importParallelism: "99",
+    localViewDefaultMode: "modal",
+    localViewDefaultPinned: 0,
+    deleteHotkeyEnabled: "no",
+    autoCheckUpdates: null,
+  }), DEFAULT_APP_SETTINGS);
   assert.equal(normalizeAppSettings({fontSize:14}).historyCapacity, 0);
   assert.equal(normalizeAppSettings({historyCapacity:0}).historyCapacity, 0);
   assert.equal(normalizeAppSettings({historyCapacity:50}).historyCapacity, 50);
   assert.equal(normalizeAppSettings({historyCapacity:123}).historyCapacity, 123);
+  assert.deepEqual(normalizeAppSettings({
+    restoreLastWorkspace: false,
+    defaultWorkspaceRoot: "  D:/Workspaces  ",
+    importParallelism: 4,
+    localViewDefaultMode: "floating",
+    localViewDefaultPinned: false,
+    deleteHotkeyEnabled: false,
+    autoCheckUpdates: false,
+  }), {
+    ...DEFAULT_APP_SETTINGS,
+    restoreLastWorkspace: false,
+    defaultWorkspaceRoot: "D:/Workspaces",
+    importParallelism: "4",
+    localViewDefaultMode: "floating",
+    localViewDefaultPinned: false,
+    deleteHotkeyEnabled: false,
+    autoCheckUpdates: false,
+  });
+});
+
+test("resetAppLayoutPreferences clears remembered sidebar width and Local View tools rect", () => {
+  const removed = [];
+  resetAppLayoutPreferences({ removeItem(key) { removed.push(key); } });
+  assert.deepEqual(removed, [PROJECT_SIDEBAR_WIDTH_KEY, SUBVIEW_TOOLS_PREFS_KEY]);
 });
 
 test("graph text follows interface unless explicitly sized, with CJK width accounted for", () => {

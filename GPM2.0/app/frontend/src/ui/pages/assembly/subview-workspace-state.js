@@ -1,5 +1,6 @@
 import { taskProjectKey, taskScopeKey, normalizeSubviewTasks, updateSubviewTasks, restoredSubviewWindows, taskText } from "./subview-task-state.js";
 import { reconcileLocalSubviewWithMain } from "./subview-fragment-reconcile.js";
+import { getAppSettings } from "../../../services/app-settings.js";
 // Runtime ownership stays separate from the durable task document. Geometry,
 // focus and evidence never enter project task storage.
 const LOCAL_KEYS = [
@@ -98,10 +99,15 @@ export function reconcileSubviewWorkspace(previous, next, { runtimeScopes } = {}
     if (!windows.some(item => item.id === activeId)) {
       activeId = globalThis.crypto?.randomUUID ? `local-${globalThis.crypto.randomUUID()}` : `local-${Date.now()}-${workspace.generation}-${nextId++}`;
       assembly = { ...assembly, trackSelectedCtgIds: [] };
-      // New comparisons use the single docked slot. Retain previous tasks and
+      const { localViewDefaultMode, localViewDefaultPinned } = getAppSettings();
+      const floating = localViewDefaultMode === "floating";
+      const pinned = localViewDefaultPinned !== false;
+      // Docked comparisons use the single docked slot. Retain previous tasks and
       // explicitly floated windows; only the previous docked task becomes unopened.
-      windows = windows.map(item => !item.floating ? { ...item, opened: false } : item);
-      windows = [...windows, { id: activeId, number: windows.length + 1, snapshot, name: "", note: "", opened: true, floating: false, minimized: false, pinned: true,
+      if (!floating) {
+        windows = windows.map(item => !item.floating ? { ...item, opened: false } : item);
+      }
+      windows = [...windows, { id: activeId, number: windows.length + 1, snapshot, name: "", note: "", opened: true, floating, minimized: false, pinned,
         x: 80 + windows.length % 6 * 24, y: 100 + windows.length % 6 * 24, z: Math.max(0, ...windows.map(item => item.z)) + 1 }];
     } else {
       windows = windows.map(item => item.id === activeId ? { ...item, snapshot } : item);

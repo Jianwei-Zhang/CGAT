@@ -13,16 +13,29 @@ export function createAppUpdater({ invoke, listen = async () => () => {}, storag
   const dismissed = new Set();
   let notifying = false;
   let unlisten = () => {};
-  const snapshot = () => ({ ...state });
-  const set = patch => { state = { ...state, ...patch }; for (const fn of subscribers) fn(snapshot()); };
-  const snoozed = () => {
-    try { const until = Number(storage?.getItem(UPDATE_SNOOZE_KEY)); return Number.isFinite(until) && until > now(); }
-    catch { return false; }
+  const snoozedUntil = () => {
+    try {
+      const until = Number(storage?.getItem?.(UPDATE_SNOOZE_KEY));
+      return Number.isFinite(until) && until > now() ? until : null;
+    } catch { return null; }
   };
+  const snapshot = () => ({ ...state, snoozeUntil: snoozedUntil() });
+  const set = patch => { state = { ...state, ...patch }; for (const fn of subscribers) fn(snapshot()); };
+  const snoozed = () => snoozedUntil() !== null;
   function snooze() {
     try {
       if (!storage) throw new Error("storage unavailable");
       storage.setItem(UPDATE_SNOOZE_KEY, String(now() + UPDATE_SNOOZE_MS));
+      set({});
+      return true;
+    } catch { set({ error: "update_storage" }); return false; }
+  }
+  function clearSnooze() {
+    try {
+      if (!storage) throw new Error("storage unavailable");
+      if (typeof storage.removeItem === "function") storage.removeItem(UPDATE_SNOOZE_KEY);
+      else storage.setItem(UPDATE_SNOOZE_KEY, "");
+      set({});
       return true;
     } catch { set({ error: "update_storage" }); return false; }
   }
@@ -55,7 +68,7 @@ export function createAppUpdater({ invoke, listen = async () => () => {}, storag
         notify(manual);
       } catch (error) { set({ phase: "error", error: String(error?.message || error) }); }
     },
-    notify, snooze,
+    notify, snooze, clearSnooze, snoozedUntil,
     dismiss(mute = false) {
       // Do not silently claim a persistent 24h preference if storage is unavailable.
       if (mute && !snooze()) return false;

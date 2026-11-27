@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { archiveImportForm, createProjectDropController, localWorkspaceTimestamp, relocateWorkspaceSuggestion, projectEntryBusy } from "../project-drop-controller.js";
+import { DEFAULT_APP_SETTINGS, setAppSettings } from "../app-settings.js";
 
 function harness(overrides = {}) {
   let state = { locale: "en", activeRoute: "assembly", importer: {}, initializer: {}, session: { workspacePath: "/previous", projectId: 4 } };
@@ -131,4 +132,20 @@ test("partition management dialogs block external file drops", async () => {
   const h = harness(); h.store.setState({ importer: { libraryDialog: { kind: "create" } } });
   assert.equal(await h.handle(drop("/new.zip")), false);
   assert.equal(h.calls.some(row => row[0] === "inspect"), false);
+});
+
+test("archiveImportForm applies defaultWorkspaceRoot and importParallelism preferences", () => {
+  try {
+    setAppSettings({ ...DEFAULT_APP_SETTINGS, defaultWorkspaceRoot: "D:\\Workspaces", importParallelism: "4" }, { persist: false });
+    const form = archiveImportForm({
+      kind: "archive",
+      path: "D:\\Downloads\\wheat.tar.gz",
+      suggestedWorkspace: "D:\\Downloads\\wheat_20261127_160000",
+    });
+    assert.equal(form.workspaceRoot, "D:/Workspaces/wheat_20261127_160000");
+    assert.equal(form.importParallelism, "4");
+    assert.equal(form.projectNameInput, "wheat_20261127_160000");
+  } finally {
+    setAppSettings(DEFAULT_APP_SETTINGS, { persist: false });
+  }
 });

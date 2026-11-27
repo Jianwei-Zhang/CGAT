@@ -1,5 +1,6 @@
 import { filterPrimaryTrackSelectionCtgIds, normalizeTrackSelectionCtgIds } from "./selection-state.js";
 import { resolveFilteredSubviewTrackPairSelectionsFromAssembly } from "./subview-state.js";
+import { getAppSettings } from "../../../services/app-settings.js";
 
 const ASSEMBLY_TRACK_HOTKEYS_BOUND = Symbol("assemblyTrackHotkeysBound");
 const ASSEMBLY_TRACK_HOTKEYS_HANDLER = Symbol("assemblyTrackHotkeysHandler");
@@ -65,6 +66,9 @@ export async function handleTrackDeleteHotkey(host, store, event, deps) {
 }
 
 export function shouldHandleTrackDeleteHotkey(event, state) {
+  if (getAppSettings().deleteHotkeyEnabled === false) {
+    return false;
+  }
   if (String(event?.key || "").trim() !== "Delete") {
     return false;
   }

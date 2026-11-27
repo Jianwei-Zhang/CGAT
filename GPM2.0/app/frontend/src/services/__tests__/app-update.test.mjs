@@ -114,3 +114,17 @@ test("24h reminders resume in the same long-running App session", async () => {
   now += UPDATE_SNOOZE_MS - 1; f.updater.notify(); assert.equal(f.notices.length, 1);
   now++; f.updater.notify(); assert.equal(f.notices.length, 2);
 });
+
+test("clearSnooze removes persisted 24h suppression and exposes snoozeUntil", async () => {
+  const f = fixture();
+  f.storage.removeItem = k => f.values.delete(k);
+  await f.updater.initialize();
+  await f.updater.check();
+  assert.equal(f.updater.snoozedUntil(), null);
+  assert.equal(f.updater.snooze(), true);
+  assert.equal(f.updater.snoozedUntil(), 1000 + UPDATE_SNOOZE_MS);
+  assert.equal(f.updater.getState().snoozeUntil, 1000 + UPDATE_SNOOZE_MS);
+  assert.equal(f.updater.clearSnooze(), true);
+  assert.equal(f.updater.snoozedUntil(), null);
+  assert.equal(f.updater.getState().snoozeUntil, null);
+});

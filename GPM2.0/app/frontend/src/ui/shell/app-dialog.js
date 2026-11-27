@@ -13,6 +13,7 @@ function requestDialog(mode, message, options = {}) {
   const cancelled = mode === "prompt" ? null : false;
   if (!doc?.body) return Promise.resolve(cancelled);
   const locale = options.locale || options.store?.getState?.()?.locale
+    || (doc.documentElement?.lang?.toLowerCase().startsWith("en") ? "en" : null)
     || doc.querySelector("#app-language-select")?.value || "zh";
   const labels = copy[locale === "en" ? "en" : "zh"];
   const id = `app-dialog-${++dialogSequence}`;

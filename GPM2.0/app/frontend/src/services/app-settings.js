@@ -1,10 +1,34 @@
+import { MAX_IMPORT_PARSER_WORKERS, MIN_IMPORT_PARSER_WORKERS } from "./import-parallelism.js";
+
 export const APP_SETTINGS_KEY = "gpm_next:app_settings";
+export const PROJECT_SIDEBAR_WIDTH_KEY = "gpm.project-library-width";
+export const SUBVIEW_TOOLS_PREFS_KEY = "gpm.subviewTools.v1";
+
 export const DEFAULT_APP_SETTINGS = Object.freeze({
   theme: "system",
   fontSize: 14,
   graphFontSize: null,
   historyCapacity: 0,
+  restoreLastWorkspace: true,
+  defaultWorkspaceRoot: "",
+  importParallelism: "auto",
+  localViewDefaultMode: "docked",
+  localViewDefaultPinned: true,
+  deleteHotkeyEnabled: true,
+  autoCheckUpdates: true,
 });
+
+function normalizeImportParallelismSetting(value) {
+  const text = String(value ?? "").trim().toLowerCase();
+  if (!text || text === "auto") return "auto";
+  if (/^\d+$/.test(text)) {
+    const parsed = Number(text);
+    if (Number.isInteger(parsed) && parsed >= MIN_IMPORT_PARSER_WORKERS && parsed <= MAX_IMPORT_PARSER_WORKERS) {
+      return String(parsed);
+    }
+  }
+  return "auto";
+}
 
 export function normalizeAppSettings(value = {}) {
   return {
@@ -13,7 +37,19 @@ export function normalizeAppSettings(value = {}) {
     graphFontSize: [10, 12, 14, 16].includes(value?.graphFontSize) ? value.graphFontSize : null,
     historyCapacity: Number.isSafeInteger(value?.historyCapacity) && value.historyCapacity >= 0
       && value.historyCapacity <= 1000000 ? value.historyCapacity : 0,
+    restoreLastWorkspace: typeof value?.restoreLastWorkspace === "boolean" ? value.restoreLastWorkspace : true,
+    defaultWorkspaceRoot: typeof value?.defaultWorkspaceRoot === "string" ? value.defaultWorkspaceRoot.trim() : "",
+    importParallelism: normalizeImportParallelismSetting(value?.importParallelism),
+    localViewDefaultMode: value?.localViewDefaultMode === "floating" ? "floating" : "docked",
+    localViewDefaultPinned: typeof value?.localViewDefaultPinned === "boolean" ? value.localViewDefaultPinned : true,
+    deleteHotkeyEnabled: typeof value?.deleteHotkeyEnabled === "boolean" ? value.deleteHotkeyEnabled : true,
+    autoCheckUpdates: typeof value?.autoCheckUpdates === "boolean" ? value.autoCheckUpdates : true,
   };
+}
+
+export function resetAppLayoutPreferences(storage = globalThis.localStorage) {
+  storage?.removeItem?.(PROJECT_SIDEBAR_WIDTH_KEY);
+  storage?.removeItem?.(SUBVIEW_TOOLS_PREFS_KEY);
 }
 
 function readSettings() {

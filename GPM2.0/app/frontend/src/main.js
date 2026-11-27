@@ -8,20 +8,20 @@ import { retagAssemblyDomLocale } from "./ui/shell/assembly-session-cache.js";
 import { patchLocaleMarkup } from "./ui/i18n/presentation-patch.js";
 import { renderAssemblyPage, syncAssemblyTransientInteractions, disposeAssemblyTransientInteractions } from "./ui/pages/assembly-page.js";
 import { createAppUpdater, updateWorkBusy } from "./services/app-update.js";
-import { invokeCommand, listenBackendEvent, getPendingBackendCommands } from "./services/backend-api.js";
+import { invokeCommand, listenBackendEvent, getPendingBackendCommands, pickDirectoryPath } from "./services/backend-api.js";
 import { openUpdateDialog } from "./ui/shell/app-update-panel.js";
 import "./styles/app-update.css";
-import { bindShellSelects, syncShellSelect } from "./ui/shell/shell-select-runtime.js";
+import { bindShellSelects } from "./ui/shell/shell-select-runtime.js";
 import { projectEntryBusy } from "./services/project-drop-controller.js";
 import { bindProjectDrop } from "./ui/shell/project-drop.js";
 import { readWorkspaceHistory as readSharedHistory, writeWorkspaceHistory as writeSharedHistory } from "./services/workspace-history.js";
-import { applyAppTypography, initializeAppTheme, subscribeAppTheme } from "./services/app-settings.js";
+import { applyAppTypography, getAppSettings, initializeAppTheme, subscribeAppTheme } from "./services/app-settings.js";
 import { bindAppSettings } from "./ui/shell/app-settings-panel.js";
 import "./styles/settings.css";
 import { createStore } from "./state/store.js";
 import { flushAssemblyProjectState, selectAssemblyChromosome } from "./ui/pages/assembly-page.js";
 import { openProjectWorkspace as openWorkspace } from "./services/project-session.js";
-import { bindAppThemeToggle, renderAppShell } from "./ui/shell/app-shell.js";
+import { bindAppShellUpdateIndicator, bindAppThemeToggle, renderAppShell } from "./ui/shell/app-shell.js";
 import { registerRoutes, renderCurrentRoute } from "./ui/shell/router.js";
 import {
   migrateWorkspaceHistoryToArrivalOrder,
@@ -64,7 +64,7 @@ const store = createStore({
     libraryQuery: "",
     libraryRenamingId: "",
     libraryRenameError: "",
-    restoringSession: true,
+    restoringSession: getAppSettings().restoreLastWorkspace !== false,
     importSource: "zip",
     projectNameInput: "",
     projectError: "",
@@ -84,7 +84,7 @@ const store = createStore({
     importCancelling: false,
     importCancelError: "",
     importProgressDismissed: false,
-    importParallelism: "auto",
+    importParallelism: getAppSettings().importParallelism || "auto",
     status: getMessages(initialLocale, "importer").runtime.notStarted,
     stages: [],
     summary: t(initialLocale, "importer.page.title"),
@@ -305,10 +305,13 @@ const updater = createAppUpdater({
 void updater.initialize().then(() => {
   if (!updater.getState().enabled) return;
   // One automatic check per launch; notification retries reuse its result.
-  void updater.check();
+  if (typeof getAppSettings !== "function" || getAppSettings().autoCheckUpdates !== false) {
+    void updater.check();
+  }
   setInterval(() => updater.notify(), 30_000);
 });
 
+document.documentElement.lang = initialLocale === "en" ? "en" : "zh-CN";
 migrateWorkspaceHistoryToArrivalOrder(window.localStorage);
 applyAppTypography();
 initializeAppTheme();
@@ -317,10 +320,12 @@ initializeAppTheme();
 subscribeAppTheme(() => {
   window.dispatchEvent(new Event("gpm-next:route-refresh"));
 });
+let settingsController = null;
 app.innerHTML = renderAppShell(store.getState());
 bindAppTooltips(app);
-bindSettings(app, store);
-bindGlobalLanguageSwitch(app, store);
+settingsController = bindSettings(app, store);
+bindGlobalSettingsShortcut(() => settingsController);
+void listenBackendEvent("gpm-open-settings", () => settingsController?.open?.()).catch(() => {});
 bindGlobalSessionSwitchers(app, store);
 registerRoutes(app, store, () => {
   renderCurrentRoute(app, store);
@@ -328,10 +333,12 @@ registerRoutes(app, store, () => {
 renderCurrentRoute(app, store);
 syncSessionHeader(store.getState());
 bindProjectDrop(app, store).catch(error => console.error("GPM drag/drop setup failed", error));
-restoreLastWorkspace(store).finally(() => {
-  store.setState({ importer: { ...store.getState().importer, restoringSession: false } });
-  window.dispatchEvent(new Event("gpm-next:route-refresh"));
-});
+if (getAppSettings().restoreLastWorkspace !== false) {
+  restoreLastWorkspace(store).finally(() => {
+    store.setState({ importer: { ...store.getState().importer, restoringSession: false } });
+    window.dispatchEvent(new Event("gpm-next:route-refresh"));
+  });
+}
 
 let lastRoute = store.getState().activeRoute;
 let lastSessionWorkspacePath = normalizeWorkspacePath(store.getState().session.workspacePath);
@@ -352,7 +359,6 @@ store.subscribe((nextState) => {
   lastSessionProjectName = nextState.session.projectName;
   lastSessionWorkspacePath = nextWorkspacePath;
   syncSessionHeader(nextState);
-  syncLanguageSwitch(nextState);
   persistLastWorkspace(nextState);
   persistLocale(nextState);
 });
@@ -439,48 +445,53 @@ function persistLocale(state) {
   }
 }
 
-function syncLanguageSwitch(state) {
-  const select = document.querySelector("#app-language-select");
-  if (select) {
-    const nextValue = state.locale === "en" ? "en" : "zh";
-    if (select.value !== nextValue) {
-      select.value = nextValue;
-    }
-    syncShellSelect(select);
+function applyGlobalLanguageChange(root, storeRef, locale) {
+  const value = locale === "en" ? "en" : "zh";
+  document.documentElement.lang = value === "en" ? "en" : "zh-CN";
+  hideAppTooltips(root);
+  const previous = storeRef.getState();
+  if (previous.locale === value) return;
+  const next = relocalizeAppState(previous, value);
+  storeRef.setState(next);
+  if (previous.activeRoute === "assembly") {
+    patchLocaleMarkup(root, renderAppShell(previous), renderAppShell(next));
+    const routeHost = root.querySelector("#route-host");
+    patchLocaleMarkup(routeHost, renderAssemblyPage(previous), renderAssemblyPage(next));
+    retagAssemblyDomLocale(routeHost, next);
+    syncAssemblyTransientInteractions(routeHost, storeRef);
+    syncSessionHeader(next);
+    return;
   }
+  disposeAssemblyTransientInteractions(root.querySelector("#route-host"));
+  releaseProjectOverviewPreview(root.querySelector("#route-host"));
+  releaseProjectPathOverview(root.querySelector("#route-host"));
+  root.innerHTML = renderAppShell(storeRef.getState());
+  settingsController = bindSettings(root, storeRef);
+  bindGlobalSessionSwitchers(root, storeRef);
+  registerRoutes(root, storeRef, () => {
+    renderCurrentRoute(root, storeRef);
+  });
+  renderCurrentRoute(root, storeRef);
+  syncSessionHeader(storeRef.getState());
 }
 
-function bindGlobalLanguageSwitch(root, storeRef) {
-  const select = root.querySelector("#app-language-select");
-  select?.addEventListener("change", () => {
-    const value = select.value === "en" ? "en" : "zh";
-    hideAppTooltips(root);
-    const previous = storeRef.getState();
-    const next = relocalizeAppState(previous, value);
-    storeRef.setState(next);
-    if (previous.activeRoute === "assembly") {
-      patchLocaleMarkup(root, renderAppShell(previous), renderAppShell(next));
-      const routeHost = root.querySelector("#route-host");
-      patchLocaleMarkup(routeHost, renderAssemblyPage(previous), renderAssemblyPage(next));
-      retagAssemblyDomLocale(routeHost, next);
-      syncAssemblyTransientInteractions(routeHost, storeRef);
-      syncSessionHeader(next);
-      syncLanguageSwitch(next);
+function bindGlobalSettingsShortcut(getController) {
+  window.addEventListener("keydown", (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key !== ",") {
       return;
     }
-    disposeAssemblyTransientInteractions(root.querySelector("#route-host"));
-    releaseProjectOverviewPreview(root.querySelector("#route-host"));
-    releaseProjectPathOverview(root.querySelector("#route-host"));
-    root.innerHTML = renderAppShell(storeRef.getState());
-    bindSettings(root, storeRef);
-    bindGlobalLanguageSwitch(root, storeRef);
-    bindGlobalSessionSwitchers(root, storeRef);
-    registerRoutes(root, storeRef, () => {
-      renderCurrentRoute(root, storeRef);
-    });
-    renderCurrentRoute(root, storeRef);
-    syncSessionHeader(storeRef.getState());
-    syncLanguageSwitch(storeRef.getState());
+    const controller = getController();
+    if (!controller) return;
+    if (controller.isOpen()) {
+      event.preventDefault();
+      controller.close();
+      return;
+    }
+    if (document.querySelector("dialog[open], .modal-overlay, [role='dialog'][aria-modal='true']")) {
+      return;
+    }
+    event.preventDefault();
+    controller.open();
   });
 }
 
@@ -627,13 +638,17 @@ function appendWorkspaceHistory(workspacePath, projectName = "") {
 function bindSettings(root, storeRef) {
   bindShellSelects(root);
   bindAppThemeToggle(root, { getLocale: () => storeRef.getState().locale });
-  bindAppSettings(root, {
+  bindAppShellUpdateIndicator(root, updater);
+  return bindAppSettings(root, {
     updater,
     getLocale: () => storeRef.getState().locale === "en" ? "en" : "zh",
+    getRuntimeMode: () => storeRef.getState().runtime?.mode || "",
     onTypographyChange: () => window.dispatchEvent(new Event("gpm-next:route-refresh")),
-    onLanguageChange: locale => {
-      const select = root.querySelector("#app-language-select");
-      if (select) { select.value = locale; select.dispatchEvent(new Event("change")); }
+    onLanguageChange: locale => applyGlobalLanguageChange(root, storeRef, locale),
+    onPickDirectory: () => pickDirectoryPath(storeRef.getState()),
+    onLayoutReset: () => {
+      root.querySelector(".project-browser")?.style?.removeProperty("--project-sidebar-width");
+      window.dispatchEvent(new Event("gpm-next:route-refresh"));
     },
   });
 }

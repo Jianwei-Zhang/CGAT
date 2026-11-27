@@ -13,7 +13,7 @@ fn main_window_title(version: &semver::Version) -> String {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -21,7 +21,15 @@ pub fn run() {
             local_view_windows::create_main_window(app)?;
             Ok(())
         })
-        .on_window_event(local_view_windows::on_window_event)
+        .on_window_event(local_view_windows::on_window_event);
+    #[cfg(target_os = "macos")]
+    let builder = builder.on_menu_event(|app, event| {
+        if event.id().as_ref() == app_menu::OPEN_SETTINGS_MENU_ID {
+            use tauri::Emitter;
+            let _ = app.emit_to("main", app_menu::OPEN_SETTINGS_EVENT, ());
+        }
+    });
+    builder
         .manage(app_update::UpdateState::default())
         .invoke_handler(tauri::generate_handler![
             local_view_windows::probe_local_view_drag,

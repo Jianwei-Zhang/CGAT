@@ -33,5 +33,6 @@ test("approved name renderers explicitly opt in rather than globally suppressing
   ];
   for (const [file, pattern] of expectations) assert.match(source(file), pattern, file);
   assert.doesNotMatch(source("pages/workspace-page.js"), /class="project-path project-detail-path"[^>]*data-app-tooltip/);
-  assert.match(source("shell/app-shell.js"), /nameTooltips: false/);
+  assert.match(source("shell/app-shell.js"), /data-app-theme-toggle data-app-tooltip=/);
+  assert.match(source("shell/app-shell.js"), /data-app-settings data-app-tooltip=/);
 });

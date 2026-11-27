@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { bindTrackSelectionHotkeys, handleTrackDeleteHotkey } from "../track-hotkeys-runtime.js";
+import { bindTrackSelectionHotkeys, handleTrackDeleteHotkey, shouldHandleTrackDeleteHotkey } from "../track-hotkeys-runtime.js";
+import { DEFAULT_APP_SETTINGS, setAppSettings } from "../../../../services/app-settings.js";
 
 test("bindTrackSelectionHotkeys registers one window keydown handler per host and routes events", async () => {
   const originalWindow = globalThis.window;
@@ -62,4 +63,16 @@ test("native Local View hotkeys bind to its own window and never delete an unrel
       deleteSelectedTrackCtgs() { throw new Error("Main selection belongs to Main"); },
     }), false);
   } finally { globalThis.window = main; }
+});
+
+test("deleteHotkeyEnabled=false suppresses Delete hotkey handling", () => {
+  try {
+    const state = { assembly: { activeTab: "assembly", trackSelectedCtgIds: [1] } };
+    setAppSettings({ ...DEFAULT_APP_SETTINGS, deleteHotkeyEnabled: true }, { persist: false });
+    assert.equal(shouldHandleTrackDeleteHotkey({ key: "Delete" }, state), true);
+    setAppSettings({ ...DEFAULT_APP_SETTINGS, deleteHotkeyEnabled: false }, { persist: false });
+    assert.equal(shouldHandleTrackDeleteHotkey({ key: "Delete" }, state), false);
+  } finally {
+    setAppSettings(DEFAULT_APP_SETTINGS, { persist: false });
+  }
 });

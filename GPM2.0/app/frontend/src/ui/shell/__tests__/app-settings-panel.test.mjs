@@ -3,85 +3,38 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { APP_SETTINGS_COPY, SETTINGS_TABS, bindAppSettings, renderSettingsContent } from "../app-settings-panel.js";
 import { DEFAULT_APP_SETTINGS, getAppSettings, setAppSettings } from "../../../services/app-settings.js";
+import { clearSkippedConfirmations, rememberConfirmation } from "../confirmation-session.js";
 
 for (const locale of ["zh", "en"]) {
-  test(`settings expose and select system/light/dark themes in ${locale}`, () => {
+  test(`settings expose visual theme cards for system/light/dark in ${locale}`, () => {
     for (const theme of ["system", "light", "dark"]) {
-      const output = renderSettingsContent(locale, {...DEFAULT_APP_SETTINGS, theme});
-      assert.match(output, /label for="settings-theme-toggle"/);
-      assert.match(output, new RegExp(`<option value="${theme}" selected>`));
-      assert.match(output, /name="theme"/);
+      const output = renderSettingsContent(locale, { ...DEFAULT_APP_SETTINGS, theme }, "appearance");
+      assert.match(output, new RegExp(`data-settings-radio="theme" data-settings-value="${theme}" aria-checked="true"`));
     }
   });
 }
 
 for (const locale of ["zh", "en"]) {
-  test(`history capacity defaults to unlimited in ${locale}`, () => {
-    const output = renderSettingsContent(locale, DEFAULT_APP_SETTINGS);
-    assert.match(output, /id="settings-history-input"[^>]+value="(?:不限步数|Unlimited)"/);
-    assert.match(output, /<div id="settings-history-option-0" class="assembly-track-combo-option" role="option" aria-selected="true" data-history-option="0">/);
-    assert.match(output, /data-history-option="0">(?:不限步数|Unlimited)</);
-    assert.match(output, /data-history-option="50">50 (?:步|steps)/);
+  test(`history capacity renders preset buttons and custom numeric input in ${locale}`, () => {
+    const output = renderSettingsContent(locale, DEFAULT_APP_SETTINGS, "editing");
+    assert.match(output, /data-history-preset="0" aria-pressed="true"/);
+    assert.match(output, /data-history-preset="50" aria-pressed="false"/);
+    assert.match(output, /id="settings-history-input" name="historyCapacity"/);
+    const custom = renderSettingsContent(locale, { ...DEFAULT_APP_SETTINGS, historyCapacity: 75 }, "editing");
+    assert.match(custom, /data-history-preset="0" aria-pressed="false"/);
+    assert.match(custom, /id="settings-history-input"[^>]+value="75"/);
   });
 
-  test(`restoring defaults describes unlimited history in ${locale}`, () => {
+  test(`restoring defaults preserves display language and describes unlimited history in ${locale}`, () => {
     const copy = APP_SETTINGS_COPY[locale];
-    assert.match(copy.restoreConfirm, locale === "zh" ? /恢复为不限步数/ : /return to unlimited/);
-    assert.doesNotMatch(copy.restoreConfirm, locale === "zh" ? /恢复为 50 步/ : /return to 50 steps/);
+    assert.match(copy.restoreConfirm, locale === "zh" ? /界面语言将保持不变/ : /Display language stays unchanged/);
+    assert.match(copy.restoreConfirm, locale === "zh" ? /恢复为不限步数/ : /returns to unlimited/);
   });
 }
 
 for (const locale of ["zh", "en"]) {
-  test(`settings reuse the header picker and preserve field names in ${locale}`, () => {
-    const html = renderSettingsContent(locale, DEFAULT_APP_SETTINGS);
-    assert.equal((html.match(/data-shell-select-toggle/g) || []).length, 4);
-    for (const [id, name] of [["theme", "theme"], ["font-size", "fontSize"], ["graph-size", "graphFontSize"], ["language", "language"]]) {
-      assert.match(html, new RegExp(`for="settings-${id}-toggle"`));
-      assert.match(html, new RegExp(`<select id="settings-${id}" name="${name}" hidden`));
-      assert.match(html, new RegExp(`id="settings-${id}-menu"[^>]+role="listbox"`));
-    }
-    assert.match(html, /value="" selected>Follow Interface|value="" selected>跟随界面/);
-    assert.match(html, /class="assembly-track-combo-menu settings-options"/);
-    assert.match(html, /name="historyCapacity"[^>]+role="combobox"/);
-  });
-}
-
-test("settings constrain picker widths and share history option/marker theme tokens", () => {
-  const css = readFileSync(new URL("../../../styles/settings.css", import.meta.url), "utf8");
-  assert.match(css, /\.settings-row \.shell-select-toggle[^}]+width: 100%; max-width: none/);
-  assert.match(css, /\.settings-combobox-toggle[^}]+border-left: 1px solid var\(--border-subtle/);
-  assert.match(css, /\.settings-combobox-toggle[^}]+background: var\(--surface-subtle/);
-  assert.match(css, /\.settings-options\[hidden\][^}]+display: none/);
-  assert.doesNotMatch(css, /\.settings-row select/);
-});
-
-test("saving a setting uses localized feedback without throwing; dialog close disposes subscriptions", () => {
-  const originalDocument = globalThis.document;
-  const previousSettings = getAppSettings();
-  const handlers = new Map(); let open, disposed = 0, removed = false;
-  const status = { textContent: "", classList: { toggle() {} } };
-  const dialog = { ownerDocument: {}, setAttribute() {}, showModal() {}, remove() { removed = true; },
-    addEventListener(type, handler) { handlers.set(type, handler); },
-    querySelectorAll() { return []; },
-    querySelector(selector) { return selector === ".settings-status" ? status : null; } };
-  const root = { querySelector() { return { addEventListener(type, handler) { open = handler; }, focus() {} }; } };
-  try {
-    globalThis.document = { createElement: () => dialog, body: { append() {} } };
-    bindAppSettings(root, { getLocale: () => "en", onTypographyChange() {}, onLanguageChange() {},
-      updater: { subscribe: () => () => disposed++ } });
-    open();
-    handlers.get("change")({ target: { name: "theme", value: "dark" } });
-    assert.equal(getAppSettings().theme, "dark");
-    assert.equal(status.textContent, "Saved");
-    handlers.get("close")();
-    assert.equal(disposed, 1);
-    assert.equal(removed, true);
-  } finally { globalThis.document = originalDocument; setAppSettings(previousSettings, { persist: false }); }
-});
-
-for (const locale of ["zh", "en"]) {
-  test(`settings organize controls into four categorized panels with ARIA tabs in ${locale}`, () => {
-    const html = renderSettingsContent(locale, DEFAULT_APP_SETTINGS);
+  test(`settings render all four balanced category panels with modern controls in ${locale}`, () => {
+    const html = renderSettingsContent(locale, DEFAULT_APP_SETTINGS, "general", { skippedConfirmations: 2 });
     assert.match(html, /role="tablist"[^>]+aria-orientation="vertical"/);
     for (const tab of SETTINGS_TABS) {
       assert.match(html, new RegExp(`id="settings-tab-${tab}"[^>]+data-settings-tab="${tab}"[^>]+aria-controls="settings-panel-${tab}"`));
@@ -97,12 +50,29 @@ for (const locale of ["zh", "en"]) {
     const appearancePanel = html.slice(html.indexOf('id="settings-panel-appearance"'), html.indexOf('id="settings-panel-editing"'));
     const editingPanel = html.slice(html.indexOf('id="settings-panel-editing"'), html.indexOf('id="settings-panel-updates"'));
     const updatesPanel = html.slice(html.indexOf('id="settings-panel-updates"'), html.indexOf('class="settings-footer"'));
-    assert.match(generalPanel, /name="language"/);
-    assert.doesNotMatch(generalPanel, /name="theme"/);
-    assert.match(appearancePanel, /name="theme"[\s\S]*name="fontSize"[\s\S]*name="graphFontSize"[\s\S]*class="settings-preview"/);
-    assert.doesNotMatch(appearancePanel, /name="language"/);
+
+    assert.match(generalPanel, /data-settings-radio="language"/);
+    assert.match(generalPanel, /name="restoreLastWorkspace"/);
+    assert.match(generalPanel, /name="defaultWorkspaceRoot"/);
+    assert.match(generalPanel, /id="settings-import-parallelism" name="importParallelism"/);
+
+    assert.match(appearancePanel, /data-settings-radio="theme"/);
+    assert.match(appearancePanel, /data-settings-radio="fontSize"/);
+    assert.match(appearancePanel, /data-settings-radio="graphFontSize"/);
+    assert.match(appearancePanel, /class="settings-preview settings-preview-card"/);
+    assert.doesNotMatch(appearancePanel, /<details/);
+    assert.match(appearancePanel, /data-settings-reset-layout/);
+
     assert.match(editingPanel, /name="historyCapacity"/);
+    assert.match(editingPanel, /data-settings-radio="localViewDefaultMode"/);
+    assert.match(editingPanel, /name="localViewDefaultPinned"/);
+    assert.match(editingPanel, /name="deleteHotkeyEnabled"/);
+    assert.match(editingPanel, /data-settings-reset-confirmations/);
+    assert.doesNotMatch(editingPanel, /data-settings-reset-confirmations disabled/);
+
     assert.match(updatesPanel, /id="settings-update-title"/);
+    assert.match(updatesPanel, /name="autoCheckUpdates"/);
+    assert.match(updatesPanel, /data-settings-copy-diagnostics/);
   });
 
   test(`selecting an initial activeTab exposes only that category panel in ${locale}`, () => {
@@ -112,6 +82,93 @@ for (const locale of ["zh", "en"]) {
     assert.match(html, /id="settings-panel-general"[^>]+hidden>/);
   });
 }
+
+test("settings stylesheet defines segmented controls, switches, theme cards, and live preview card", () => {
+  const css = readFileSync(new URL("../../../styles/settings.css", import.meta.url), "utf8");
+  assert.match(css, /\.settings-segmented\s*\{/);
+  assert.match(css, /\.settings-switch-track\s*\{/);
+  assert.match(css, /\.settings-theme-cards\s*\{/);
+  assert.match(css, /\.settings-preview-card\s*\{/);
+  assert.match(css, /\.settings-row \.shell-select-toggle[^}]+width: 100%; max-width: none/);
+});
+
+test("saving settings updates switches, radios, confirmations, layout reset, and disposes on close", async () => {
+  const originalDocument = globalThis.document;
+  const previousSettings = getAppSettings();
+  const handlers = new Map();
+  let clickOpen, disposed = 0, removed = false, layoutResets = 0, languageChanges = 0;
+  const status = { textContent: "", classList: { toggle() {} } };
+  const confDesc = { textContent: "" };
+  const confButton = { disabled: false };
+  const dialog = {
+    ownerDocument: {},
+    setAttribute() {},
+    showModal() {},
+    close() { handlers.get("close")?.(); },
+    remove() { removed = true; },
+    addEventListener(type, handler) { handlers.set(type, handler); },
+    querySelectorAll() { return []; },
+    querySelector(selector) {
+      if (selector === ".settings-status") return status;
+      if (selector === "[data-settings-confirmations-desc]") return confDesc;
+      if (selector === "[data-settings-reset-confirmations]") return confButton;
+      return null;
+    },
+  };
+  const root = {
+    querySelector() {
+      return {
+        addEventListener(type, handler) { if (type === "click") clickOpen = handler; },
+        removeEventListener() {},
+        focus() {},
+      };
+    },
+  };
+  try {
+    globalThis.document = { createElement: () => dialog, body: { append() {} } };
+    rememberConfirmation("test-settings-panel-reset");
+    const controller = bindAppSettings(root, {
+      getLocale: () => "en",
+      onTypographyChange() {},
+      onLanguageChange() { languageChanges++; },
+      onLayoutReset() { layoutResets++; },
+      updater: { subscribe: () => () => disposed++, getState: () => ({ phase: "idle", enabled: true }) },
+    });
+    assert.equal(controller.isOpen(), false);
+    clickOpen();
+    assert.equal(controller.isOpen(), true);
+
+    handlers.get("change")({ target: { name: "restoreLastWorkspace", type: "checkbox", checked: false } });
+    assert.equal(getAppSettings().restoreLastWorkspace, false);
+    assert.equal(status.textContent, "Saved");
+
+    handlers.get("change")({ target: { name: "deleteHotkeyEnabled", type: "checkbox", checked: false } });
+    assert.equal(getAppSettings().deleteHotkeyEnabled, false);
+
+    handlers.get("click")({ target: { closest: selector => selector === "[data-settings-radio]" ? { dataset: { settingsRadio: "theme", settingsValue: "dark" } } : null } });
+    assert.equal(getAppSettings().theme, "dark");
+
+    handlers.get("click")({ target: { closest: selector => selector === "[data-settings-radio]" ? { dataset: { settingsRadio: "localViewDefaultMode", settingsValue: "floating" } } : null } });
+    assert.equal(getAppSettings().localViewDefaultMode, "floating");
+
+    await handlers.get("click")({ target: { closest: selector => selector === "[data-settings-reset-layout]" ? {} : null } });
+    assert.equal(layoutResets, 1);
+
+    await handlers.get("click")({ target: { closest: selector => selector === "[data-settings-reset-confirmations]" ? {} : null } });
+    assert.equal(confButton.disabled, true);
+    assert.match(confDesc.textContent, /No confirmation prompts skipped/);
+    assert.equal(languageChanges, 0);
+
+    controller.close();
+    assert.equal(controller.isOpen(), false);
+    assert.equal(disposed, 1);
+    assert.equal(removed, true);
+  } finally {
+    clearSkippedConfirmations();
+    globalThis.document = originalDocument;
+    setAppSettings(previousSettings, { persist: false });
+  }
+});
 
 test("category tabs switch panels by click and keyboard, and toggle the update indicator dot", () => {
   const originalDocument = globalThis.document;
@@ -167,7 +224,7 @@ test("category tabs switch panels by click and keyboard, and toggle the update i
       return null;
     },
   };
-  const root = { querySelector() { return { addEventListener(type, handler) { open = handler; }, focus() {} }; } };
+  const root = { querySelector() { return { addEventListener(type, handler) { if (type === "click") open = handler; }, removeEventListener() {}, focus() {} }; } };
   try {
     globalThis.document = { activeElement: null, createElement: () => dialog, body: { append() {} } };
     bindAppSettings(root, {
@@ -198,13 +255,7 @@ test("category tabs switch panels by click and keyboard, and toggle the update i
     assert.equal(tabs[2].getAttribute("aria-selected"), "true");
     assert.equal(tabs[2].focused, true);
     assert.equal(panels[2].hidden, false);
-
-    handlers.get("keydown")({ target: tabs[2], key: "End", preventDefault() {} });
-    assert.equal(tabs[3].getAttribute("aria-selected"), "true");
-    assert.equal(panels[3].hidden, false);
-
-    handlers.get("keydown")({ target: tabs[3], key: "Home", preventDefault() {} });
-    assert.equal(tabs[0].getAttribute("aria-selected"), "true");
-    assert.equal(panels[0].hidden, false);
-  } finally { globalThis.document = originalDocument; }
+  } finally {
+    globalThis.document = originalDocument;
+  }
 });

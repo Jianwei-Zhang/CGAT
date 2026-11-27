@@ -30,6 +30,7 @@ import { invokeCommand, pickDirectoryPath, pickZipFilePath } from "../../service
 import { getMessages, t as i18nT } from "../i18n/index.js";
 import { projectIcon } from "./project-icons.js";
 import { normalizeImportParserWorkers } from "../../services/import-parallelism.js";
+import { getAppSettings } from "../../services/app-settings.js";
 
 const IMPORT_PROGRESS_BOTTOM_THRESHOLD_PX = 24;
 const IMPORTER_STATUS_TOAST_AUTO_DISMISS_MS = 1000;
@@ -496,7 +497,7 @@ function openProjectImportDialog(host, store, partitionId = "") {
     requireNewWorkspace: false,
     projectError: "",
     pendingProjectPath: "",
-    importParallelism: normalizeImportParserWorkers("auto"),
+    importParallelism: normalizeImportParserWorkers(getAppSettings().importParallelism),
   });
   rerender(host, store);
   host.querySelector("#zip-path-input, #extracted-path-input")?.focus();
@@ -767,12 +768,18 @@ async function openProjectCopyDialog(host, store, workspaceRoot) {
     const defaults = await getProjectCopyDefaults({ workspaceRoot: sourceRoot, projectName: sourceName });
     const current = store.getState().importer.copyDialog;
     if (!current?.open || current.requestId !== requestId) return;
+    const defaultTargetRoot = defaults.targetRoot || defaults.workspaceRoot;
+    const preferredParent = String(getAppSettings().defaultWorkspaceRoot || "").trim();
+    const copyLeaf = projectCopyPathLeaf(defaultTargetRoot) || String(defaults.projectName || "").trim();
+    const targetRoot = preferredParent && copyLeaf
+      ? joinProjectCopyPath(preferredParent, copyLeaf)
+      : defaultTargetRoot;
     updateImporterState(store, {
       copyDialog: {
         ...current,
         loading: false,
         projectName: defaults.projectName,
-        targetRoot: defaults.targetRoot || defaults.workspaceRoot,
+        targetRoot,
       },
     });
   } catch (error) {

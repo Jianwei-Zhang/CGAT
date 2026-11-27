@@ -7,6 +7,7 @@ import { constrainLocalViewPosition } from "../subview-workspace-runtime.js";
 import { createSubviewPairwiseController } from "../subview-pairwise-controller.js";
 import { createSubviewSelectionController } from "../subview-selection-controller.js";
 import { createState, renderAssemblyPage } from "./tabs-semantics-harness.mjs";
+import { DEFAULT_APP_SETTINGS, setAppSettings } from "../../../../services/app-settings.js";
 
 const summary = (left, right) => ({ mode: "2-contig",
   top: { role: "primary", contigId: left }, bottom: { role: "primary", contigId: right } });
@@ -56,6 +57,20 @@ test("new Local Views default to the single docked slot without deleting tasks o
   assert.deepEqual(windows.filter(item => item.opened && !item.floating).map(item => item.id), [second]);
   assert.equal(windows.find(item => item.id === first).floating, true);
   assert.equal(windows.length, 3);
+});
+
+test("new Local Views honor localViewDefaultMode=floating and localViewDefaultPinned=false", () => {
+  try {
+    setAppSettings({ ...DEFAULT_APP_SETTINGS, localViewDefaultMode: "floating", localViewDefaultPinned: false }, { persist: false });
+    const store = fixture();
+    const id = enter(store, summary(2, 5));
+    const win = store.getState().assembly.subviewWorkspace.windows.find(item => item.id === id);
+    assert.equal(win.floating, true);
+    assert.equal(win.pinned, false);
+    assert.equal(win.opened, true);
+  } finally {
+    setAppSettings(DEFAULT_APP_SETTINGS, { persist: false });
+  }
 });
 
 test("windows retain independent edits, history and viewport while sharing live Main data", () => {

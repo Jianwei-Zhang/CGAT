@@ -1,5 +1,7 @@
 import { defaultProjectName } from "./project-session.js";
 import { workspacePathIdentity } from "./workspace-history.js";
+import { getAppSettings } from "./app-settings.js";
+import { normalizeImportParserWorkers } from "./import-parallelism.js";
 
 export function localWorkspaceTimestamp(date = new Date()) {
   const pad = n => String(n).padStart(2, "0");
@@ -16,14 +18,19 @@ export function relocateWorkspaceSuggestion(parent, current) {
 
 // Both native drops and the archive picker populate the same import form.
 // Keep the backend's collision-safe destination and require a new directory.
-export function archiveImportForm(entry) {
+export function archiveImportForm(entry, { defaultWorkspaceRoot = getAppSettings().defaultWorkspaceRoot } = {}) {
   if (entry?.kind !== "archive" || !entry.path || !entry.suggestedWorkspace) {
     throw new Error("Unable to prepare a new workspace for the delivery archive.");
   }
+  const preferredRoot = String(defaultWorkspaceRoot || "").trim();
+  const workspaceRoot = preferredRoot
+    ? relocateWorkspaceSuggestion(preferredRoot, entry.suggestedWorkspace)
+    : entry.suggestedWorkspace;
   return {
     importDialogOpen: true, importSource: "zip", zipPath: entry.path,
-    workspaceRoot: entry.suggestedWorkspace, requireNewWorkspace: true,
-    projectNameInput: defaultProjectName(entry.suggestedWorkspace), projectNameEdited: false,
+    workspaceRoot, requireNewWorkspace: true,
+    importParallelism: normalizeImportParserWorkers(getAppSettings().importParallelism),
+    projectNameInput: defaultProjectName(workspaceRoot), projectNameEdited: false,
     projectError: "", pendingProjectPath: "",
   };
 }

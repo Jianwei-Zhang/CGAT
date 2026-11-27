@@ -1,6 +1,8 @@
 use tauri::menu::AboutMetadata;
 
 const APP_DISPLAY_NAME: &str = "Genome Puzzle Master";
+pub const OPEN_SETTINGS_MENU_ID: &str = "open-settings";
+pub const OPEN_SETTINGS_EVENT: &str = "gpm-open-settings";
 
 fn about_metadata(version: &semver::Version) -> AboutMetadata<'static> {
     AboutMetadata {
@@ -17,10 +19,10 @@ fn about_metadata(version: &semver::Version) -> AboutMetadata<'static> {
 // Also compile-check the menu wiring in host-side unit tests.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub fn install(app: &tauri::App) -> tauri::Result<()> {
-    use tauri::menu::{Menu, PredefinedMenuItem};
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 
     // Retain the standard Services/Edit/Window menus and their native actions;
-    // only replace the first item (About) in Tauri's macOS application submenu.
+    // replace About and insert Settings… (⌘,) in Tauri's macOS application submenu.
     let menu = Menu::default(app.handle())?;
     let items = menu.items()?;
     let app_menu = items
@@ -30,8 +32,18 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
     let mut metadata = about_metadata(&app.package_info().version);
     metadata.copyright = app.config().bundle.copyright.clone();
     let about = PredefinedMenuItem::about(app, Some("About Genome Puzzle Master"), Some(metadata))?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let settings = MenuItem::with_id(
+        app,
+        OPEN_SETTINGS_MENU_ID,
+        "Settings…",
+        true,
+        Some("CmdOrCtrl+,"),
+    )?;
     app_menu.remove_at(0)?;
     app_menu.insert(&about, 0)?;
+    app_menu.insert(&separator, 1)?;
+    app_menu.insert(&settings, 2)?;
     app.set_menu(menu)?;
     Ok(())
 }
@@ -49,5 +61,11 @@ mod tests {
             // None would bring back the duplicate CFBundleVersion value.
             assert_eq!(metadata.short_version.as_deref(), Some(""));
         }
+    }
+
+    #[test]
+    fn settings_menu_constants_match_frontend_event_contract() {
+        assert_eq!(OPEN_SETTINGS_MENU_ID, "open-settings");
+        assert_eq!(OPEN_SETTINGS_EVENT, "gpm-open-settings");
     }
 }
