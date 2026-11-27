@@ -155,7 +155,8 @@ for (const locale of ["en", "zh"]) test(`splitter sits between library and detai
 test("splitter CSS keeps a generous hit area on the existing border and hides it in stacked mode", () => {
   const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
   assert.match(css, /grid-template-columns: var\(--project-sidebar-width, var\(--project-sidebar-default\)\) 0 minmax\(0, 1fr\)/);
-  assert.match(css, /\.project-browser\.is-sidebar-collapsed \{ grid-template-columns: 48px 0 minmax\(0, 1fr\); \}/);
+  assert.match(css, /\.project-browser\.is-sidebar-collapsed \{ grid-template-columns: 48px minmax\(0, 1fr\); \}/);
+  assert.match(css, /\.project-browser\.is-sidebar-collapsed \.library-search,/);
   assert.match(css, /\.project-sidebar-splitter \{[^}]*width: 10px;[^}]*cursor: col-resize;[^}]*touch-action: none;/);
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.project-sidebar-splitter \{ display: none; \}/);
   assert.match(css, /\.project-sidebar-splitter:focus-visible/);

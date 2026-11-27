@@ -485,7 +485,7 @@
 .project-no-selection h4 { font-size: var(--font-title); }
 
 .project-browser { --project-sidebar-default: 280px; display: grid; flex: 1; grid-template-columns: var(--project-sidebar-width, var(--project-sidebar-default)) 0 minmax(0, 1fr); min-height: 440px; }
-.project-browser.is-sidebar-collapsed { grid-template-columns: 48px 0 minmax(0, 1fr); }
+.project-browser.is-sidebar-collapsed { grid-template-columns: 48px minmax(0, 1fr); }
 .project-browser.is-sidebar-collapsed > .project-sidebar-splitter { display: none; }
 /* A zero-width grid track keeps the original boundary; the hit area straddles it. */
 .project-sidebar-splitter { position: relative; z-index: 2; width: 10px; margin-left: -5px; cursor: col-resize; touch-action: none; outline: none; }
@@ -503,13 +503,13 @@
 .project-recents .project-entry-actions .project-sidebar-toggle:hover:not(:disabled) { color: var(--text-primary, #1e293b); }
 .project-entry-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-sidebar-rail-count { display: none; }
-.project-browser.is-sidebar-collapsed .project-recents { padding: 12px 6px; align-items: center; }
+.project-browser.is-sidebar-collapsed .project-recents { padding: 12px 6px; align-items: center; overflow: hidden; }
 .project-browser.is-sidebar-collapsed .project-entry-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; margin-bottom: 8px; }
 .project-browser.is-sidebar-collapsed .project-entry-actions .button { width: 34px; height: 34px; min-height: 34px; padding: 0; justify-content: center; }
 .project-browser.is-sidebar-collapsed .project-entry-actions .project-sidebar-toggle { order: -1; }
 .project-browser.is-sidebar-collapsed .project-entry-label { display: none; }
 .project-browser.is-sidebar-collapsed .project-recents-header,
-.project-browser.is-sidebar-collapsed .project-library-search,
+.project-browser.is-sidebar-collapsed .library-search,
 .project-browser.is-sidebar-collapsed .project-recent-list { display: none; }
 .project-browser.is-sidebar-collapsed .project-sidebar-rail-count {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
@@ -753,13 +753,13 @@
   .project-sidebar-splitter { display: none; }
   .project-sidebar-toggle,
   .project-browser.is-sidebar-collapsed .project-sidebar-rail-count { display: none; }
-  .project-browser.is-sidebar-collapsed .project-recents { padding: 16px 14px 12px; align-items: stretch; }
+  .project-browser.is-sidebar-collapsed .project-recents { padding: 16px 14px 12px; align-items: stretch; overflow: visible; }
   .project-browser.is-sidebar-collapsed .project-entry-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: auto; margin-bottom: 14px; }
   .project-browser.is-sidebar-collapsed .project-entry-actions .button { width: auto; height: auto; min-height: 36px; padding: 7px 10px; }
   .project-browser.is-sidebar-collapsed .project-entry-label { display: inline; }
-  .project-browser.is-sidebar-collapsed .project-recents-header,
-  .project-browser.is-sidebar-collapsed .project-library-search,
-  .project-browser.is-sidebar-collapsed .project-recent-list { display: revert; }
+  .project-browser.is-sidebar-collapsed .project-recents-header { display: grid; }
+  .project-browser.is-sidebar-collapsed .library-search { display: flex; }
+  .project-browser.is-sidebar-collapsed .project-recent-list { display: block; }
   .project-recents { border-right: 0; border-bottom: 1px solid var(--theme-line, #e6e6e6); }
   .project-recents .project-entry-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 320px; }
   .project-current { padding: 24px 20px 28px; }
