@@ -1,4 +1,6 @@
 import { isFinalPathRefSegment } from "./final-path-state.js";
+import { getAppSettings } from "../../../services/app-settings.js";
+import { deriveContigRoleColors } from "../../../services/track-colors.js";
 
 // Stable track colors, shared by Main/Local View, Final Path and project exports.
 // Keep these headless-export fallbacks in sync with the :root tokens in base.css.
@@ -22,17 +24,24 @@ export function contigColorToken(role, property = "fill") {
 
 export function getContigPalette() {
   const root = globalThis.document?.documentElement;
-  // Standalone SVG/PNG exports always use a white publication canvas.
+  const custom = getAppSettings().trackColors || {};
+  // Standalone SVG/PNG exports always use a white publication canvas while
+  // reflecting the user's customized biological track colors.
   const styles = root && root.dataset?.theme !== "dark" && typeof globalThis.getComputedStyle === "function"
     ? globalThis.getComputedStyle(root)
     : null;
-  return Object.fromEntries(Object.entries(DEFAULT_CONTIG_PALETTE).map(([role, colors]) => [
-    role,
-    Object.fromEntries(Object.entries(colors).map(([property, fallback]) => [
-      property,
-      styles?.getPropertyValue?.(`--ctg-${role}-${property}`)?.trim() || fallback,
-    ])),
-  ]));
+  return Object.fromEntries(Object.entries(DEFAULT_CONTIG_PALETTE).map(([role, colors]) => {
+    if (custom[role]) {
+      return [role, deriveContigRoleColors(custom[role], { dark: false })];
+    }
+    return [
+      role,
+      Object.fromEntries(Object.entries(colors).map(([property, fallback]) => [
+        property,
+        styles?.getPropertyValue?.(`--ctg-${role}-${property}`)?.trim() || fallback,
+      ])),
+    ];
+  }));
 }
 
 function normalizeDataset(value) {

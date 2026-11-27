@@ -6,6 +6,7 @@ import { changeSubviewWindow, getSubviewWindowStore } from "./subview-workspace-
 import { renderSubviewDockIcon, syncSubviewPinButton, subviewWindowAssembly, subviewWindowDescription } from "./render-subview-workspace.js";
 import { LOCAL_VIEW_RESIZE_EDGES, resolveLocalViewWindowGesture } from "./subview-window-geometry.js";
 import { bindAppTooltips } from "../../app-tooltip-runtime.js";
+import { TRACK_COLOR_CSS_VARS } from "../../../services/track-colors.js";
 
 const DIRECTIONS = { n: "North", s: "South", e: "East", w: "West", ne: "NorthEast", nw: "NorthWest", se: "SouthEast", sw: "SouthWest" };
 const managers = new WeakMap();
@@ -113,9 +114,10 @@ export function createNativeSubviewWindows(root, store, deps) {
     }
     entry.win.document.documentElement.dataset.theme = root.ownerDocument.documentElement.dataset.theme || "light";
     entry.win.document.documentElement.lang = state.locale || "zh";
-    for (const name of ["--app-font-size", "--graph-font-size"]) {
+    for (const name of ["--app-font-size", "--graph-font-size", ...TRACK_COLOR_CSS_VARS]) {
       const value = root.ownerDocument.documentElement.style.getPropertyValue(name);
-      if (value) entry.win.document.documentElement.style.setProperty(name, value);
+      if (value) entry.win.document.documentElement.style.setProperty?.(name, value);
+      else entry.win.document.documentElement.style.removeProperty?.(name);
     }
     // Geometry and handlers must be ready before revealing a newly opened peer.
     if (entry.ready) void entry.visibility.sync();

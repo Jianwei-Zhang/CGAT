@@ -57,6 +57,11 @@ for (const locale of ["zh", "en"]) {
     assert.match(generalPanel, /id="settings-import-parallelism" name="importParallelism"/);
 
     assert.match(appearancePanel, /data-settings-radio="theme"/);
+    assert.match(appearancePanel, /data-settings-track-preset="default"/);
+    assert.match(appearancePanel, /data-settings-track-preset="okabe"/);
+    assert.match(appearancePanel, /data-settings-track-color="primary"/);
+    assert.match(appearancePanel, /data-settings-track-color="grt"/);
+    assert.match(appearancePanel, /class="settings-track-preview"/);
     assert.match(appearancePanel, /data-settings-radio="fontSize"/);
     assert.match(appearancePanel, /data-settings-radio="graphFontSize"/);
     assert.match(appearancePanel, /class="settings-preview settings-preview-card"/);
@@ -150,6 +155,20 @@ test("saving settings updates switches, radios, confirmations, layout reset, and
 
     handlers.get("click")({ target: { closest: selector => selector === "[data-settings-radio]" ? { dataset: { settingsRadio: "localViewDefaultMode", settingsValue: "floating" } } : null } });
     assert.equal(getAppSettings().localViewDefaultMode, "floating");
+
+    handlers.get("click")({ target: { closest: selector => selector === "[data-settings-track-preset]" ? { dataset: { settingsTrackPreset: "okabe" } } : null } });
+    assert.equal(getAppSettings().trackColors.primary, "#56b4e9");
+    assert.equal(getAppSettings().trackColors.companion, "#e69f00");
+
+    handlers.get("change")({ target: { dataset: { settingsTrackColor: "primary" }, value: "#2563eb" } });
+    assert.equal(getAppSettings().trackColors.primary, "#2563eb");
+
+    handlers.get("click")({ target: { closest: selector => selector === "[data-settings-track-color-reset]" ? { dataset: { settingsTrackColorReset: "primary" } } : null } });
+    assert.equal(getAppSettings().trackColors.primary, null);
+    assert.equal(getAppSettings().trackColors.companion, "#e69f00");
+
+    handlers.get("click")({ target: { closest: selector => selector === "[data-settings-reset-track-colors]" ? {} : null } });
+    assert.equal(getAppSettings().trackColors.companion, null);
 
     await handlers.get("click")({ target: { closest: selector => selector === "[data-settings-reset-layout]" ? {} : null } });
     assert.equal(layoutResets, 1);

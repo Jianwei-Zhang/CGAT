@@ -1,4 +1,6 @@
 import { formatIntegerEnUs } from "./number-format.js";
+import { getAppSettings } from "../../../services/app-settings.js";
+import { deriveAlignmentBandBaseRgb } from "../../../services/track-colors.js";
 
 // One absolute scale for Canvas, SVG, drag previews and serialized SVGs.
 // Missing evidence is not a measured zero; MAPQ is never a fallback.
@@ -24,7 +26,10 @@ export function readHitIdentityPct(hit) {
 export function resolveAlignmentBandStyle(tone, identityPct) {
   const identity = readHitIdentityPct({ identityPct });
   if (identity === null) return { fill: translucent("rgb(222, 224, 227)"), stroke: "rgb(194, 198, 204)" };
-  const base = tone === "companion" ? [154, 126, 78] : [97, 129, 170];
+  const role = tone === "companion" ? "companion" : "primary";
+  const customHex = getAppSettings().trackColors?.[role];
+  const base = (customHex && deriveAlignmentBandBaseRgb(customHex, { dark: false }))
+    || (role === "companion" ? [154, 126, 78] : [97, 129, 170]);
   const strength = MIN_COLOR_STRENGTH + (MAX_COLOR_STRENGTH - MIN_COLOR_STRENGTH)
     * Math.max(0, Math.min(1, (identity - 80) / 20));
   const blend = (amount) => `rgb(${base.map((channel) => Math.round(255 + (channel - 255) * amount)).join(", ")})`;
@@ -36,7 +41,10 @@ export function resolveDarkAlignmentBandStyle(tone, identityPct) {
   // Unknown identity is a neutral slate wash, never a fabricated strength.
   if (identity === null) return { fill: translucent("rgb(38, 50, 66)"), stroke: "rgb(56, 72, 92)" };
   const canvas = [23, 33, 46];
-  const base = tone === "companion" ? [196, 152, 88] : [96, 150, 214];
+  const role = tone === "companion" ? "companion" : "primary";
+  const customHex = getAppSettings().trackColors?.[role];
+  const base = (customHex && deriveAlignmentBandBaseRgb(customHex, { dark: true }))
+    || (role === "companion" ? [196, 152, 88] : [96, 150, 214]);
   const strength = DARK_MIN_COLOR_STRENGTH
     + (DARK_MAX_COLOR_STRENGTH - DARK_MIN_COLOR_STRENGTH)
     * Math.max(0, Math.min(1, (identity - 80) / 20));

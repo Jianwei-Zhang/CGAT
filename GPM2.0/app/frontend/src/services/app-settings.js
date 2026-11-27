@@ -1,4 +1,10 @@
 import { MAX_IMPORT_PARSER_WORKERS, MIN_IMPORT_PARSER_WORKERS } from "./import-parallelism.js";
+import {
+  DEFAULT_TRACK_COLOR_OVERRIDES,
+  applyTrackColorVariables,
+  normalizeTrackColors,
+  trackColorsEqual,
+} from "./track-colors.js";
 
 export const APP_SETTINGS_KEY = "gpm_next:app_settings";
 export const PROJECT_SIDEBAR_WIDTH_KEY = "gpm.project-library-width";
@@ -9,6 +15,7 @@ export const DEFAULT_APP_SETTINGS = Object.freeze({
   theme: "system",
   fontSize: 14,
   graphFontSize: null,
+  trackColors: DEFAULT_TRACK_COLOR_OVERRIDES,
   historyCapacity: 0,
   restoreLastWorkspace: true,
   defaultWorkspaceRoot: "",
@@ -36,6 +43,7 @@ export function normalizeAppSettings(value = {}) {
     theme: ["system", "light", "dark"].includes(value?.theme) ? value.theme : "system",
     fontSize: [12, 14, 16, 18].includes(value?.fontSize) ? value.fontSize : 14,
     graphFontSize: [10, 12, 14, 16].includes(value?.graphFontSize) ? value.graphFontSize : null,
+    trackColors: normalizeTrackColors(value?.trackColors),
     historyCapacity: Number.isSafeInteger(value?.historyCapacity) && value.historyCapacity >= 0
       && value.historyCapacity <= 1000000 ? value.historyCapacity : 0,
     restoreLastWorkspace: typeof value?.restoreLastWorkspace === "boolean" ? value.restoreLastWorkspace : true,
@@ -56,17 +64,18 @@ export function resetAppLayoutPreferences(storage = globalThis.localStorage) {
 
 function readSettings() {
   try { return normalizeAppSettings(JSON.parse(globalThis.localStorage?.getItem(APP_SETTINGS_KEY) || "{}")); }
-  catch { return { ...DEFAULT_APP_SETTINGS }; }
+  catch { return { ...DEFAULT_APP_SETTINGS, trackColors: { ...DEFAULT_TRACK_COLOR_OVERRIDES } }; }
 }
 let current = readSettings();
-export function getAppSettings() { return { ...current }; }
+export function getAppSettings() { return { ...current, trackColors: { ...current.trackColors } }; }
 export function setAppSettings(value, { persist = true } = {}) {
   const next = normalizeAppSettings(value);
+  const trackColorsChanged = !trackColorsEqual(current.trackColors, next.trackColors);
   // Persist before changing runtime state: storage failures must remain visible to the user.
   if (persist) globalThis.localStorage?.setItem(APP_SETTINGS_KEY, JSON.stringify(next));
   current = next;
   applyAppTypography();
-  applyAppTheme();
+  applyAppTheme(globalThis.document?.documentElement, undefined, { forceNotify: trackColorsChanged });
   return getAppSettings();
 }
 export function getHistoryCapacity() { return current.historyCapacity; }
@@ -103,11 +112,16 @@ export function subscribeAppTheme(listener) {
 
 export function getAppliedAppTheme() { return appliedTheme; }
 
-export function applyAppTheme(root = globalThis.document?.documentElement, systemDark) {
+export function applyAppTrackColors(root = globalThis.document?.documentElement, theme = appliedTheme) {
+  applyTrackColorVariables(root, current.trackColors, { dark: theme === "dark" });
+}
+
+export function applyAppTheme(root = globalThis.document?.documentElement, systemDark, { forceNotify = false } = {}) {
   const dark = systemDark ?? globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
   const theme = resolveAppTheme(current.theme, dark);
   if (root) root.dataset.theme = theme;
-  if (theme !== appliedTheme) {
+  applyAppTrackColors(root, theme);
+  if (theme !== appliedTheme || forceNotify) {
     const previous = appliedTheme;
     appliedTheme = theme;
     for (const listener of [...themeSubscribers]) {

@@ -4,10 +4,23 @@ import { requestAppConfirm } from "./app-dialog.js";
 import { clearSkippedConfirmations, skippedConfirmationCount } from "./confirmation-session.js";
 import {
   DEFAULT_APP_SETTINGS,
+  getAppliedAppTheme,
   getAppSettings,
   resetAppLayoutPreferences,
   setAppSettings,
 } from "../../services/app-settings.js";
+import {
+  DEFAULT_TRACK_BASE_COLORS,
+  DEFAULT_TRACK_COLOR_OVERRIDES,
+  TRACK_COLOR_KEYS,
+  TRACK_COLOR_PRESETS,
+  applyTrackColorVariables,
+  detectTrackColorPreset,
+  hasCustomTrackColors,
+  normalizeHexColor,
+  normalizeTrackColors,
+  resolveEffectiveTrackBaseColors,
+} from "../../services/track-colors.js";
 import { importParserWorkerChoices, recommendedImportParserWorkers } from "../../services/import-parallelism.js";
 
 export const SETTINGS_TABS = Object.freeze(["general", "appearance", "editing", "updates"]);
@@ -43,6 +56,20 @@ export const APP_SETTINGS_COPY = {
     system: "跟随系统",
     light: "浅色",
     dark: "深色",
+    trackColorsGroup: "轨道与条带配色",
+    trackColorsDesc: "选择各条带主色，系统自动派生描边、高对比文字与深色模式适配色；共线性比对带自动跟随轨道色相，图表导出同步生效。",
+    trackColorsResetAll: "恢复默认配色",
+    trackColorsResetOne: "恢复此项默认颜色",
+    trackPresetDefault: "默认经典",
+    trackPresetOkabe: "色盲友好",
+    trackPresetNature: "学术出版",
+    trackPresetVivid: "高对比度",
+    trackColorPrimary: "主组装",
+    trackColorCompanion: "辅助组装",
+    trackColorRef: "参考基因组",
+    trackColorSelection: "选中高亮",
+    trackColorGrt: "GRT 叠加层",
+    trackPreviewLabel: "条带与比对带预览",
     typography: "文字与图内排版",
     size: "界面字号",
     sizeDesc: "控制菜单、列表、按钮与弹窗正文大小。",
@@ -124,6 +151,20 @@ export const APP_SETTINGS_COPY = {
     system: "Follow System",
     light: "Light",
     dark: "Dark",
+    trackColorsGroup: "Track & Strip Colors",
+    trackColorsDesc: "Pick one base color per role; borders, high-contrast ink, and dark-mode tones derive automatically. Collinearity ribbons follow track hues and apply to figure exports.",
+    trackColorsResetAll: "Reset colors",
+    trackColorsResetOne: "Reset to default color",
+    trackPresetDefault: "Classic",
+    trackPresetOkabe: "Colorblind Safe",
+    trackPresetNature: "Academic (NPG)",
+    trackPresetVivid: "High Contrast",
+    trackColorPrimary: "Primary",
+    trackColorCompanion: "Auxiliary",
+    trackColorRef: "Reference",
+    trackColorSelection: "Selection",
+    trackColorGrt: "GRT Overlay",
+    trackPreviewLabel: "Track & Ribbon Preview",
     typography: "Typography",
     size: "Interface text",
     sizeDesc: "Controls menus, lists, buttons, and body labels.",
@@ -221,6 +262,78 @@ function renderThemeCards(c, selectedTheme) {
   }).join("")}</div>`;
 }
 
+function renderTrackColorsGroup(copy, trackColors) {
+  const normalized = normalizeTrackColors(trackColors);
+  const effective = resolveEffectiveTrackBaseColors(normalized);
+  const activePreset = detectTrackColorPreset(normalized);
+  const hasCustom = hasCustomTrackColors(normalized);
+  const presetLabels = {
+    default: copy.trackPresetDefault,
+    okabe: copy.trackPresetOkabe,
+    nature: copy.trackPresetNature,
+    vivid: copy.trackPresetVivid,
+  };
+  const roleLabels = {
+    primary: copy.trackColorPrimary,
+    companion: copy.trackColorCompanion,
+    ref: copy.trackColorRef,
+    selection: copy.trackColorSelection,
+    grt: copy.trackColorGrt,
+  };
+  const presetsHtml = TRACK_COLOR_PRESETS.map(preset => {
+    const active = activePreset === preset.id;
+    const dots = preset.swatches.map(color => `<i style="background:${color}"></i>`).join("");
+    return `<button type="button" class="settings-palette-preset${active ? " is-active" : ""}" data-settings-track-preset="${preset.id}" aria-pressed="${active}">
+      <span class="settings-palette-dots" aria-hidden="true">${dots}</span>
+      <span>${escapeHtml(presetLabels[preset.id] || preset.id)}</span>
+    </button>`;
+  }).join("");
+
+  const pickersHtml = TRACK_COLOR_KEYS.map(key => {
+    const label = roleLabels[key] || key;
+    const hex = effective[key];
+    const isCustom = normalized[key] !== null;
+    return `<div class="settings-color-item${isCustom ? " is-custom" : ""}" data-settings-color-item="${key}">
+      <label class="settings-color-swatch-wrap" for="settings-track-color-${key}">
+        <input id="settings-track-color-${key}" class="settings-color-input" type="color" name="trackColor:${key}" data-settings-track-color="${key}" value="${hex}" aria-label="${escapeHtml(label)}">
+        <span class="settings-color-meta">
+          <span class="settings-color-label">${escapeHtml(label)}</span>
+          <code class="settings-color-hex" data-settings-track-color-hex="${key}">${hex.toUpperCase()}</code>
+        </span>
+      </label>
+      <button type="button" class="settings-color-reset" data-settings-track-color-reset="${key}" aria-label="${escapeHtml(`${copy.trackColorsResetOne}: ${label}`)}" data-app-tooltip="${escapeHtml(copy.trackColorsResetOne)}"${isCustom ? "" : " disabled"}>↺</button>
+    </div>`;
+  }).join("");
+
+  return `<div class="settings-group">
+    <div class="settings-group-head">
+      <h4 class="settings-group-title">${copy.trackColorsGroup}</h4>
+      <button type="button" class="settings-group-action" data-settings-reset-track-colors${hasCustom ? "" : " disabled"}>${copy.trackColorsResetAll}</button>
+    </div>
+    <p class="settings-group-desc">${copy.trackColorsDesc}</p>
+    <div class="settings-palette-presets" role="group" aria-label="${escapeHtml(copy.trackColorsGroup)}">${presetsHtml}</div>
+    <div class="settings-color-grid">${pickersHtml}</div>
+    <div class="settings-track-preview" aria-label="${escapeHtml(copy.trackPreviewLabel)}">
+      <svg viewBox="0 0 420 76" role="img" aria-label="${escapeHtml(copy.trackPreviewLabel)}">
+        <rect x="6" y="6" width="408" height="10" rx="3" fill="var(--ctg-ref-fill)" stroke="var(--ctg-ref-stroke)" stroke-width="1"/>
+        <text x="12" y="13.5" font-size="8.5" font-weight="600" fill="var(--ctg-ref-text)">Ref · Chr01</text>
+        <path d="M 18 16 L 196 16 L 188 38 L 12 38 Z" fill="var(--alignment-legend-primary-high)"/>
+        <path d="M 214 16 L 368 16 L 358 38 L 206 38 Z" fill="var(--alignment-legend-companion-high)"/>
+        <rect x="12" y="38" width="176" height="15" rx="2.5" fill="var(--ctg-primary-fill)" stroke="var(--ctg-primary-stroke)" stroke-width="1"/>
+        <text x="18" y="48.5" font-size="9.5" font-weight="600" fill="var(--ctg-primary-text)">primary_ctg1</text>
+        <rect x="206" y="38" width="152" height="15" rx="2.5" fill="var(--ctg-companion-fill)" stroke="var(--ctg-companion-stroke)" stroke-width="1"/>
+        <text x="212" y="48.5" font-size="9.5" font-weight="600" fill="var(--ctg-companion-text)">aux_ctg2</text>
+        <rect x="12" y="38" width="176" height="15" rx="2.5" fill="var(--final-path-selection-fill)" stroke="var(--final-path-selection-stroke)" stroke-width="1.5"/>
+        <rect x="366" y="38" width="46" height="15" rx="2.5" fill="var(--grt-result-fill, rgba(108, 143, 120, 0.38))" stroke="var(--grt-result-stroke, #718d79)" stroke-width="1"/>
+        <text x="374" y="48.5" font-size="8.5" font-weight="600" fill="var(--text-primary)">GRT</text>
+        <rect x="12" y="60" width="176" height="10" rx="2" fill="var(--ctg-primary-fill)" stroke="var(--final-path-selection-stroke)" stroke-width="1.4"/>
+        <rect x="194" y="60" width="164" height="10" rx="2" fill="var(--ctg-companion-fill)" stroke="var(--ctg-companion-stroke)" stroke-width="1"/>
+        <rect x="364" y="60" width="48" height="10" rx="2" fill="var(--ctg-ref-fill)" stroke="var(--ctg-ref-stroke)" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>`;
+}
+
 export function renderSettingsContent(locale, settings = getAppSettings(), activeTab = "general", context = {}) {
   const c = APP_SETTINGS_COPY[locale === "en" ? "en" : "zh"];
   const currentTab = SETTINGS_TABS.includes(activeTab) ? activeTab : "general";
@@ -313,6 +426,7 @@ export function renderSettingsContent(locale, settings = getAppSettings(), activ
             <p class="settings-group-desc">${c.themeDesc}</p>
             ${renderThemeCards(c, settings.theme)}
           </div>
+          ${renderTrackColorsGroup(c, settings.trackColors)}
           <div class="settings-group">
             <h4 class="settings-group-title">${c.typography}</h4>
             <div class="settings-row">
@@ -651,6 +765,44 @@ export function bindAppSettings(root, {
       if (button) button.disabled = count === 0;
     };
 
+    const syncTrackColorsUI = (trackColors = getAppSettings().trackColors) => {
+      const normalized = normalizeTrackColors(trackColors);
+      const effective = resolveEffectiveTrackBaseColors(normalized);
+      const activePreset = detectTrackColorPreset(normalized);
+      const hasCustom = hasCustomTrackColors(normalized);
+      const resetAllBtn = dialog.querySelector("[data-settings-reset-track-colors]");
+      if (resetAllBtn) resetAllBtn.disabled = !hasCustom;
+      dialog.querySelectorAll("[data-settings-track-preset]").forEach(button => {
+        const active = button.dataset.settingsTrackPreset === activePreset;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+      for (const key of TRACK_COLOR_KEYS) {
+        const hex = effective[key];
+        const isCustom = normalized[key] !== null;
+        const item = dialog.querySelector(`[data-settings-color-item="${key}"]`);
+        item?.classList?.toggle("is-custom", isCustom);
+        const input = dialog.querySelector(`[data-settings-track-color="${key}"]`);
+        if (input && input.value.toLowerCase() !== hex) input.value = hex;
+        const hexEl = dialog.querySelector(`[data-settings-track-color-hex="${key}"]`);
+        if (hexEl) hexEl.textContent = hex.toUpperCase();
+        const resetBtn = dialog.querySelector(`[data-settings-track-color-reset="${key}"]`);
+        if (resetBtn) resetBtn.disabled = !isCustom;
+      }
+    };
+
+    const updateTrackColors = (nextColors, { commit = true } = {}) => {
+      const normalized = normalizeTrackColors(nextColors);
+      if (commit) {
+        if (save({ trackColors: normalized })) syncTrackColorsUI(normalized);
+        return;
+      }
+      const rootEl = dialog.ownerDocument?.documentElement || globalThis.document?.documentElement;
+      const isDark = rootEl?.dataset?.theme === "dark" || getAppliedAppTheme() === "dark";
+      applyTrackColorVariables(rootEl, normalized, { dark: isDark });
+      syncTrackColorsUI(normalized);
+    };
+
     render();
     document.body.append(dialog);
     dialog.addEventListener("close", () => {
@@ -662,6 +814,14 @@ export function bindAppSettings(root, {
     }, { once: true });
 
     dialog.addEventListener("input", event => {
+      if (event.target.dataset?.settingsTrackColor) {
+        const key = event.target.dataset.settingsTrackColor;
+        const hex = normalizeHexColor(event.target.value);
+        if (hex && TRACK_COLOR_KEYS.includes(key)) {
+          updateTrackColors({ ...getAppSettings().trackColors, [key]: hex }, { commit: false });
+        }
+        return;
+      }
       if (event.target.name === "historyCapacity") {
         event.target.removeAttribute("aria-invalid");
         status(labels().scope);
@@ -679,6 +839,14 @@ export function bindAppSettings(root, {
 
     dialog.addEventListener("change", event => {
       const target = event.target;
+      if (target.dataset?.settingsTrackColor) {
+        const key = target.dataset.settingsTrackColor;
+        const hex = normalizeHexColor(target.value);
+        if (hex && TRACK_COLOR_KEYS.includes(key)) {
+          updateTrackColors({ ...getAppSettings().trackColors, [key]: hex }, { commit: true });
+        }
+        return;
+      }
       const { name, type, value, checked } = target;
       if (type === "checkbox") {
         if (name === "restoreLastWorkspace") save({ restoreLastWorkspace: checked });
@@ -766,6 +934,27 @@ export function bindAppSettings(root, {
       if (presetButton) {
         const nextCapacity = Number(presetButton.dataset.historyPreset);
         if (save({ historyCapacity: nextCapacity })) syncHistoryUI();
+        return;
+      }
+
+      const trackPresetButton = event.target.closest?.("[data-settings-track-preset]");
+      if (trackPresetButton) {
+        const preset = TRACK_COLOR_PRESETS.find(item => item.id === trackPresetButton.dataset.settingsTrackPreset);
+        if (preset) updateTrackColors(preset.colors, { commit: true });
+        return;
+      }
+
+      const trackResetOne = event.target.closest?.("[data-settings-track-color-reset]");
+      if (trackResetOne) {
+        const key = trackResetOne.dataset.settingsTrackColorReset;
+        if (TRACK_COLOR_KEYS.includes(key)) {
+          updateTrackColors({ ...getAppSettings().trackColors, [key]: null }, { commit: true });
+        }
+        return;
+      }
+
+      if (event.target.closest?.("[data-settings-reset-track-colors]")) {
+        updateTrackColors(DEFAULT_TRACK_COLOR_OVERRIDES, { commit: true });
         return;
       }
 
