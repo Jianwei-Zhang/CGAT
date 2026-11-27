@@ -9,6 +9,10 @@ owner_pair=authorization.get('schema')=='q0_exact_owner_pair_v1'
 parent, pin, job = (
     ('q0-pair-transition-20261127.WY7Rw2ll','a0ac52d9e238e8d7bf339610c6fa140082fd8f3b42d25e9dc08e1e7edb7d715d',43138304)
     if owner_pair else ('q0-continuity-transition-20261127.bs5d44Do','248ee1e7a93edc6e5c1e14199d1e8c7f0b7e4fed04f2d1d5e3518da4fb631941',43137228))
+source_change=authorization.get('schema')=='q0_cross_chromosome_source_occupancy_v1'
+if source_change:
+    from q0_exact_engineering_transition import SOURCE_TRANSITION
+    parent,pin,job='q0-owner-transition.TjrxmZGI',SOURCE_TRANSITION,43224098
 previous=base/parent/'transition.json'
 if p.digest(previous)!=pin:
     raise ValueError('retired transition changed; inspect instead of restaging')
@@ -28,12 +32,12 @@ for name in sorted(p.THRESHOLD_POLICY_CHANGES):
 manifest={'schema':p.SOURCE_SCHEMA,'workspace':str(work),'git_revision':(root/'source-revision.txt').read_text().strip(),
           'previous_transition':p.record(previous),'previous_job':job,'protected_baseline':43061436,
           'continuous_q0_policy_change':dict(p.CONTINUITY_CHANGE),
-          'exact_engineering_change':authorization,
+          ('source_occupancy_change' if source_change else 'exact_engineering_change'):authorization,
           'q0_supplement_scope':'positive_threshold','proof_repair_package':p.record(work/'metadata/package.tsv'),
           'prior_selector_files':prior,'positive_threshold_policy_changes':changes,
           'regional_mapper_loader_policy':'clear_same_dependencies_v1',
           'files':json.loads((root/'source-files.json').read_text())}
-if manifest['git_revision'] != manifest['exact_engineering_change']['runtime_revision']:
+if manifest['git_revision'] != authorization['runtime_revision']:
     raise ValueError('wrong qualified engineering revision')
 if changes:
     raise ValueError('engineering successor cannot change any scientific policy')

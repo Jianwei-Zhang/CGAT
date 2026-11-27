@@ -87,3 +87,44 @@ def validate(bundle, manifest):
     support=bundle/"support/workspace_layout.py"
     need(digest(support)==sha256(new["tools/workspace_layout.py"]).hexdigest(),"qualified support module differs")
     return declaration
+
+
+# Scientific successor: source ownership changes by design, not field-exact.
+SOURCE_REVISION = "adfe5e31831bc995aaec127a5ab98c1b65a37567"
+SOURCE_PARENT = "9291117613910937da5f4f9c3c57beadb7885254"
+SOURCE_SCHEMA = "q0_cross_chromosome_source_occupancy_v1"
+SOURCE_FILES = {
+    "q0_admission.py": "9e34cfddc1418cc114cca19142ca302795fc509d001a517ae4ee96662fa9a3cb",
+    "q0_selection_cache.py": "988ea48233538794e91eb9a1b028b04c890e12bed24896dac639fa1442295382",
+    "q0_collinear.py": "d77c8ba46a4f2c599ea25f0258afc4af43dbf12a540e70559a5981b2ccb39a13",
+}
+SOURCE_EVIDENCE = {
+    "baseline_archive": "e1b5b25cf6fe0e565cef2bcc8efd6e67714b4ba01fba43ec2d4f6e74f66faed0",
+    "candidate_archive": "36c1573bf59a8fa6427fbb8e71d6c3a963ee9b821b16666dd2b27b3800daa560",
+    "baseline_replay": "b07c4bafc970c0f2e412946926eb16c947d3e981687b507077345f4f70e279cd",
+    "fixed_replay": "03c77fc5a92cbd8f309e2b211c828d40766da8c5415aec9285dcfebf36f6c3cc",
+    "census": "06cb554006533b2a35aeb1e5a641c76af7dfc0f621165b3c46274ec28cb5b3c7",
+}
+SOURCE_TRANSITION = "dbd07f2d31489146a63471e1484d500ae0407b4918c85657e38f6b1f213f09c4"
+SOURCE_JOURNAL = "4693c2774cf7be523e6c6854292a45cfd84f09ceb048cb48d39fe2c44e84b1ae"
+
+
+def validate_source_change(bundle, manifest):
+    auth = manifest["source_occupancy_change"]
+    need(auth["schema"] == SOURCE_SCHEMA and auth["baseline_revision"] == SOURCE_PARENT
+         and auth["runtime_revision"] == manifest["git_revision"] == SOURCE_REVISION
+         and manifest["previous_job"] == 43224098 and not manifest.get("exact_engineering_change"),
+         "wrong source-occupancy lineage")
+    parent = checked(manifest["previous_transition"])
+    need(digest(parent) == SOURCE_TRANSITION and digest(parent.parent / "installation/receipt.json") == SOURCE_JOURNAL,
+         "not the reviewed installed parent")
+    for key, pin in SOURCE_EVIDENCE.items():
+        need(digest(checked(auth[key])) == pin, "wrong source change evidence: " + key)
+    old, new = (contents(checked(auth[key])) for key in ("baseline_archive", "candidate_archive"))
+    prefix = "tools/lgz_core/"
+    need({n for n in old.keys() | new.keys() if old.get(n) != new.get(n)} == {prefix+n for n in SOURCE_FILES},
+         "unreviewed source-ownership archive change")
+    for folder, base in (("runtime", prefix), ("support", "tools/")):
+        for path in (bundle/folder).glob("*.py"):
+            need(path.read_bytes() == new[base+path.name], "transition file differs from source archive: " + path.name)
+    return auth
