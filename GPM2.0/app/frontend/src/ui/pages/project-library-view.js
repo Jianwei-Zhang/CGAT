@@ -171,7 +171,10 @@ export function renderLibraryDialog(state) {
   const deleteError = removing ? library.error || (!node ? "missing" : "") : "";
   const impact = removing && !deleteError ? partitionDeletionImpact(library, dialog.id, readWorkspaceHistory()) : null;
   return `<div class="modal-overlay library-dialog-overlay"><form class="modal-dialog library-dialog" role="dialog" aria-modal="true" aria-labelledby="library-dialog-title" autocomplete="off">
-    <h3 id="library-dialog-title">${title}</h3>
+    <header class="project-dialog-head">
+      <h3 id="library-dialog-title">${title}</h3>
+      <button type="button" data-library-dialog-dismiss class="dialog-close-button" aria-label="${html(labels.cancel)}">×</button>
+    </header>
     ${editing ? `<label for="library-name">${labels.name}</label><input id="library-name" maxlength="120" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${html(dialog.name ?? node?.name ?? "")}" />` : `<p class="library-dialog-subject">${html(node?.name || dialog.projectName || dialog.path || "")}</p>`}
     ${removing ? `<p>${labels.deleteHint}</p>${impact ? `<p class="library-delete-impact">${labels.deleteImpact.replace("{partitions}", impact.ids.length).replace("{projects}", impact.projectCount)}</p>` : ""}` : `<label for="library-target">${editing || dialog.kind === "move-folder" ? labels.parent : labels.target}</label>
     <select id="library-target">${partitionOptions(library, dialog.parentId ?? node?.parentId ?? "", dialog.kind === "move-project" ? labels.unassigned : labels.root, dialog.id)}</select>`}
@@ -554,6 +557,7 @@ export function bindProjectLibrary(host, store, { refresh, openImport, openProje
       host.querySelector(forImport ? "#import-partition" : "[data-library-create]")?.focus();
     };
     dialog.querySelector("[data-library-dialog-close]").addEventListener("click", close);
+    dialog.querySelector("[data-library-dialog-dismiss]")?.addEventListener("click", close);
     dialog.addEventListener("keydown", event => {
       if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }

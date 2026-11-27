@@ -13,7 +13,7 @@ export function renderSubviewTools(preferences, labels, { escapeHtml, escapeAttr
     aria-modal="false" aria-labelledby="subview-tools-title" data-subview-tools-window="1">
     <header class="subview-tools-header" data-subview-tools-drag="1">
       <strong id="subview-tools-title">${escapeHtml(labels.title)}</strong>
-      <button type="button" class="button ghost tiny" data-subview-tools-close="1"
+      <button type="button" class="dialog-close-button subview-tools-close" data-subview-tools-close="1"
         aria-label="${escapeAttr(labels.close)}" data-app-tooltip="${escapeAttr(labels.close)}">×</button>
     </header>
     <div class="subview-tools-tabs" role="tablist" aria-label="${escapeAttr(labels.title)}">

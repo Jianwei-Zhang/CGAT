@@ -69,7 +69,7 @@ export function openTrackMembersDialog(host, store, context, deps) {
   dialog.className = "app-dialog track-members-dialog";
   dialog.setAttribute("data-track-members-dialog", "");
   dialog.setAttribute("aria-labelledby", "track-members-title");
-  dialog.innerHTML = `<header><h2 id="track-members-title">${labels.title} · ${escape(scope.name)} · ${escape(scope.chrName)}</h2><button type="button" class="button ghost" data-member-close>${labels.close}</button></header>
+  dialog.innerHTML = `<header><h2 id="track-members-title">${labels.title} · ${escape(scope.name)} · ${escape(scope.chrName)}</h2><button type="button" class="dialog-close-button" data-member-close aria-label="${escape(labels.close)}" data-app-tooltip="${escape(labels.close)}">×</button></header>
     <input type="search" data-member-search aria-label="${labels.search}" placeholder="${labels.search}"/>
     <div data-track-members-content></div>`;
   const content = dialog.querySelector("[data-track-members-content]");

@@ -595,9 +595,10 @@ function renderSettingsModal(state, { copy, escapeAttr, escapeHtml }) {
         <h4>${escapeHtml(copy.settingsTitle)}</h4>
         <button
           type="button"
-          class="button ghost tiny"
+          class="dialog-close-button"
           data-manual-ref-settings-close
           aria-label="${escapeAttr(copy.settingsClose)}"
+          data-app-tooltip="${escapeAttr(copy.settingsClose)}"
         >×</button>
       </header>
       <p class="manual-ref-settings-scope-notice" data-manual-ref-settings-scope-notice role="note">${escapeHtml(copy.settingsProjectNotice)}</p>
@@ -615,10 +616,10 @@ function renderSettingsModal(state, { copy, escapeAttr, escapeHtml }) {
       </div>
       <footer class="manual-ref-settings-foot">
         <div class="manual-ref-settings-foot-left">
-          <button type="button" class="button ghost tiny" data-manual-ref-settings-reset-tab ${state.exporting ? "disabled" : ""}>${escapeHtml(copy.settingsResetTab)}</button>
-          <button type="button" class="button ghost tiny" data-manual-ref-settings-reset-all ${state.exporting ? "disabled" : ""}>${escapeHtml(copy.settingsResetAll)}</button>
+          <button type="button" class="button ghost" data-manual-ref-settings-reset-tab ${state.exporting ? "disabled" : ""}>${escapeHtml(copy.settingsResetTab)}</button>
+          <button type="button" class="button ghost" data-manual-ref-settings-reset-all ${state.exporting ? "disabled" : ""}>${escapeHtml(copy.settingsResetAll)}</button>
         </div>
-        <button type="button" class="button primary tiny" data-manual-ref-settings-close>${escapeHtml(copy.settingsDone)}</button>
+        <button type="button" class="button primary" data-manual-ref-settings-close>${escapeHtml(copy.settingsDone)}</button>
       </footer>
     </article>
   </div>`;

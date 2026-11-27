@@ -2449,11 +2449,11 @@ function renderSupportDsCtgLenRulesDialog({ rules = [], chrLength = null, suppor
           <h4>${escapeHtml(labels.supportDatasetLengthRulesTitle)}</h4>
           <button
             type="button"
-            class="button ghost tiny assembly-support-ds-len-rules-close"
+            class="dialog-close-button assembly-support-ds-len-rules-close"
             data-support-ds-ctg-len-rules-close="1"
             aria-label="${escapeAttr(labels.supportDatasetLengthRulesClose)}"
             data-app-tooltip="${escapeAttr(labels.supportDatasetLengthRulesClose)}"
-          >X</button>
+          >×</button>
         </div>
         <div class="assembly-support-ds-len-rules-body">
           <table class="records-table assembly-support-ds-len-rules-table">
@@ -2469,10 +2469,10 @@ function renderSupportDsCtgLenRulesDialog({ rules = [], chrLength = null, suppor
           </table>
         </div>
         <div class="assembly-support-ds-len-rules-foot">
-          <button type="button" class="button ghost tiny" data-support-ds-ctg-len-rules-add="1">${escapeHtml(labels.supportDatasetLengthRulesAdd)}</button>
+          <button type="button" class="button ghost" data-support-ds-ctg-len-rules-add="1">${escapeHtml(labels.supportDatasetLengthRulesAdd)}</button>
           <div class="assembly-support-ds-len-rules-actions">
-            <button type="button" class="button ghost tiny" data-support-ds-ctg-len-rules-reset="1">${escapeHtml(labels.supportDatasetLengthRulesReset)}</button>
-            <button type="button" class="button primary tiny" data-support-ds-ctg-len-rules-save="1">${escapeHtml(labels.supportDatasetLengthRulesSave)}</button>
+            <button type="button" class="button ghost" data-support-ds-ctg-len-rules-reset="1">${escapeHtml(labels.supportDatasetLengthRulesReset)}</button>
+            <button type="button" class="button primary" data-support-ds-ctg-len-rules-save="1">${escapeHtml(labels.supportDatasetLengthRulesSave)}</button>
           </div>
         </div>
       </article>

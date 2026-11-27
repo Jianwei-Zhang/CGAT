@@ -61,13 +61,13 @@
 
 .final-path-toast.is-ok {
   border-color: var(--theme-green-line, #77b38b);
-  background: rgba(240, 253, 244, 0.96);
+  background: var(--theme-green-surface, #f0fdf4);
   color: var(--theme-green-ink, #166534);
 }
 
 .final-path-toast.is-error {
   border-color: var(--theme-red-line, #d4a3a3);
-  background: rgba(254, 242, 242, 0.96);
+  background: var(--theme-red-surface, #fef2f2);
   color: var(--theme-red-ink, #991b1b);
 }
 

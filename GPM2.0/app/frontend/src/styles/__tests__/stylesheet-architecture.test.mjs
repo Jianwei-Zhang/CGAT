@@ -251,3 +251,31 @@ test("final path card shares the main view subtle surface and keeps table and lo
   assert.match(finalPathCss, /\.final-path-log-summary\s*\{[^}]*background:\s*var\(--surface-panel,\s*#ffffff\);/);
   assert.match(finalPathCss, /\.final-path-log-table-wrap\s*\{[^}]*background:\s*var\(--surface-panel,\s*#ffffff\);/);
 });
+
+test("modal dialogs share unified radius, backdrop, close button, and semantic action tokens", () => {
+  const baseCss = readFileSync(new URL("./base.css", entryUrl), "utf8");
+  const overlaysCss = readFileSync(new URL("./overlays.css", entryUrl), "utf8");
+  const settingsCss = readFileSync(new URL("./settings.css", entryUrl), "utf8");
+  const importerCss = readFileSync(new URL("./importer.css", entryUrl), "utf8");
+  const degapCss = readFileSync(new URL("./degap.css", entryUrl), "utf8");
+  const finalPathCss = readFileSync(new URL("./final-path.css", entryUrl), "utf8");
+
+  assert.match(baseCss, /--dialog-radius:\s*10px;/);
+  assert.match(baseCss, /--dialog-backdrop:\s*rgba\(15,\s*23,\s*42,\s*0\.42\);/);
+  assert.match(overlaysCss, /\.modal-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(overlaysCss, /\.app-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(overlaysCss, /\.app-dialog::backdrop\s*\{[^}]*var\(--dialog-backdrop[^}]*backdrop-filter:\s*blur\(2px\)/);
+  assert.match(overlaysCss, /\.dialog-close-button\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/);
+  assert.match(overlaysCss, /\.app-dialog-actions \.button\.primary\s*\{[^}]*background:\s*var\(--action-primary-bg/);
+  assert.doesNotMatch(overlaysCss, /#3f638d/);
+  assert.match(settingsCss, /\.app-settings-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(importerCss, /\.project-import-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(importerCss, /\.project-copy-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(importerCss, /\.project-catalog-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(importerCss, /\.library-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(degapCss, /\.degap-settings-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(degapCss, /\.manual-ref-settings-dialog\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(degapCss, /\.manual-ref-preview-modal\s*\{[^}]*border-radius:\s*var\(--dialog-radius/);
+  assert.match(importerCss, /\.project-refinement-badge\.is-ok\s*\{[^}]*var\(--theme-green-surface/);
+  assert.match(finalPathCss, /\.final-path-toast\.is-ok\s*\{[^}]*var\(--theme-green-surface/);
+});

@@ -205,9 +205,10 @@ export function renderManualRefinementExportPreviewModal(modal, state) {
         </div>
         <button
           type="button"
-          class="button ghost tiny"
+          class="dialog-close-button"
           data-refinement-export-preview-cancel="true"
           aria-label="${escapeAttr(copy.close)}"
+          data-app-tooltip="${escapeAttr(copy.close)}"
           ${isExporting ? "disabled" : ""}
         >×</button>
       </header>
@@ -224,13 +225,13 @@ export function renderManualRefinementExportPreviewModal(modal, state) {
         <div class="manual-ref-foot-actions">
           <button
             type="button"
-            class="button ghost tiny"
+            class="button ghost"
             data-refinement-export-preview-cancel="true"
             ${isExporting ? "disabled" : ""}
           >${escapeHtml(isSuccess ? copy.close : copy.cancel)}</button>
           ${isSuccess ? "" : `<button
             type="button"
-            class="button primary tiny"
+            class="button primary"
             data-refinement-export-preview-confirm="true"
             ${canConfirm ? "" : "disabled"}
           >${escapeHtml(isExporting ? copy.exporting : copy.confirm)}</button>`}

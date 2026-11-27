@@ -141,7 +141,10 @@ function renderProjectCopyDialog(state, messages) {
   </section>`;
   return `<div class="modal-overlay project-copy-overlay">
     <article class="card modal-dialog project-copy-dialog" role="dialog" aria-modal="true" aria-labelledby="project-copy-title">
-      <h3 id="project-copy-title">${escapeHtml(phase === "success" ? messages.page.copySuccessTitle : phase === "copying" ? messages.page.copyProgressTitle : messages.page.copyTitle)}</h3>
+      <header class="project-dialog-head">
+        <h3 id="project-copy-title">${escapeHtml(phase === "success" ? messages.page.copySuccessTitle : phase === "copying" ? messages.page.copyProgressTitle : messages.page.copyTitle)}</h3>
+        ${phase === "copying" ? "" : `<button type="button" data-project-copy-close class="dialog-close-button" aria-label="${escapeAttr(messages.buttons.cancel)}">×</button>`}
+      </header>
       ${loading ? `<p role="status">${escapeHtml(messages.runtime.copyLoadingDefaults)}</p>` : phase === "copying" ? copying : phase === "success" ? success : form}
     </article>
   </div>`;
@@ -556,6 +559,7 @@ function bindProjectEntryControls(host, store) {
     host.querySelector("#project-import-button")?.focus();
   };
   host.querySelector("[data-project-import-close]")?.addEventListener("click", closeImport);
+  host.querySelector("[data-project-import-dismiss]")?.addEventListener("click", closeImport);
   const overlay = host.querySelector("[data-project-import-overlay]");
   let backdropPointerId = null;
   let dismissFromBackdrop = false;

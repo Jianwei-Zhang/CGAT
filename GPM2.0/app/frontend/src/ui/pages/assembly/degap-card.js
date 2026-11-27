@@ -164,15 +164,15 @@ function renderGlobalSettingsModal({ degap, escapeAttr, escapeHtml, labels }) {
     <div class="degap-settings-modal-overlay" data-degap-settings-modal>
       <div class="degap-settings-dialog" role="dialog" aria-modal="true" aria-label="${escapeAttr(labels.settingsTitle)}">
         <div class="degap-settings-head">
-          <strong>${escapeHtml(labels.settingsTitle)}</strong>
-          <button type="button" class="button ghost tiny degap-icon-button" data-degap-settings-close aria-label="${escapeAttr(labels.close)}">×</button>
+          <h4>${escapeHtml(labels.settingsTitle)}</h4>
+          <button type="button" class="dialog-close-button degap-icon-button" data-degap-settings-close aria-label="${escapeAttr(labels.close)}" data-app-tooltip="${escapeAttr(labels.close)}">×</button>
         </div>
         <div class="degap-settings-body" data-degap-settings-panel>
           ${renderDegapSettingsFields({ settings, escapeAttr, escapeHtml, labels })}
         </div>
         <div class="degap-settings-foot">
           <span class="${degap.error ? "danger" : "muted"}">${escapeHtml(degap.error || degap.feedback || "")}</span>
-          <button type="button" class="button primary tiny" data-degap-settings-save>${escapeHtml(labels.save)}</button>
+          <button type="button" class="button primary" data-degap-settings-save>${escapeHtml(labels.save)}</button>
         </div>
       </div>
     </div>

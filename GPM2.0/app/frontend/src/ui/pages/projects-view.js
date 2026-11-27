@@ -108,7 +108,10 @@ export function renderProjectImportDialog(state, messages) {
   }).join("");
   return `<div class="modal-overlay" data-project-import-overlay>
     <form class="modal-dialog project-import-dialog" role="dialog" aria-modal="true" aria-labelledby="project-import-title" autocomplete="off">
-      <h3 id="project-import-title">${labels.importTitle}</h3>
+      <header class="project-dialog-head">
+        <h3 id="project-import-title">${labels.importTitle}</h3>
+        <button type="button" data-project-import-dismiss class="dialog-close-button" aria-label="${html(labels.cancel)}">×</button>
+      </header>
       <fieldset class="project-source-switch"><legend>${labels.source}</legend>
         <label><input type="radio" name="project-source" value="zip" ${extracted ? "" : "checked"} />${labels.zip}</label>
         <label><input type="radio" name="project-source" value="extracted" ${extracted ? "checked" : ""} />${labels.extractedOption}</label>

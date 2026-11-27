@@ -47,6 +47,7 @@ function requestDialog(mode, message, options = {}) {
   let skip;
   if (confirmationKey) {
     const label = doc.createElement("label");
+    label.className = "app-dialog-checkbox";
     skip = doc.createElement("input");
     skip.type = "checkbox";
     label.append(skip, doc.createTextNode(confirmationSessionLabel(locale)));

@@ -49,7 +49,7 @@ export function renderExportJobDialog({ job, locale, scope, stepLabel, escapeHtm
     ? `${text.step.replace("{index}", current + 1).replace("{total}", steps.length)} · ${stepLabel(steps[current].kind)}` : "";
   const action = running
     ? `<button type="button" class="button ghost tiny" data-${prefix}-close="true" ${job.cancelRequested ? "disabled" : ""}>${text.cancel}</button>`
-    : `<button type="button" class="button ghost tiny" data-${prefix}-close="true" aria-label="${text.close}" title="${text.close}">×</button>`;
+    : `<button type="button" class="dialog-close-button" data-${prefix}-close="true" aria-label="${text.close}" data-app-tooltip="${text.close}">×</button>`;
   return `<div class="modal-overlay assembly-final-path-export-overlay" data-${prefix}-overlay="true">
     <article class="card modal-dialog export-job-dialog" data-${prefix}-modal="true" role="dialog" aria-modal="true" aria-labelledby="${prefix}-title">
       <header><h4 id="${prefix}-title">${icon}${title}</h4>${action}</header>

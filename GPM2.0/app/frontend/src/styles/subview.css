@@ -104,11 +104,11 @@
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden;
-  border: 1px solid var(--theme-line, #aeb7c2);
+  border: 1px solid var(--border-subtle, #dbe3ec);
   border-radius: var(--card-radius);
-  background: var(--theme-surface-subtle, #f5f7f9);
-  color: var(--theme-ink, #344354);
-  box-shadow: 0 4px 16px rgba(26, 39, 52, 0.18);
+  background: var(--surface-panel, #ffffff);
+  color: var(--text-primary, #1e293b);
+  box-shadow: var(--shadow-md);
   font-size: var(--font-body);
 }
 
@@ -118,28 +118,36 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle, #dbe3ec);
+  background: var(--surface-subtle, #f8fafc);
   cursor: move;
   touch-action: none;
   user-select: none;
 }
 
 .subview-tools-header strong {
+  font-size: var(--font-small);
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.subview-tools-header button {
-  flex: 0 0 auto;
-  font-size: var(--font-heading);
-  line-height: 1;
+.subview-tools-header .subview-tools-close {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  font-size: 16px;
 }
 
 .subview-tools-tabs {
   display: flex;
   flex: 0 0 auto;
-  border-bottom: 1px solid var(--theme-line, #cdd3db);
+  background: var(--surface-subtle, #f8fafc);
+  border-bottom: 1px solid var(--border-subtle, #dbe3ec);
 }
 
 .subview-tools-tabs button {
@@ -149,14 +157,23 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: inherit;
+  color: var(--text-secondary, #334155);
   font: inherit;
+  font-size: var(--font-small);
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.subview-tools-tabs button:hover:not([aria-selected="true"]) {
+  color: var(--text-primary, #1e293b);
+  background: var(--surface-muted, #eef2f6);
 }
 
 .subview-tools-tabs [aria-selected="true"] {
-  border-bottom-color: var(--theme-strong-line, #517398);
-  background: var(--theme-surface-subtle, #e9eef4);
+  border-bottom-color: var(--focus-ring, #4f82b5);
+  background: var(--surface-panel, #ffffff);
+  color: var(--theme-ink, #1e3a5f);
   font-weight: 600;
 }
 
@@ -165,8 +182,8 @@
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 8px 8px 18px;
-  background: var(--theme-surface-subtle, #fafbfc);
+  padding: 10px 10px 18px;
+  background: var(--surface-panel, #ffffff);
 }
 
 .subview-tools-empty {

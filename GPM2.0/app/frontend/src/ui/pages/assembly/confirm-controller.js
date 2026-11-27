@@ -151,15 +151,8 @@ function renderAssemblyConfirmModal(state) {
         <p class="assembly-confirm-message${dangerClass}">${escapeHtml(message)}</p>
         ${promptInput}
         ${anchorOffsetFields}
-        ${mode === "confirm" && dialog.confirmationKey ? `<label><input type="checkbox" data-assembly-confirm-skip="${escapeAttr(id)}"> ${escapeHtml(confirmationSessionLabel(state.locale))}</label>` : ""}
+        ${mode === "confirm" && dialog.confirmationKey ? `<label class="app-dialog-checkbox"><input type="checkbox" data-assembly-confirm-skip="${escapeAttr(id)}"> ${escapeHtml(confirmationSessionLabel(state.locale))}</label>` : ""}
         <div class="assembly-confirm-actions">
-          <button
-            type="button"
-            class="button primary"
-            data-assembly-confirm-action="confirm"
-            data-assembly-confirm-id="${escapeAttr(id)}"
-            ${mode === "anchor-offset" && !anchorOffsetResult?.ok ? "disabled" : ""}
-          >${escapeHtml(confirmLabel)}</button>
           ${mode === "notice" ? "" : `
             <button
               type="button"
@@ -168,6 +161,13 @@ function renderAssemblyConfirmModal(state) {
               data-assembly-confirm-id="${escapeAttr(id)}"
             >${escapeHtml(cancelLabel)}</button>
           `}
+          <button
+            type="button"
+            class="button primary"
+            data-assembly-confirm-action="confirm"
+            data-assembly-confirm-id="${escapeAttr(id)}"
+            ${mode === "anchor-offset" && !anchorOffsetResult?.ok ? "disabled" : ""}
+          >${escapeHtml(confirmLabel)}</button>
         </div>
       </article>
     </div>
