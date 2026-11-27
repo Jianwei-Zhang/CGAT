@@ -160,6 +160,8 @@ test("splitter CSS keeps a generous hit area on the existing border and hides it
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.project-sidebar-splitter \{ display: none; \}/);
   assert.match(css, /\.project-sidebar-splitter:focus-visible/);
   assert.match(css, /\.project-dataset-table \{[^}]*table-layout: fixed;/);
+  assert.match(css, /\.project-dataset-table thead th:nth-child\(2\),[\s\S]*width: 19%;/);
+  assert.match(css, /\.project-dataset-table \.numeric \{[^}]*text-align: left;/);
 });
 
 test("sidebar collapse toggle switches to the narrow icon rail, persists state, and restores width on expand", () => {
