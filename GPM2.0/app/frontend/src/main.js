@@ -647,7 +647,9 @@ function bindSettings(root, storeRef) {
     onLanguageChange: locale => applyGlobalLanguageChange(root, storeRef, locale),
     onPickDirectory: () => pickDirectoryPath(storeRef.getState()),
     onLayoutReset: () => {
-      root.querySelector(".project-browser")?.style?.removeProperty("--project-sidebar-width");
+      const browser = root.querySelector(".project-browser");
+      browser?.style?.removeProperty("--project-sidebar-width");
+      browser?.classList?.remove("is-sidebar-collapsed");
       window.dispatchEvent(new Event("gpm-next:route-refresh"));
     },
   });

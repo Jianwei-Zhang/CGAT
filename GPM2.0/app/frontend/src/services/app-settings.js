@@ -2,6 +2,7 @@ import { MAX_IMPORT_PARSER_WORKERS, MIN_IMPORT_PARSER_WORKERS } from "./import-p
 
 export const APP_SETTINGS_KEY = "gpm_next:app_settings";
 export const PROJECT_SIDEBAR_WIDTH_KEY = "gpm.project-library-width";
+export const PROJECT_SIDEBAR_COLLAPSED_KEY = "gpm.project-library-collapsed";
 export const SUBVIEW_TOOLS_PREFS_KEY = "gpm.subviewTools.v1";
 
 export const DEFAULT_APP_SETTINGS = Object.freeze({
@@ -49,6 +50,7 @@ export function normalizeAppSettings(value = {}) {
 
 export function resetAppLayoutPreferences(storage = globalThis.localStorage) {
   storage?.removeItem?.(PROJECT_SIDEBAR_WIDTH_KEY);
+  storage?.removeItem?.(PROJECT_SIDEBAR_COLLAPSED_KEY);
   storage?.removeItem?.(SUBVIEW_TOOLS_PREFS_KEY);
 }
 

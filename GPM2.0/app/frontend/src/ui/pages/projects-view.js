@@ -4,11 +4,15 @@ import { projectImportName } from "../../services/project-session.js";
 import { projectIcon } from "./project-icons.js";
 import { getMessages } from "../i18n/index.js";
 import { importParserWorkerChoices, normalizeImportParserWorkers, recommendedImportParserWorkers } from "../../services/import-parallelism.js";
+import { readProjectSidebarCollapsed } from "./project-sidebar-resize.js";
 
 export function projectLabels(state) {
   return state.locale === "en" ? {
     projectInformation: "Assembly Information",
     resizeLibrary: "Resize project library",
+    collapseSidebar: "Collapse library",
+    expandSidebar: "Expand library",
+    expandSidebarCount: "Expand assemblies ({count})",
     import: "Import", open: "Open", importTitle: "Import Assembly", recent: "Assemblies",
     empty: "No assemblies yet", emptyHint: "Import a delivery bundle or open an existing assembly directory.",
     name: "Assembly name (optional)", nameDefault: "Use directory name", location: "Assembly directory",
@@ -28,6 +32,9 @@ export function projectLabels(state) {
   } : {
     projectInformation: "组装信息",
     resizeLibrary: "调整项目库宽度",
+    collapseSidebar: "收起项目库",
+    expandSidebar: "展开项目库",
+    expandSidebarCount: "展开组装列表（{count}）",
     import: "导入", open: "打开", importTitle: "导入组装", recent: "组装",
     empty: "尚未添加组装", emptyHint: "导入交付包，或打开已有组装目录。",
     name: "组装名称（可选）", nameDefault: "使用目录名称", location: "组装目录",
@@ -137,17 +144,22 @@ export function renderProjectsBody(state, { records, messages, summaryHtml }) {
   const busy = projectEntryBusy(state);
   const disabled = busy ? "disabled" : "";
   const empty = !records.length && !state.session?.workspacePath;
+  const collapsed = readProjectSidebarCollapsed();
+  const toggleLabel = collapsed ? labels.expandSidebar : labels.collapseSidebar;
+  const railTooltip = labels.expandSidebarCount.replace("{count}", records.length);
   const actions = `<div class="project-entry-actions">
-    <button id="project-import-button" class="button ${empty ? "project-primary" : "ghost"}" ${disabled}>${projectIcon("import")}${labels.import}</button>
-    <button id="project-open-button" class="button ghost" ${disabled}>${projectIcon("open")}${labels.open}</button>
-  </div>`;
+    <button id="project-import-button" class="button ${empty ? "project-primary" : "ghost"}"${collapsed ? ` data-app-tooltip="${html(labels.import)}"` : ""} aria-label="${html(labels.import)}" ${disabled}>${projectIcon("import")}<span class="project-entry-label">${labels.import}</span></button>
+    <button id="project-open-button" class="button ghost"${collapsed ? ` data-app-tooltip="${html(labels.open)}"` : ""} aria-label="${html(labels.open)}" ${disabled}>${projectIcon("open")}<span class="project-entry-label">${labels.open}</span></button>
+    <button type="button" class="button ghost project-sidebar-toggle" data-project-sidebar-toggle data-collapse-label="${html(labels.collapseSidebar)}" data-expand-label="${html(labels.expandSidebar)}" data-app-tooltip="${html(toggleLabel)}" aria-label="${html(toggleLabel)}" aria-controls="project-recents" aria-expanded="${!collapsed}">${projectIcon(collapsed ? "sidebarExpand" : "sidebarCollapse")}</button>
+  </div>
+  <button type="button" class="project-sidebar-rail-count" data-project-sidebar-expand data-app-tooltip="${html(railTooltip)}" aria-label="${html(railTooltip)}">${projectIcon("project")}<span>${records.length}</span></button>`;
   const validation = projectValidationView(state, records);
   const library = libraryLabels(state);
   const rows = renderLibraryTree(state, records);
   return `${importer.pendingProjectPath ? `<section class="project-pending">
     <strong>${labels.pending}</strong><span class="project-path">${html(importer.pendingProjectPath)}</span>
     <button id="project-retry-button" class="button" ${disabled}>${labels.retry}</button></section>` : ""}
-  <div class="project-browser">
+  <div class="project-browser${collapsed ? " is-sidebar-collapsed" : ""}">
     <section class="project-recents" id="project-recents" aria-labelledby="project-recents-title">
       ${actions}
       <header class="project-recents-header" data-library-drop-root data-library-drop-root-label="${html(library.root)}"><h4 id="project-recents-title"><span class="project-recents-title-label">${labels.recent}</span><span class="project-count"><span aria-hidden="true">·</span>${records.length}</span></h4>

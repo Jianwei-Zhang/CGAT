@@ -1,4 +1,4 @@
-import { resolveAppTheme, initializeAppTheme, applyAppTheme, resetAppLayoutPreferences, PROJECT_SIDEBAR_WIDTH_KEY, SUBVIEW_TOOLS_PREFS_KEY } from "../app-settings.js";
+import { resolveAppTheme, initializeAppTheme, applyAppTheme, resetAppLayoutPreferences, PROJECT_SIDEBAR_WIDTH_KEY, PROJECT_SIDEBAR_COLLAPSED_KEY, SUBVIEW_TOOLS_PREFS_KEY } from "../app-settings.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeAppSettings, setAppSettings, getAppSettings, DEFAULT_APP_SETTINGS, getGraphFontSize, estimateGraphTextWidth, APP_SETTINGS_KEY } from "../app-settings.js";
@@ -42,10 +42,10 @@ test("invalid or older stored settings migrate to readable defaults", () => {
   });
 });
 
-test("resetAppLayoutPreferences clears remembered sidebar width and Local View tools rect", () => {
+test("resetAppLayoutPreferences clears remembered sidebar width, collapsed rail, and Local View tools rect", () => {
   const removed = [];
   resetAppLayoutPreferences({ removeItem(key) { removed.push(key); } });
-  assert.deepEqual(removed, [PROJECT_SIDEBAR_WIDTH_KEY, SUBVIEW_TOOLS_PREFS_KEY]);
+  assert.deepEqual(removed, [PROJECT_SIDEBAR_WIDTH_KEY, PROJECT_SIDEBAR_COLLAPSED_KEY, SUBVIEW_TOOLS_PREFS_KEY]);
 });
 
 test("graph text follows interface unless explicitly sized, with CJK width accounted for", () => {

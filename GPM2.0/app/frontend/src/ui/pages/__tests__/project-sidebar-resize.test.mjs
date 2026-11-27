@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { bindProjectSidebarResize, projectSidebarBounds } from "../project-sidebar-resize.js";
+import { bindProjectSidebarResize, projectSidebarBounds, SIDEBAR_COLLAPSED_KEY } from "../project-sidebar-resize.js";
 import { renderProjectsBody } from "../projects-view.js";
 import { getMessages } from "../../i18n/index.js";
 
@@ -155,7 +155,76 @@ for (const locale of ["en", "zh"]) test(`splitter sits between library and detai
 test("splitter CSS keeps a generous hit area on the existing border and hides it in stacked mode", () => {
   const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
   assert.match(css, /grid-template-columns: var\(--project-sidebar-width, var\(--project-sidebar-default\)\) 0 minmax\(0, 1fr\)/);
+  assert.match(css, /\.project-browser\.is-sidebar-collapsed \{ grid-template-columns: 48px 0 minmax\(0, 1fr\); \}/);
   assert.match(css, /\.project-sidebar-splitter \{[^}]*width: 10px;[^}]*cursor: col-resize;[^}]*touch-action: none;/);
   assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.project-sidebar-splitter \{ display: none; \}/);
   assert.match(css, /\.project-sidebar-splitter:focus-visible/);
+  assert.match(css, /\.project-dataset-table \{[^}]*table-layout: fixed;/);
+});
+
+test("sidebar collapse toggle switches to the narrow icon rail, persists state, and restores width on expand", () => {
+  const storeMap = new Map();
+  const classes = new Set();
+  const style = new Map();
+  const makeNode = (dataset = {}, attrs = {}) => {
+    const listeners = new Map();
+    const map = new Map(Object.entries(attrs));
+    return {
+      dataset,
+      innerHTML: "",
+      addEventListener: (type, fn) => listeners.set(type, fn),
+      removeEventListener: type => listeners.delete(type),
+      setAttribute: (k, v) => map.set(k, v),
+      getAttribute: k => map.get(k) || "",
+      removeAttribute: k => map.delete(k),
+      attrs: map,
+      click: () => listeners.get("click")?.({}),
+    };
+  };
+  const toggleBtn = makeNode({ collapseLabel: "Collapse library", expandLabel: "Expand library" });
+  const expandRailBtn = makeNode();
+  const importBtn = makeNode({}, { "aria-label": "Import" });
+  const openBtn = makeNode({}, { "aria-label": "Open" });
+  const view = {
+    getComputedStyle: () => ({ getPropertyValue: () => "280px" }),
+    localStorage: {
+      getItem: key => storeMap.get(key) ?? null,
+      setItem: (key, value) => storeMap.set(key, value),
+      removeItem: key => storeMap.delete(key),
+    },
+  };
+  const browser = {
+    ownerDocument: { defaultView: view },
+    isConnected: true,
+    getBoundingClientRect: () => ({ width: 1200 }),
+    style: { setProperty: (key, value) => style.set(key, value) },
+    classList: { add: name => classes.add(name), remove: name => classes.delete(name) },
+    querySelector(selector) {
+      if (selector === "[data-project-sidebar-toggle]") return toggleBtn;
+      if (selector === "[data-project-sidebar-expand]") return expandRailBtn;
+      if (selector === "#project-import-button") return importBtn;
+      if (selector === "#project-open-button") return openBtn;
+      return null;
+    },
+  };
+  const handle = { setAttribute() {}, addEventListener() {}, removeEventListener() {}, hasPointerCapture: () => false };
+  const host = { querySelector: selector => selector === ".project-browser" ? browser : handle };
+
+  bindProjectSidebarResize(host);
+  assert.equal(classes.has("is-sidebar-collapsed"), false);
+  assert.equal(importBtn.attrs.has("data-app-tooltip"), false);
+
+  toggleBtn.click();
+  assert.equal(classes.has("is-sidebar-collapsed"), true);
+  assert.equal(storeMap.get(SIDEBAR_COLLAPSED_KEY), "1");
+  assert.equal(toggleBtn.attrs.get("aria-expanded"), "false");
+  assert.equal(toggleBtn.attrs.get("data-app-tooltip"), "Expand library");
+  assert.equal(importBtn.attrs.get("data-app-tooltip"), "Import");
+  assert.equal(openBtn.attrs.get("data-app-tooltip"), "Open");
+
+  expandRailBtn.click();
+  assert.equal(classes.has("is-sidebar-collapsed"), false);
+  assert.equal(storeMap.has(SIDEBAR_COLLAPSED_KEY), false);
+  assert.equal(toggleBtn.attrs.get("aria-expanded"), "true");
+  assert.equal(importBtn.attrs.has("data-app-tooltip"), false);
 });
