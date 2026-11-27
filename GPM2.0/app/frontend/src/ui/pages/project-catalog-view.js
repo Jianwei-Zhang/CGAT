@@ -216,13 +216,20 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
   };
   const catalog = currentCatalog(store.getState());
   if (!catalog.loading && !catalog.data && !catalog.error) void load();
+  const catalogHeader = host.querySelector?.("#project-data-catalog > .project-section-collapsible");
   const toggleBtn = host.querySelector?.('[data-overview-section-toggle="datasets"]');
-  toggleBtn?.addEventListener("click", () => {
-    const defaultExpanded = toggleBtn.dataset?.overviewSectionDefault !== "false";
+  const handleSectionToggle = (event) => {
+    const interactive = event?.target?.closest?.("button, a, input, select, textarea");
+    if (interactive && interactive !== toggleBtn && !interactive.matches?.('[data-overview-section-toggle="datasets"]')) {
+      return;
+    }
+    const button = toggleBtn || catalogHeader?.querySelector?.('[data-overview-section-toggle="datasets"]');
+    const defaultExpanded = button?.dataset?.overviewSectionDefault !== "false";
     toggleOverviewSection(store.getState(), "datasets", { defaultExpanded });
     refresh();
     host.querySelector?.('[data-overview-section-toggle="datasets"]')?.focus?.();
-  });
+  };
+  (catalogHeader || toggleBtn)?.addEventListener("click", handleSectionToggle);
   host.querySelector("[data-catalog-retry]")?.addEventListener("click", () => { void load(); refresh(); });
   host.querySelectorAll("[data-catalog-edit]").forEach(button => button.addEventListener("click", () => {
     const latest = currentCatalog(store.getState());

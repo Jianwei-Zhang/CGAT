@@ -11,8 +11,8 @@ import {
   setPreviewFilterState,
   toggleOverviewSection,
 } from "../project-overview-sections.js";
-import { projectCatalogKey, renderProjectCatalog } from "../project-catalog-view.js";
-import { renderProjectRefinementCard } from "../project-refinement-view.js";
+import { bindProjectCatalog, projectCatalogKey, renderProjectCatalog } from "../project-catalog-view.js";
+import { bindProjectRefinementCard, renderProjectRefinementCard } from "../project-refinement-view.js";
 import { buildProjectPreviewModel, previewProjectKey } from "../project-preview-state.js";
 import { PREVIEW_MODEL_VERSION, previewOverrideSignature } from "../project-preview-cache.js";
 import { previewMutationStamp } from "../../../services/preview-content-events.js";
@@ -178,4 +178,70 @@ test("empty dataset note hover keeps stable column width via grid overlap withou
   assert.match(css, /\.project-dataset-note\[data-empty="true"\]\s*\{[^}]*display:\s*grid/);
   assert.match(css, /\.project-dataset-note\[data-empty="true"\]\s*>\s*span\s*\{[^}]*grid-area:\s*1\s*\/\s*1/);
   assert.doesNotMatch(css, /\.project-dataset-note\[data-empty="true"\][^{]*\{[^}]*display:\s*(?:none|inline)/);
+});
+
+test("Datasets and Refinement toggle when clicking anywhere on their collapsible header row while ignoring the import action button", () => {
+  resetOverviewSectionsSession();
+  const state = catalogState(2, "en");
+  let renders = 0;
+  const store = { getState: () => state, setState() {} };
+
+  const datasetToggle = { dataset: { overviewSectionDefault: "true" }, matches: s => s === '[data-overview-section-toggle="datasets"]', focus() {} };
+  const datasetHandlers = {};
+  const datasetHeader = {
+    addEventListener(type, fn) { datasetHandlers[type] = fn; },
+    querySelector: s => s === '[data-overview-section-toggle="datasets"]' ? datasetToggle : null,
+  };
+  const catalogHost = {
+    querySelector(selector) {
+      if (selector === "#project-data-catalog") return {};
+      if (selector === "#project-data-catalog > .project-section-collapsible") return datasetHeader;
+      if (selector === '[data-overview-section-toggle="datasets"]') return datasetToggle;
+      return null;
+    },
+    querySelectorAll: () => [],
+  };
+  bindProjectCatalog(catalogHost, store, () => { renders += 1; });
+  assert.equal(isOverviewSectionExpanded(state, "datasets", { defaultExpanded: true }), true);
+  datasetHandlers.click({ target: { closest: () => null } });
+  assert.equal(isOverviewSectionExpanded(state, "datasets", { defaultExpanded: true }), false);
+  assert.equal(renders, 1);
+
+  const refToggle = { dataset: { overviewSectionDefault: "false" }, focus() {} };
+  const refHeader = { querySelector: s => s === '[data-overview-section-toggle="refinement"]' ? refToggle : null };
+  let refClick;
+  let refRenders = 0;
+  const refHost = {
+    addEventListener(type, fn) { if (type === "click") refClick = fn; },
+    querySelector: s => s === '[data-overview-section-toggle="refinement"]' ? refToggle : null,
+  };
+  bindProjectRefinementCard(refHost, store, () => { refRenders += 1; });
+  assert.equal(isOverviewSectionExpanded(state, "refinement", { defaultExpanded: false }), false);
+  // Clicking the horizontal row (summary/divider) toggles Refinement.
+  refClick({
+    target: {
+      closest(selector) {
+        if (selector === "#project-refinement > .project-section-collapsible") return refHeader;
+        return null;
+      },
+    },
+  });
+  assert.equal(isOverviewSectionExpanded(state, "refinement", { defaultExpanded: false }), true);
+  assert.equal(refRenders, 1);
+
+  // Clicking the import button inside the header must not toggle the section.
+  refClick({
+    target: {
+      closest(selector) {
+        if (selector === "button, a, input, select, textarea") return { tagName: "BUTTON" };
+        if (selector === "#project-refinement > .project-section-collapsible") return refHeader;
+        return null;
+      },
+    },
+  });
+  assert.equal(isOverviewSectionExpanded(state, "refinement", { defaultExpanded: false }), true);
+  assert.equal(refRenders, 1);
+
+  const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
+  assert.match(css, /\.project-section-collapsible\s*\{[^}]*cursor:\s*pointer/);
 });

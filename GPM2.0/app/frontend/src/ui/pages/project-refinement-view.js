@@ -1235,8 +1235,14 @@ export function bindProjectRefinementCard(host, store, rerender, deps = {}) {
   }
   host.addEventListener("click", (event) => {
     const toggleSectionBtn = event.target?.closest?.('[data-overview-section-toggle="refinement"]');
-    if (toggleSectionBtn) {
-      const defaultExpanded = toggleSectionBtn.dataset?.overviewSectionDefault !== "false";
+    const collapsibleHeader = !toggleSectionBtn
+      && !event.target?.closest?.("button, a, input, select, textarea")
+      ? event.target?.closest?.("#project-refinement > .project-section-collapsible")
+      : null;
+    const toggleTarget = toggleSectionBtn
+      || collapsibleHeader?.querySelector?.('[data-overview-section-toggle="refinement"]');
+    if (toggleTarget) {
+      const defaultExpanded = toggleTarget.dataset?.overviewSectionDefault !== "false";
       toggleOverviewSection(store.getState(), "refinement", { defaultExpanded });
       rerender?.(host, store);
       host.querySelector?.('[data-overview-section-toggle="refinement"]')?.focus?.();

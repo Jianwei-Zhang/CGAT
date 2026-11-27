@@ -771,24 +771,43 @@
 .project-section-divider > h3 { flex: 0 0 auto; margin: 0; color: var(--text-secondary, #475569); font-size: inherit; font-weight: 600; line-height: inherit; white-space: nowrap; }
 .project-current .project-section-divider { font-size: var(--font-title); }
 .project-section-count { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; font-size: var(--font-small); font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.project-section-collapsible {
+  margin-left: -6px;
+  margin-right: -6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.project-section-collapsible:hover:not(:has(.project-refinement-import-btn:hover)) {
+  background: var(--surface-muted, #eef2f6);
+}
+.project-section-collapsible:hover:not(:has(.project-refinement-import-btn:hover)) > h3,
+.project-section-collapsible:hover:not(:has(.project-refinement-import-btn:hover)) .project-section-chevron {
+  color: var(--text-primary, #1e293b);
+}
+.project-section-collapsible:hover:not(:has(.project-refinement-import-btn:hover))::after {
+  background: var(--border-default, #cbd5e1);
+}
 .project-section-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 0 0 0 -6px;
-  padding: 2px 6px;
+  margin: 0;
+  padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   font: inherit;
   line-height: inherit;
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: color 120ms ease;
 }
-.project-section-toggle:hover {
-  background: var(--surface-muted, #eef2f6);
-  color: var(--text-primary, #1e293b);
+.project-section-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring, #4f82b5);
+  outline-offset: 2px;
 }
 .project-section-chevron {
   display: inline-block;
