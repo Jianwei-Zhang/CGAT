@@ -5807,3 +5807,9 @@ Donau 作业 `43029926` 于 21:07:29 正常结束（退出码 0；总墙钟 26 �
 - `43224098` 预装 `q0-owner-transition.TjrxmZGI` 成功：仅配对模块运行时代码改变，安装器保留逐文件备份，`q0_chr:Un` 实读通过，25 份父 checkpoint/控制文件未变。未跑正式流程。
 - `43225037`：`q0-whole-local-maps.production22-owner.Jww3W4bC`，`agent-X86-34` 32 核/320 GiB，22 组隔离验证。`43225040`：`q0-owner-relay.rG2rK0rq`，依赖本次验证和预装；21 条主染色体可信路径、获选源长 ≥11 Gb、零源坐标重复占用、零新增跨染色体旧 Q0 冲突才可执行正式 Q0→LGZ，否则 HOLD。不可由资格通过或调度 RUNNING 推断全麦门禁已过。
 - 完整身份、路径与调度绑定：`incident-tools/wheat-20261119/wheat-owner-pair-launch-20261127.json`。
+
+### 2026-11-27 20:52（北京时间）：整麦 7A 占用冲突，正式接力 HOLD
+
+- 隔离验证 `43225037` 于 20:52:49 终止（FAILED）。第一轮配对由主进程处理全部 31,371 个候选（3,249 秒），正常进入第二轮，并在第五轮收敛；不是旧配对死锁复现。
+- `q0-whole-local-maps.production22-owner.Jww3W4bC/selection/` 保留 `admission.jsonl`（19,148 条，969,018,008 字节）及 `group-001.jsonl` 至 `group-018.jsonl`。第 19 组 7A 在 `_occupy_path` 的源切片区间重叠检查处抛出 `Q0EvidenceError`，未发布 7A 检查点。异常未打印双方坐标，不能从错误文本推定冲突一定是 7A 与哪一组。未形成全麦审计结果。
+- 守门作业 `43225040` 于 20:52:53 终止，`q0-owner-relay.rG2rK0rq/gate-hold.json` 的 SHA-256 为 `a1a84ba8dbb8e03182a2add1828866fcb913636b3eee93f0759a9db432220b1e`；原因是验证作业未成功。无 GO、无正式启动意图、未启动 Q0→LGZ、无自动重试。按门禁要求保留现场待审；先定位冲突的源区间和占用双方，不跳过检查、不丢弃已有检查点。
