@@ -1,4 +1,5 @@
-import { resolveAppTheme, initializeAppTheme, applyAppTheme, resetAppLayoutPreferences, PROJECT_SIDEBAR_WIDTH_KEY, PROJECT_SIDEBAR_COLLAPSED_KEY, SUBVIEW_TOOLS_PREFS_KEY } from "../app-settings.js";
+import { readFileSync } from "node:fs";
+import { resolveAppTheme, resolveNativeWindowTheme, syncNativeWindowTheme, initializeAppTheme, applyAppTheme, resetAppLayoutPreferences, PROJECT_SIDEBAR_WIDTH_KEY, PROJECT_SIDEBAR_COLLAPSED_KEY, SUBVIEW_TOOLS_PREFS_KEY } from "../app-settings.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeAppSettings, setAppSettings, getAppSettings, DEFAULT_APP_SETTINGS, getGraphFontSize, estimateGraphTextWidth, APP_SETTINGS_KEY } from "../app-settings.js";
@@ -113,4 +114,38 @@ test("system theme changes live while manual selection stays fixed, and listener
     dispose();
     assert.equal(listeners.size, 0);
   } finally { setAppSettings(DEFAULT_APP_SETTINGS,{persist:false}); }
+});
+
+test("native window frame theme follows explicit light/dark preference and clears to OS on system", () => {
+  assert.equal(resolveNativeWindowTheme("light"), "light");
+  assert.equal(resolveNativeWindowTheme("dark"), "dark");
+  assert.equal(resolveNativeWindowTheme("system"), null);
+
+  const originalWindow = globalThis.window;
+  const calls = [];
+  try {
+    globalThis.window = {
+      __TAURI__: {
+        window: {
+          getCurrentWindow: () => ({
+            setTheme: (theme) => { calls.push(theme); return Promise.resolve(); },
+          }),
+        },
+      },
+    };
+    syncNativeWindowTheme("light", { force: true });
+    syncNativeWindowTheme("light");
+    setAppSettings({ ...DEFAULT_APP_SETTINGS, theme: "dark" }, { persist: false });
+    setAppSettings({ ...DEFAULT_APP_SETTINGS, theme: "system" }, { persist: false });
+    assert.deepEqual(calls, ["light", "dark", null]);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+    setAppSettings(DEFAULT_APP_SETTINGS, { persist: false });
+  }
+
+  for (const file of ["default.json", "local-view.json"]) {
+    const cap = JSON.parse(readFileSync(new URL(`../../../../src-tauri/capabilities/${file}`, import.meta.url), "utf8"));
+    assert.ok(cap.permissions.includes("core:window:allow-set-theme"), `${file} should allow set-theme`);
+  }
 });

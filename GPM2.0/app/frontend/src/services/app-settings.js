@@ -99,8 +99,23 @@ export function resolveAppTheme(preference, systemDark = false) {
   return preference === "dark" || (preference !== "light" && systemDark) ? "dark" : "light";
 }
 
+export function resolveNativeWindowTheme(preference) {
+  return preference === "dark" ? "dark" : preference === "light" ? "light" : null;
+}
+
 let appliedTheme = null;
+let lastNativeWindowTheme = undefined;
 const themeSubscribers = new Set();
+
+export function syncNativeWindowTheme(preference = current.theme, { force = false } = {}) {
+  const target = resolveNativeWindowTheme(preference);
+  const nativeWindow = globalThis.window?.__TAURI__?.window?.getCurrentWindow?.();
+  if (typeof nativeWindow?.setTheme !== "function") return target;
+  if (!force && target === lastNativeWindowTheme) return target;
+  lastNativeWindowTheme = target;
+  void Promise.resolve(nativeWindow.setTheme(target)).catch(() => {});
+  return target;
+}
 
 // Theme changes repaint SVG/Canvas series colours, so mounted views subscribe
 // once instead of each module watching matchMedia on its own.
@@ -121,6 +136,7 @@ export function applyAppTheme(root = globalThis.document?.documentElement, syste
   const theme = resolveAppTheme(current.theme, dark);
   if (root) root.dataset.theme = theme;
   applyAppTrackColors(root, theme);
+  syncNativeWindowTheme(current.theme);
   if (theme !== appliedTheme || forceNotify) {
     const previous = appliedTheme;
     appliedTheme = theme;
