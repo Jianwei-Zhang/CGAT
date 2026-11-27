@@ -225,9 +225,12 @@ export function bindProjectCatalog(host, store, rerender, deps = {}) {
     }
     const button = toggleBtn || catalogHeader?.querySelector?.('[data-overview-section-toggle="datasets"]');
     const defaultExpanded = button?.dataset?.overviewSectionDefault !== "false";
+    const fromKeyboard = event?.detail === 0;
     toggleOverviewSection(store.getState(), "datasets", { defaultExpanded });
     refresh();
-    host.querySelector?.('[data-overview-section-toggle="datasets"]')?.focus?.();
+    if (fromKeyboard) {
+      host.querySelector?.('[data-overview-section-toggle="datasets"]')?.focus?.();
+    }
   };
   (catalogHeader || toggleBtn)?.addEventListener("click", handleSectionToggle);
   host.querySelector("[data-catalog-retry]")?.addEventListener("click", () => { void load(); refresh(); });

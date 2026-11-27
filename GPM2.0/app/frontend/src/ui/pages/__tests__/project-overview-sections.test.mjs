@@ -186,7 +186,8 @@ test("Datasets and Refinement toggle when clicking anywhere on their collapsible
   let renders = 0;
   const store = { getState: () => state, setState() {} };
 
-  const datasetToggle = { dataset: { overviewSectionDefault: "true" }, matches: s => s === '[data-overview-section-toggle="datasets"]', focus() {} };
+  let datasetFocusCount = 0;
+  const datasetToggle = { dataset: { overviewSectionDefault: "true" }, matches: s => s === '[data-overview-section-toggle="datasets"]', focus() { datasetFocusCount += 1; } };
   const datasetHandlers = {};
   const datasetHeader = {
     addEventListener(type, fn) { datasetHandlers[type] = fn; },
@@ -203,11 +204,18 @@ test("Datasets and Refinement toggle when clicking anywhere on their collapsible
   };
   bindProjectCatalog(catalogHost, store, () => { renders += 1; });
   assert.equal(isOverviewSectionExpanded(state, "datasets", { defaultExpanded: true }), true);
-  datasetHandlers.click({ target: { closest: () => null } });
+  // Pointer click toggles without programmatically focusing the inner button.
+  datasetHandlers.click({ detail: 1, target: { closest: () => null } });
   assert.equal(isOverviewSectionExpanded(state, "datasets", { defaultExpanded: true }), false);
   assert.equal(renders, 1);
+  assert.equal(datasetFocusCount, 0);
+  // Keyboard activation (detail === 0) restores focus on the toggle button.
+  datasetHandlers.click({ detail: 0, target: { closest: () => null } });
+  assert.equal(isOverviewSectionExpanded(state, "datasets", { defaultExpanded: true }), true);
+  assert.equal(datasetFocusCount, 1);
 
-  const refToggle = { dataset: { overviewSectionDefault: "false" }, focus() {} };
+  let refFocusCount = 0;
+  const refToggle = { dataset: { overviewSectionDefault: "false" }, focus() { refFocusCount += 1; } };
   const refHeader = { querySelector: s => s === '[data-overview-section-toggle="refinement"]' ? refToggle : null };
   let refClick;
   let refRenders = 0;
@@ -217,8 +225,9 @@ test("Datasets and Refinement toggle when clicking anywhere on their collapsible
   };
   bindProjectRefinementCard(refHost, store, () => { refRenders += 1; });
   assert.equal(isOverviewSectionExpanded(state, "refinement", { defaultExpanded: false }), false);
-  // Clicking the horizontal row (summary/divider) toggles Refinement.
+  // Clicking the horizontal row (summary/divider) toggles Refinement without sticky focus.
   refClick({
+    detail: 1,
     target: {
       closest(selector) {
         if (selector === "#project-refinement > .project-section-collapsible") return refHeader;
@@ -228,9 +237,11 @@ test("Datasets and Refinement toggle when clicking anywhere on their collapsible
   });
   assert.equal(isOverviewSectionExpanded(state, "refinement", { defaultExpanded: false }), true);
   assert.equal(refRenders, 1);
+  assert.equal(refFocusCount, 0);
 
   // Clicking the import button inside the header must not toggle the section.
   refClick({
+    detail: 1,
     target: {
       closest(selector) {
         if (selector === "button, a, input, select, textarea") return { tagName: "BUTTON" };
@@ -244,4 +255,6 @@ test("Datasets and Refinement toggle when clicking anywhere on their collapsible
 
   const css = readFileSync(new URL("../../../styles/importer.css", import.meta.url), "utf8");
   assert.match(css, /\.project-section-collapsible\s*\{[^}]*cursor:\s*pointer/);
+  assert.match(css, /\.project-section-toggle\s*\{[^}]*min-height:\s*0/);
+  assert.match(css, /\.project-section-collapsible:has\(\.project-section-toggle:focus-visible\)/);
 });

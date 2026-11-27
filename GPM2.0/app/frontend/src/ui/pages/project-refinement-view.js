@@ -1243,9 +1243,12 @@ export function bindProjectRefinementCard(host, store, rerender, deps = {}) {
       || collapsibleHeader?.querySelector?.('[data-overview-section-toggle="refinement"]');
     if (toggleTarget) {
       const defaultExpanded = toggleTarget.dataset?.overviewSectionDefault !== "false";
+      const fromKeyboard = event?.detail === 0;
       toggleOverviewSection(store.getState(), "refinement", { defaultExpanded });
       rerender?.(host, store);
-      host.querySelector?.('[data-overview-section-toggle="refinement"]')?.focus?.();
+      if (fromKeyboard) {
+        host.querySelector?.('[data-overview-section-toggle="refinement"]')?.focus?.();
+      }
       return;
     }
     const preview = event.target?.closest?.("[data-preview-version]");
