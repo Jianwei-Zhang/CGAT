@@ -483,30 +483,86 @@ class GapFillingVisualizer:
                 out[f"{chrom}:{gid}"] = info
         return out
 
+    def _build_boundary_summary_html(self):
+        """Render a compact 1-line global boundary/backoff summary below the 02 tasks table."""
+        gaps = self.gap_filling_results.get("gaps", []) if isinstance(self.gap_filling_results, dict) else []
+        f_pres = f_rep = f_conf = 0
+        e_acc = e_ret = e_prot = 0
+        bo_total = bo_gaps = 0
+        for g in gaps:
+            if not isinstance(g, dict):
+                continue
+            j = g.get("junction")
+            if isinstance(j, dict):
+                flanks = j.get("flanks")
+                if isinstance(flanks, dict):
+                    seen_sides = set()
+                    for side in ("L", "R", "left", "right"):
+                        fd = flanks.get(side)
+                        if isinstance(fd, dict) and fd.get("status"):
+                            sk = "L" if side.upper().startswith("L") else "R"
+                            if sk in seen_sides:
+                                continue
+                            seen_sides.add(sk)
+                            st = str(fd["status"]).strip().lower()
+                            if st == "preserved":
+                                f_pres += 1
+                            elif st == "repaired":
+                                f_rep += 1
+                            elif st == "conflict":
+                                f_conf += 1
+                repairs = j.get("repairs")
+                if isinstance(repairs, list):
+                    for r in repairs:
+                        if not isinstance(r, dict):
+                            continue
+                        rst = str(r.get("status", "")).lower()
+                        if rst == "accepted":
+                            e_acc += 1
+                        elif rst == "retained":
+                            e_ret += 1
+                        elif rst == "protected":
+                            e_prot += 1
+            retries = g.get("anchor_retries")
+            if retries is None and isinstance(j, dict):
+                retries = j.get("anchor_retries")
+            if isinstance(retries, list) and retries:
+                bo_total += len(retries)
+                bo_gaps += 1
+        parts = []
+        if f_pres or f_rep or f_conf:
+            parts.append(
+                '<span><span class="lang-en">Flanks (preserved / repaired / conflict)</span>'
+                '<span class="lang-zh">侧翼（保持 / 修订 / 冲突）</span> '
+                f'<b class="num">{f_pres} / {f_rep} / {f_conf}</b></span>'
+            )
+        if e_acc or e_ret or e_prot:
+            parts.append(
+                '<span><span class="lang-en">Terminal edits (A / R / P)</span>'
+                '<span class="lang-zh">末端修订（采用 / 保留 / 保护）</span> '
+                f'<b class="num">{e_acc} / {e_ret} / {e_prot}</b></span>'
+            )
+        if bo_total:
+            parts.append(
+                '<span><span class="lang-en">Anchor backoff</span>'
+                '<span class="lang-zh">锚点回退</span> '
+                f'<b class="num">{bo_total}</b> '
+                f'<span class="lang-en">({bo_gaps} gaps)</span>'
+                f'<span class="lang-zh">（{bo_gaps} 个缺口）</span></span>'
+            )
+        if not parts:
+            return ""
+        return (
+            '\n                <div class="reads-bar" style="margin-top:10px;">'
+            + "".join(parts)
+            + '</div>'
+        )
+
     def _create_full_html(self):
         """创建完整的 HTML 内容"""
         summary = self.gap_filling_results.get('summary', {})
 
-        # 准备数据
-        from JunctionReport import render_project_junctions
-        def _gap_report_href(gap):
-            chrom = gap.get('chromosome')
-            gap_id = gap.get('gap_id')
-            if not chrom or gap_id is None:
-                return None
-            fill_dir = gap.get('fill_direction', 'none')
-            if gap.get('report_direction') == 'bidirectional' or fill_dir == 'bidirectional':
-                flag = 'bidirectional'
-            elif gap.get('filled') and fill_dir in ('left', 'right'):
-                flag = fill_dir
-            else:
-                flag = 'left'
-            return f"{chrom}.{gap_id}.{flag}.html"
-        junction_html = render_project_junctions(
-            {'events': self.gap_filling_results.get('gaps', [])},
-            include_event_details=False,
-            event_href_fn=_gap_report_href,
-        )
+        boundary_summary_html = self._build_boundary_summary_html()
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         header_time = current_time[:16]
         total_gaps = summary.get('total_gaps', 0)
@@ -1966,14 +2022,6 @@ class GapFillingVisualizer:
         """
 
         css = report_css(extra_css)
-        junction_drawer_html = ""
-        if junction_html:
-            junction_drawer_html = f"""
-            <details class="fold">
-                <summary><span class="fold-title"><span class="lang-en">Junction &amp; Connection Diagnostics</span><span class="lang-zh">连接边界与诊断</span></span></summary>
-                <div class="fold-body">{junction_html}</div>
-            </details>"""
-
         brand_icon = degap_logo_html(24)
         title_proj_html = (
             f'<span class="degap-heading-project" title="{esc(project_name)}">{esc(project_name)}</span>'
@@ -2199,10 +2247,10 @@ class GapFillingVisualizer:
                     <div class="table-toggle-container">
                         <button type="button" id="tasks-toggle-btn" class="table-toggle-btn" onclick="toggleTableExpand('tasks')"><span class="lang-en">Expand</span><span class="lang-zh">展开</span></button>
                     </div>
-                </div>
+                </div>{boundary_summary_html}
 
-                <!-- Secondary Appendices Folded Under 02 (no redundant top-level 03 card) -->
-                <div class="sec-appendices" style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:4px;">
+                <!-- Hidden coordinate table anchors retained for script/test compatibility -->
+                <div class="sec-appendices" hidden>
                     <details class="fold">
                         <summary><span class="fold-title"><span class="lang-en">Remaining Gaps (Final Coordinates)</span><span class="lang-zh">剩余未填补 Gap（终版坐标清单）</span> <span id="remainingCount" class="muted num"></span></span></summary>
                         <div class="fold-body">
@@ -2279,7 +2327,7 @@ class GapFillingVisualizer:
                                 </div>
                             </div>
                         </div>
-                    </details>{junction_drawer_html}
+                    </details>
                 </div>
             </div>
         </section>

@@ -6,7 +6,7 @@
     "bin/AutoGapfillerPart2.py": "4d888aaee3d013de21df7c4d52d4009c019217bf971ba2cb866c3ef07af8e53e",
     "bin/AutoGapfillerPart3.py": "fd96e2f7f508c5a4530669cae33520b163998f84d72718237c7950ad526cd8da",
     "bin/AutoGapfillerPart4.py": "5cf9c3f72d80cf7e38b6faa2a4a83dccb73a5d80ed0fade759f1d096d75554d8",
-    "bin/AutoGapfillerVisualizer.py": "8348de3a6617f6dff54cd497e264d3a54aa1ed7790ecf59a44d064a470fb80b1",
+    "bin/AutoGapfillerVisualizer.py": "7c5924edf2b6f044848db87949fcd1c8daffc45ce32c9e262bda2909c9c4f03f",
     "bin/CtgLinker.py": "4fc1146d7116c5f324aece8c0230a1dcffb4370bb7e781d8a5ded9bfcf451fa6",
     "bin/CtgLinkerCheck.py": "d23d03b917a34c8239e233ceffe6edcfb63329df334306b59208acd9397eccfa",
     "bin/CtgLinkerVisualizer.py": "b2acee0739bbf830f3384f854824f62f9e3164f3d7ffad2ce3baba4291812477",
@@ -15,8 +15,8 @@
     "bin/FamilyCtgLinker.py": "cb18bdf660b0f0f752efcdae4c1f4b21f92022401da8b367dc55fd7cb7280664",
     "bin/FamilyGap.py": "206a70c413c8cf7d3fac7766c58d0a45ab2e9d8fb9b5812337b203914ea30e55",
     "bin/FamilyOverlap.py": "0647b13e72cde0ec0891b0f1bdcdb11f121754c81b92963751b40c02008251fd",
-    "bin/FamilyReport.py": "665f1e4c14483bdebde6b1ecb92250d5f34875056cf36b17fd038616825f5ba7",
-    "bin/FamilyReportStyle.py": "00847ffa3f468592b624cb46da66883cbbc3a044c57caacbeaabcd00ae925d1f",
+    "bin/FamilyReport.py": "dd3a8219ec3f37f044d9864f04de2467c27c38b520459e49cdfa926f6c5c8b15",
+    "bin/FamilyReportStyle.py": "4189f4cfcacb5f9f9f11605a0e7c07175bd69f2c863d621bec1c54e2147486a9",
     "bin/FamilyResult.py": "93d7788439b5660977202f2e03fd201fc3360f890deccce62619354d510b18be",
     "bin/FamilyRound.py": "1f153672886fbb5565dbf9905a8c7e2d7e5054c0e2dce6b44d005fb865289ad9",
     "bin/FamilyTelomere.py": "72e63bc6784ced997c31ca641357a0b2e41799ccc2c27b26619389a79dffabdb",
@@ -48,6 +48,6 @@
     "environment.yml": "8bdc2cf1c077ba273a81912b92f9e8fc03f53d4d93b2b49896db99521350c7a8"
   },
   "repository": "https://github.com/Jianwei-Zhang/DEGAP",
-  "revision": "ee378649de25e09a28cae6e713d75487948f7c9f",
+  "revision": "ec26a174c0bbb84f2a48affa6e4f50ad14adf465",
   "schema": "gpm.degap.runtime.v1"
 }

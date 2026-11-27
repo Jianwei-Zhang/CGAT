@@ -55,7 +55,7 @@ bash /work/lgz_only/run_all.sh --gapfill-tools none
 
 | 顺序 / 参数标识 | 同时提供两种技术时 | 固定源码/分发版本 |
 | --- | --- | --- |
-| `01_degap` / `degap` | 一次原生混合输入运行 | DEGAP 2.0，revision `ee378649de25e09a28cae6e713d75487948f7c9f` |
+| `01_degap` / `degap` | 一次原生混合输入运行 | DEGAP 2.0，revision `ec26a174c0bbb84f2a48affa6e4f50ad14adf465` |
 | `02_tgsgapcloser` / `tgsgapcloser` | 仅用 HiFi；没有 HiFi 时使用 ONT | TGS-GapCloser `1.2.1`，分发变体 `1.2.1_ml`、build 4；revision `52818b3e464209477baec506ade3240be43b4fa8` |
 | `03_quartet` / `quartet` | 一次 GapFiller 运行消费两组输入 | quarTeT `1.3.1`，revision `a44d8c87e3f4bcefaf43dc4134e88b6a21890265` |
 | `04_lrgapcloser` / `lrgapcloser` | 仅用 HiFi；没有 HiFi 时使用 ONT | LR_Gapcloser `1.0`、build `pl5321hdfd78af_0`；revision `156381adec01a5c664edbf5df1d866b5c70e82a1` |

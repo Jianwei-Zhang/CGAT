@@ -6,9 +6,9 @@ from urllib.parse import quote
 
 from FamilyReportStyle import CSS, SCRIPT
 from JunctionReport import render_junction_report
-from ReportStyle import badge_bi, bi, esc, report_css
+from ReportStyle import badge_bi, bi, degap_logo_html, esc, report_css
 
-LEFT, RIGHT, ORIGINAL, BRIDGE = "#2563eb", "#d97706", "#cbd5e1", "#16a34a"
+LEFT, RIGHT, ORIGINAL, BRIDGE = "#2563eb", "#d97706", "#cbd5e1", "#2b7a57"
 
 _REASON_ZH = {
     "closed": "已闭合",
@@ -186,11 +186,11 @@ def scene(families, events, w):
         return rect(a, y, b - a, 20, color, title, cls=cls, rx=rx)
 
     parts = [
-        '<path d="M62,38 H768 M62,103 H768" stroke="#e2e8f0" stroke-dasharray="3 3"/>',
+        '<path class="svg-guide" d="M62,38 H768 M62,103 H768" stroke="#e2e8f0" stroke-dasharray="3 3"/>',
         text(10, 43, "L →", cls="label"),
         text(10, 108, "R ←", cls="label"),
-        block(-base["L"], 0, 28, ORIGINAL, "Left original flank / 左侧原始侧翼"),
-        block(boundary, boundary + base["R"], 93, ORIGINAL, "Right original flank / 右侧原始侧翼"),
+        block(-base["L"], 0, 28, ORIGINAL, "Left original flank / 左侧原始侧翼", cls="seg-orig"),
+        block(boundary, boundary + base["R"], 93, ORIGINAL, "Right original flank / 右侧原始侧翼", cls="seg-orig"),
     ]
     for i, (side, event) in enumerate(events, 1):
         if not event["delta"]:
@@ -200,7 +200,7 @@ def scene(families, events, w):
         a, b, y = (gain - delta, gain, 28) if side == "L" else (boundary - gain, boundary - gain + delta, 93)
         label = f"{side}/v{event['version']} · +{bp(delta)}"
         item = block(a, b, y, LEFT if side == "L" else RIGHT, label, cls="seg-bar", rx=2)
-        item += f'<path d="M{x(a):.3f},{y} v20" stroke="#ffffff" stroke-width="1.2"/>'
+        item += f'<path class="seg-sep" d="M{x(a):.3f},{y} v20" stroke="#ffffff" stroke-width="1.2"/>'
         if x(b) - x(a) > 76:
             item += text((x(a) + x(b)) / 2, y + 14, "+" + bp(delta), "middle", "delta")
         parts.append(f'<g data-from="{i}">{item}</g>')
@@ -227,7 +227,8 @@ def player(families, events, checks_en, checks_zh, w, status):
         if entry:
             s, e = entry
             versions[s] = e["version"]
-            label = f"{s}→v{e['version']}" if e["delta"] else f"{s} · #{e['attempt']}"
+            label_en = f"{s}→v{e['version']}" if e["delta"] else f"{s} · #{e['attempt']}"
+            label_zh = label_en
             cap_en = f"Round {i} · {s}/v{e['version']} · +{bp(e['delta'])} → {bp(e['length'])}" + (
                 " · " + e["reason"] if e["reason"] else ""
             )
@@ -235,16 +236,19 @@ def player(families, events, checks_en, checks_zh, w, status):
                 " · " + zh_term(e["reason"]) if e["reason"] else ""
             )
         else:
-            label = "初始 v0"
+            label_en = "Init v0"
+            label_zh = "初始 v0"
             cap_en = "Initial · L/v0 × R/v0"
             cap_zh = "初始状态 · L/v0 × R/v0"
         last = i == len(events)
         if last:
-            label += " · 闭合" if w else " · 未闭合"
+            label_en += " · Closed" if w else " · Unclosed"
+            label_zh += " · 闭合" if w else " · 未闭合"
             cap_en += " · " + status
             cap_zh += " · " + zh_term(status)
+        pill_label = bi(label_en, label_zh) if label_en != label_zh else esc(label_en)
         pills.append(
-            f'<button type="button" data-step="{i}" aria-current="{"step" if last else "false"}">{esc(label)}</button>'
+            f'<button type="button" data-step="{i}" aria-current="{"step" if last else "false"}">{pill_label}</button>'
         )
         detail_en = "; ".join(checks_en[i]) or (
             "No new pair · versions unchanged"
@@ -284,7 +288,7 @@ def player(families, events, checks_en, checks_zh, w, status):
         )
     return (
         f'<div data-player><div class="player-bar"><div class="controls">'
-        f'<button type="button" class="play" aria-pressed="false"{disabled}>▶ 播放过程</button>'
+        f'<button type="button" class="play" aria-pressed="false"{disabled}>▶ Play</button>'
         f'<button type="button" class="prev"{disabled}>{bi("← Prev", "← 上一步")}</button>'
         f'<button type="button" class="next" disabled>{bi("Next →", "下一步 →")}</button></div>'
         f'<div class="pills">{"".join(pills)}</div></div>'
@@ -326,7 +330,7 @@ def alignment(families, w):
         ext = n - orig
         parts += [
             text(10, y + 12, f"{s}/v{w['left_version' if s == 'L' else 'right_version']}", cls="label"),
-            rect(origin, y, n * scale, 16, ORIGINAL, "Original flank / 原始侧翼", rx=3),
+            rect(origin, y, n * scale, 16, ORIGINAL, "Original flank / 原始侧翼", cls="seg-orig", rx=3),
             rect(
                 x(orig if s == "L" else 0),
                 y,
@@ -515,7 +519,7 @@ def growth_chart(events):
     for label, value, dash in [(bp(peak), peak, ""), (bp(peak // 2), peak // 2, ' stroke-dasharray="3 3"'), ("0 bp", 0, "")]:
         marks += [
             text(95, y(value) + 4, label, "end", "tick"),
-            f'<path d="M106,{y(value):.2f} H766" stroke="#cbd5e1"{dash}/>',
+            f'<path class="svg-grid" d="M106,{y(value):.2f} H766" stroke="#cbd5e1"{dash}/>',
         ]
     marks += [text(106, 102, "R0", cls="tick"), text(766, 102, f"R{len(events)}", "end", cls="tick")]
     if len(events) >= 2:
@@ -740,12 +744,21 @@ def render(result, checked):
         '<button type="button" data-lang="en" aria-pressed="true">EN</button>'
         '</div>'
     )
+    theme_ctrl = (
+        '<div class="fr-theme-wrap">'
+        '<button type="button" data-theme-toggle="1" aria-label="Toggle theme" title="Toggle theme" aria-pressed="false">'
+        '<svg class="ico-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>'
+        '<svg class="ico-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-14.93 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
+        '</button>'
+        '</div>'
+    )
     sub_id_html = f'<div class="sub-id">{esc(sub_id)}</div>' if sub_id else ""
+    brand_icon = degap_logo_html(24)
     return f"""<!doctype html>
 <html lang="en" data-lang="en" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(display_title)} · DEGAP</title><style>{report_css(CSS)}</style></head>
-<body><main class="sheet"><header class="fr-header"><div class="top"><div><div class="kicker">{bi("DEGAP · Bidirectional Family Extension", "DEGAP · 双向缺口延伸")}</div>
-<h1>{esc(display_title)}</h1>{sub_id_html}</div><div class="header-right">{badge}{lang_ctrl}</div></div><div class="strip">{strip}</div></header>
+<body><header class="fr-topbar"><div class="fr-topbar-inner"><div class="fr-topbar-left">{brand_icon}<div class="fr-title-block"><div class="fr-title-row"><h1><span class="fr-brand-tag">DEGAP</span> · {esc(display_title)}</h1>{badge}</div>{sub_id_html}</div></div><div class="fr-topbar-right">{lang_ctrl}{theme_ctrl}</div></div></header>
+<main class="sheet"><section class="fr-kpi-card"><div class="strip">{strip}</div></section>
 {"".join(sections)}
 <footer>{bi("DEGAP · Bidirectional family extension report", "DEGAP · 双向缺口延伸报告")}</footer>
 </main><script>{SCRIPT}</script></body></html>"""
