@@ -158,7 +158,7 @@ class VerifiedSelection:
 def load(root,manifest,data):
     """The caller has verified the ready manifest; verify this artifact at consumption too."""
     from . import q0_preparation as prep
-    from .q0_admission import Admission, AdmissionPolicy, PathSelection, _occupy_path
+    from .q0_admission import Admission, AdmissionPolicy, PathSelection, _occupy_path, _intervals_only, validate_admission_occupancy
     from .q0_paths import Placement, SearchResult
     relative=output_path(manifest)
     if relative is None:
@@ -207,5 +207,6 @@ def load(root,manifest,data):
         raise Q0EvidenceError('incomplete accepted Q0 selection')
     if prep.identity(root,relative)!=expected:
         raise Q0EvidenceError('accepted Q0 selection changed during consumption')
-    selection=PathSelection(Admission(tuple(placements),records,tuple(unplaced),ambiguous,AdmissionPolicy()),searches,occupied)
+    validate_admission_occupancy(placements)
+    selection=PathSelection(Admission(tuple(placements),records,tuple(unplaced),ambiguous,AdmissionPolicy()),searches,_intervals_only(occupied))
     return VerifiedSelection(selection,data,stamp)

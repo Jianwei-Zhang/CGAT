@@ -758,6 +758,24 @@ def _candidate_delta(part, groups, linked, policy, path_policy, clean, rooted_co
             rooted_context.screened_bp[1] - tile_bp)
 
 
+def validate_admission_occupancy(placements):
+    """Reject cross-chromosome collisions by physical source, not segment or strand."""
+    by_source = defaultdict(list)
+    for p in placements:
+        by_source[p.source].append(p)
+    for source, rows in by_source.items():
+        farthest = {}
+        for p in sorted(rows, key=lambda p: p.interval.start):
+            for chromosome, prev in farthest.items():
+                if chromosome != p.chromosome and prev.interval.end > p.interval.start:
+                    raise Q0EvidenceError(f"admission source overlap: {source} "
+                                          f"{chromosome} {prev.interval} ({prev.placement_id}) vs "
+                                          f"{p.chromosome} {p.interval} ({p.placement_id})")
+            prev = farthest.get(p.chromosome)
+            if prev is None or prev.interval.end < p.interval.end:
+                farthest[p.chromosome] = p
+
+
 def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = AdmissionPolicy(),
                      path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,
                      screen_threads: int = 1, screen_progress: Callable[[str], None] = _quiet) -> Admission:
@@ -806,16 +824,16 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
                 records.append({"placement_id": placement.placement_id, "segment_id": key, "status": "accepted",
                                 "reason": "unique_reference_blocks" if interval == part.interval else "supported_reference_subinterval",
                                 "qc": "not_measured" if quality_pass is None else "passed"})
-        if policy.continuous is not None:
+        if reference_seed is None and policy.continuous is not None:
             continuous, audit = continuous_candidates(part, groups[key], high, policy, _placement, policy.continuous)
-            existing = ({(reference_seed.interval, reference_seed.chromosome, reference_seed.orientation,
-                          reference_seed.reference_blocks)} if reference_seed is not None else set())
+            if not continuous and any(row.get("status") == "unresolved" for row in audit):
+                # Do not relabel this contested part later via weaker pair/gap inheritance.
+                allowed.discard(key)
+                if not first_request:
+                    records.append({"segment_id": key, "status": "unresolved",
+                                    "reason": "overlapping_cross_chromosome_chain_hulls"})
             for placement in continuous:
-                geometry = (placement.interval, placement.chromosome, placement.orientation, placement.reference_blocks)
-                if geometry in existing:
-                    continue
                 accepted[placement.placement_id] = placement
-                existing.add(geometry)
                 if not first_request:
                     records.append({"placement_id": placement.placement_id, "segment_id": key,
                                     "status": "accepted", "reason": "continuous_collinear_chain",
@@ -1096,6 +1114,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
         if not added:
             break
     placements = tuple(sorted(accepted.values(), key=lambda p: p.placement_id))
+    validate_admission_occupancy(placements)
     if first_request:
         return RequestAdmission(placements)
     placed = {p.segment_id for p in placements}
@@ -1148,6 +1167,8 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
                                               phases, first_request=True)
             if checkpoint is not None:
                 checkpoint.save_admission(admission)
+        else:
+            validate_admission_occupancy(admission.placements)
         if checkpoint is not None:
             checkpoint.after_admission()
     else:
@@ -1198,24 +1219,34 @@ def _select_paths(data, admission_policy, path_policy, quality_pass, progress, s
         _occupy_path(data, search, occupied)
         if checkpoint is not None and not restored:
             checkpoint.save_group(index, chromosome, search)  # only after canonical occupancy checks
-    return FirstRequestSelection(admission, searches) if first_request else PathSelection(admission, searches, occupied)
+    return FirstRequestSelection(admission, searches) if first_request else PathSelection(admission, searches, _intervals_only(occupied))
 
 
 def _occupy_path(data, search, occupied):
     """The same linear source-occupancy check for fresh and restored paths."""
     if search.path is None:
         return
+    def claim(source, interval, reason):
+        rows = occupied.setdefault(source, [])
+        for previous, chromosome in rows:
+            overlap = interval.intersection(previous)
+            if overlap:
+                raise Q0EvidenceError(f"{reason}: source={source} {chromosome} {previous} vs "
+                                      f"{search.path.chromosome} {interval}; overlap={overlap}")
+        rows.append((interval, search.path.chromosome))
+
     for item in search.path.slices:
         if item.interval.end > len(data.sources[item.source]):
             raise Q0EvidenceError("q0 path source exceeds sequence length")
-        if any(item.interval.intersection(previous) for previous in occupied.setdefault(item.source, [])):
-            raise Q0EvidenceError("q0 source interval selected on multiple chromosomes")
-        occupied.setdefault(item.source, []).append(item.interval)
+        claim(item.source, item.interval, "q0 source interval selected on multiple chromosomes or slices")
     for join in search.path.joins:
         if join.kind == "input_assembly_gap":
-            if any(join.gap_interval.intersection(previous) for previous in occupied.setdefault(join.gap_source, [])):
-                raise Q0EvidenceError("original N source interval selected more than once")
-            occupied.setdefault(join.gap_source, []).append(join.gap_interval)
+            claim(join.gap_source, join.gap_interval, "original N source interval selected more than once")
+
+
+def _intervals_only(occupied):
+    return defaultdict(list, {src: [iv for iv, _ in rows] for src, rows in occupied.items()})
+
 
 def construct_q0(data: EvidenceInput, *, admission_policy: AdmissionPolicy = AdmissionPolicy(),
                  path_policy: PathPolicy = PathPolicy(), quality_pass: Mapping[SourceKey, bool] | None = None,

@@ -91,6 +91,6 @@ class ExactTransitionTests(unittest.TestCase):
 
 
 class ReviewedBytesTests(unittest.TestCase):
-    def test_pins_bind_the_actual_reviewed_engine(self):
+    def test_scientific_successor_cannot_use_owner_engineering_pins(self):
         core=Path(__file__).resolve().parents[3]/"server/tools/lgz_core"
-        for name,pin in exact.OWNER_FILES.items():self.assertEqual(exact.digest(core/name),pin)
+        self.assertEqual({n for n,h in exact.OWNER_FILES.items() if exact.digest(core/n)!=h}, {"q0_admission.py"})

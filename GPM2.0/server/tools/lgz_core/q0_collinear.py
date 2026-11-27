@@ -154,6 +154,29 @@ def foreign_barriers(groups, high, main_key, main_chain, length, *, minimum_anch
     return merged_intervals(barriers), audit
 
 
+def exclusive_carriers(regions):
+    """Partition carried source (half-open); do not give an unsupported junction to either arm.
+
+    Each proposal is (chromosome, carried interval, main source-chain hull).
+    Keep natural ends away from the junction and same-chromosome inversions.
+    Decide all conflicts on the original proposals, independent of iteration order.
+    """
+    limits = [[iv.start, iv.end] for _, iv, _ in regions]
+    rejected = set()
+    for i, (chrom, iv, anchors) in enumerate(regions):
+        for j in range(i):
+            other, span, rival = regions[j]
+            if chrom == other or not iv.intersection(span):
+                continue
+            if anchors.intersection(rival):
+                rejected.update((i, j))
+                continue
+            left, right = (i, j) if anchors.end <= rival.start else (j, i)
+            limits[left][1] = regions[left][2].end
+            limits[right][0] = regions[right][2].start
+    return tuple(None if i in rejected else Interval(*ends) for i, ends in enumerate(limits))
+
+
 def continuous_candidates(part, groups, high, admission_policy, make_placement,
                           policy=ContinuousAdmissionPolicy()):
     support = {key: size(a.source for a in rows) for key, rows in groups.items()}
@@ -164,7 +187,7 @@ def continuous_candidates(part, groups, high, admission_policy, make_placement,
     chain_bp = {key: size(a.source for a in rows) for key, rows in chains.items()}
     raw_dominant = min(support, key=lambda k: (-support[k], k))
     total = size(a.source for rows in groups.values() for a in rows)
-    placements, audit = [], []
+    proposals, audit = [], []
     for chromosome in sorted({key[0] for key in chains}):
         key = min((k for k in chains if k[0] == chromosome), key=lambda k: (-chain_bp[k], k))
         main = chains[key]
@@ -195,12 +218,26 @@ def continuous_candidates(part, groups, high, admission_policy, make_placement,
             top_pass = (bp >= policy.minimum_new_chain_bp and bp >= policy.top_chain_ratio * top
                         and maximum_group <= policy.maximum_single_group_fraction * bp)
             if legacy_pass or top_pass:
-                placements.append(make_placement(part, *key, region, (a.source for a in anchors), anchors,
-                                                 (a.evidence_id for a in anchors), kind="continuous_reference"))
+                proposals.append((key, region, anchors))
                 audit.append({"chromosome": chromosome, "orientation": key[1],
                               "source_interval": [region.start, region.end], "main_chain_bp": bp,
                               "high_mapq_bp": high_bp, "top_competing_chain_bp": top,
                               "maximum_single_group_support_bp": maximum_group,
                               "legacy_dominance_passed": legacy_pass, "top_chain_passed": top_pass,
                               "foreign_barriers": foreign})
+    placements = []
+    if len({key[0] for key, _, _ in proposals}) <= 1:
+        carriers = [region for _, region, _ in proposals]
+    else:
+        carriers = exclusive_carriers([(key[0], region, hull(a.source for a in anchors))
+                                       for key, region, anchors in proposals])
+    for (key, region, anchors), carrier, row in zip(proposals, carriers, audit):
+        if carrier is None:
+            row.update(status="unresolved", reason="overlapping_cross_chromosome_chain_hulls")
+            continue
+        if carrier != region:
+            row.update(proposed_interval=row["source_interval"], source_interval=[carrier.start, carrier.end],
+                       reason="disjoint_cross_chromosome_arms")
+        placements.append(make_placement(part, *key, carrier, (a.source for a in anchors), anchors,
+                                         (a.evidence_id for a in anchors), kind="continuous_reference"))
     return tuple(placements), tuple(audit)

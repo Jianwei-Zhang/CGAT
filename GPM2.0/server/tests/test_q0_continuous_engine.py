@@ -31,6 +31,42 @@ class ContinuousAdmissionTests(unittest.TestCase):
     def candidates(self,part,groups,high):
         return continuous_candidates(part,groups,high,admission.AdmissionPolicy(),admission._placement)[0]
 
+    def test_asymmetric_barriers_keep_only_exclusive_carried_arms(self):
+        # Observed ptg000571l geometry (synthetic anchor contents). The real
+        # checkpoint replay also checks the original main-chain blocks verbatim.
+        part=SourceSegment('part',SourceKey('asm','ptg000571l'),Interval(0,16202389),'a'*64,0,'start','end')
+        g={('2A','+'): [anchor(349,811857,100)], ('7A','-'): [anchor(1079989,1089989,17000000), anchor(1250000,16202386,100)]}
+        high={k:[a.source for a in rows] for k,rows in g.items()}
+        def barriers(groups, high, key, *args, **kwargs):
+            return ((Interval(1200585,part.interval.end),) if key[0]=='2A' else (Interval(0,1048919),)), []
+        with patch('server.tools.lgz_core.q0_collinear.foreign_barriers',side_effect=barriers):
+            ps=self.candidates(part,g,high)
+        self.assertEqual({p.chromosome:p.interval for p in ps},
+                         {'2A':Interval(0,811857),'7A':Interval(1079989,16202389)})
+        admission.validate_admission_occupancy(ps)
+
+    def test_overlapping_chain_hulls_reject_both_and_keep_disjoint_arm(self):
+        from server.tools.lgz_core.q0_collinear import exclusive_carriers
+        rows=[('A',Interval(0,120),Interval(5,70)), ('B',Interval(50,185),Interval(65,175)),
+              ('D',Interval(185,220),Interval(190,215))]
+        self.assertEqual(exclusive_carriers(rows),(None,None,rows[2][1]))
+        self.assertEqual(exclusive_carriers(rows[::-1]),(rows[2][1],None,None))
+
+    def test_unique_reference_seed_is_not_also_emitted_as_continuous(self):
+        from server.tests.test_q0_admission import EvidenceFixture,dna
+        f=EvidenceFixture();src=f.source('a',dna(2000));f.ref(src,(0,1700),(0,1700))
+        with patch.object(admission,'continuous_candidates',side_effect=AssertionError('redundant seed')):
+            ps=admission.admit_placements(f.data()).placements
+        self.assertEqual([p.localization_kind for p in ps],['reference'])
+
+    def test_admission_guard_checks_physical_source_across_segment_ids(self):
+        from types import SimpleNamespace as Row
+        s=SourceKey('a','x'); a=Row(source=s,interval=Interval(0,100),chromosome='2A',placement_id='first',segment_id='one')
+        b=Row(source=s,interval=Interval(99,103),chromosome='7A',placement_id='second',segment_id='two')
+        with self.assertRaisesRegex(Q0EvidenceError, '2A.*first.*7A.*second'):
+            admission.validate_admission_occupancy([b,a])
+        b.interval=Interval(100,103); admission.validate_admission_occupancy([b,a])
+
     def test_internal_and_terminal_inversions_preserve_whole_source(self):
         for terminal in (False,True):
             part,g,h=self.fixture(terminal);ps=self.candidates(part,g,h)

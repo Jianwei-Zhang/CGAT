@@ -213,7 +213,9 @@ class CandidatePreparationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'differs from reviewed'):
             prep.validate_continuity_change(self.bundle, manifest)
         for name, expected in prep.CONTINUITY_FILES.items():
-            if name != 'q0_admission.py':
+            if name in ('q0_admission.py', 'q0_collinear.py'):
+                self.assertNotEqual(prep.digest(core/name), expected)  # not authorized by this historical packet
+            else:
                 self.assertEqual(prep.digest(core/name), expected)
         manifest['continuous_q0_policy_change']['reference_locus_padding_bp'] = 1000000
         with self.assertRaisesRegex(ValueError, 'authorization'):
