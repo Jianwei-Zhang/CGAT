@@ -5,7 +5,9 @@ from __future__ import annotations
 from bisect import bisect_right
 from collections import defaultdict
 from dataclasses import asdict, dataclass
+from operator import attrgetter
 from pathlib import Path
+from time import monotonic
 from typing import Callable, Iterable, Mapping, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -54,7 +56,20 @@ class _IntervalUnion:
 
     def _compact(self) -> None:
         if self._pending:
-            self._merged = merged_intervals((*self._merged, *self._pending))
+            # Emit one interval per connected run, not one allocation per
+            # overlapping CIGAR block. Reuse the first interval if unchanged.
+            ordered = iter(sorted((*self._merged, *self._pending), key=attrgetter("start")))
+            first = next(ordered)  # pending is nonempty
+            end = first.end
+            out = []
+            for row in ordered:
+                if row.start > end:
+                    out.append(first if end == first.end else Interval(first.start, end))
+                    first, end = row, row.end
+                elif row.end > end:
+                    end = row.end
+            out.append(first if end == first.end else Interval(first.start, end))
+            self._merged = tuple(out)
             self._pending.clear()
             self._starts = tuple(interval.start for interval in self._merged)
             self._threshold = max(1024, len(self._merged))
@@ -124,7 +139,8 @@ class ObservedSourcePairs(set):
 
 
 def interval_rows(intervals: Iterable[Interval]) -> list[list[int]]:
-    return [[i.start, i.end] for i in merged_intervals(intervals)]
+    rows = intervals if isinstance(intervals, _IntervalUnion) else merged_intervals(intervals)
+    return [[i.start, i.end] for i in rows]
 
 
 def evidence_ref(hit: PafAlignment) -> dict:
@@ -193,9 +209,11 @@ def _reference_blocks(hit, parts, ends):
 def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
                   reference_lengths: Mapping[str, int],
                   assignments: Iterable[dict[str, str]], *, min_gap: int = 100,
+                  progress: Callable[[str], None] | None = None,
                   regional_factory: Callable[[Mapping[str, SourceSegment], Mapping[str, int]], RegionalIndex] | None = None) -> CandidateCatalog:
     if type(min_gap) is not int or min_gap < 1:
         raise Q0EvidenceError("q0 minimum gap must be a positive integer")
+    started = monotonic()
     grouped = {(row["dataset_name"], row["seq_name"], row["assigned_chr_name"])
                for row in assignments}
     payload = {"schema": CATALOG_SCHEMA, "min_gap": min_gap, "sources": [], "segments": [],
@@ -293,6 +311,11 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
     finally:
         if routing is not None:
             routing.close()
+    total = len(accumulated)
+    materialize_start = last_log = monotonic()
+    if progress:
+        progress(f"reference scan complete; materializing candidates 0/{total}; "
+                 f"catalog preparation so far={materialize_start - started:.1f}s")
     for (segment_id, chromosome, strand), row in sorted(accumulated.items()):
         part = parts[segment_id]
         payload["candidates"].append({
@@ -306,6 +329,13 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
             "reference_evidence_ids": sorted(row["evidence"]), "pairwise_evidence_ids": [],
             "anchor_candidate_ids": [], "maximum_available_mapq": row["maximum_mapq"],
         })
+        if progress and monotonic() - last_log >= 60:
+            last_log = monotonic()
+            done = len(payload["candidates"])
+            progress(f"materializing candidates {done}/{total}; "
+                     f"elapsed={last_log - materialize_start:.1f}s")
+    if progress:
+        progress(f"candidate rows ready {total}/{total}; elapsed={monotonic() - materialize_start:.1f}s")
     catalog = CandidateCatalog(payload, sequences, parts, routing.path if routing else None, routing_report,
                                frozenset(reference_routable_parts),
                                {key: tuple(value) for key, value in reference_routable_footprints.items()}
@@ -314,6 +344,8 @@ def build_catalog(root: Path, sequences: Mapping[SourceKey, str],
     # regional mapper need not hash a 289Mb parent again for every short window.
     catalog._regional_verified_parts = {key:(sequences[p.source],p.interval,p.sequence_sha256) for key,p in parts.items()}
     catalog.finish()
+    if progress:
+        progress(f"catalog ready; candidates={total}; total elapsed={monotonic() - started:.1f}s")
     return catalog
 
 
