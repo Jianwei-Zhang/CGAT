@@ -8,7 +8,7 @@ Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、�
 
 GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流程中，用于导入、浏览、轻量编辑和 Final Path 导出。
 
-> 当前功能分支的 [LGZ 后精修指南](server/REFINEMENT_zh.md)说明四工具、编号路径和旧工作区迁移；已发布的 v2.0.21 下载包不变。Linux x86_64 合成样例和报告离线浏览已通过，ARM64 原生验收仍待完成。
+v2.0.22 的四工具精修、编号结果目录和旧工作区迁移见[精修指南](server/REFINEMENT_zh.md)。
 
 ## 项目架构
 
@@ -25,7 +25,7 @@ GPM2.0 将多种 de novo 组装结果统一到以参考基因组为锚点的流�
 
 ### 1. 下载工具并创建环境
 
-在 Linux 服务端执行以下命令，优先从[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)下载 Server 工具包，失败时回退 [Release v2.0.21](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.21)，校验后解压安装：
+在 Linux 服务端执行以下命令，优先从[官网](https://riceome.hzau.edu.cn/cgat/zh/downloads)下载 Server 工具包，失败时回退 [Release v2.0.22](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.22)，校验后解压安装：
 
 新安装默认使用 `~/bin/GPM_Server`，已有安装保留原路径。以下子 shell 不会改变当前工作目录，项目结果仍写入当前工作目录。若不使用 AI，可直接按下列命令安装；AI 安装提示词见[Server README](server/README_zh.md#给-ai-agent-的安装提示词)。
 
@@ -36,15 +36,15 @@ SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要�
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.21_source.tar.gz
+  archive=GPM_Server_2.0.22_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.21/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.22/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.21 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.22 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -187,12 +187,12 @@ bash "$SERVER/run.sh" -o ./gpm_server
 
 | 结果 / 交付 | 路径与用途 |
 | --- | --- |
-| LGZ-only 基线 | `05_final/00_lgz/`；未精修，包在 `07_delivery/00_lgz/gpm_server[.light].tar.gz`。 |
-| 每工具精修 | 如 `05_final/01_degap/assembly.fa`、`final_path.json` 和 `provenance.json`；包在 `07_delivery/01_degap/gpm_server.degap[.light].tar.gz`。其他工具使用固定编号。 |
-| Full / Light | 各工具都生成两种包；Full 含序列，可重建/导出 FASTA，Light 不含 FASTA，保留索引、来源和路径关系。导入匹配新版 App 的独立项目。 |
+| LGZ 基线 | `05_final/<out>.lgz.fa`；不被后续精修覆盖。 |
+| 工具结果 | `05_final/<out>.<tool>.fa`；`05_final/results.tsv` 列出已发布的 FASTA。 |
+| Full / Light | `07_delivery/` 中的一对项目包包含已交付的自动精修结果。Full 含来源序列；Light 保留索引、来源和路径关系。手动批次另有独立补丁。 |
 | 报告入口 | `06_report/report.html` 总览 → `01_lgz` 过程报告、`02_refinement/<工具>/report.html`、job 诊断及 `03_comparison/<batch>/`。 |
 
-方括号表示两个文件，不是文件名的一部分；默认 pigz 多线程 `tar.gz`，`--archive-format zip` 改用 ZIP。不再向输出目录旁边散放新交付文件，也不递归打包 `07_delivery`。只运行 LGZ 或仅存在工具目录不能声明本次精修成功。
+已有编号任务保留原来的逐工具目录。默认 pigz 多线程 `tar.gz`，`--archive-format zip` 改用 ZIP。不再向输出目录旁边散放新交付文件，也不递归打包 `07_delivery`。只运行 LGZ 或仅存在工具目录不能声明本次精修成功。
 
 LGZ 过程报告会保留失败、中断、未执行阶段及显式缓存记录，历史在 `.runtime/history/reports/`；完整日志在 `.runtime/logs/run_all.log`。其独立报告目录可复制后运行 `python3 /path/to/report/render_report.py` 离线重建，详见[报告格式与边界](server/REPORT.md)。精修报告使用自己的全部原始 gap 分母，不用 LGZ 过程报告的 ≥100 N 统计阈值替代；打开 `06_report/report.html` 查看精修状态、失败原因及诊断。固定版本 DEGAP 的交互报告已在工作区和解压后的 Full/Light 包中验证可离线浏览。参数保存/替换、固定版本、逐工具读取策略、真实最终路径和迁移命令见[精修使用指南](server/REFINEMENT_zh.md)。
 
@@ -264,7 +264,7 @@ xattr -dr com.apple.quarantine /Applications/GPM2.0.app
 
 ### 应用内更新（已启用更新的构建）
 
-本功能正在接入，尚未随本次改动发布。以下流程适用于已启用签名更新的构建；不含更新模块的旧版本仍需手动安装一次首个支持更新的版本。
+以下流程适用于已启用签名更新的构建；不含更新模块的旧版本仍需手动安装一次首个支持更新的版本。
 
 - 在设置面板底部打开 **App 设置 → 应用更新**，查看当前版本并点击 **检查更新**。App 也会在后台检查，发现新版后弹窗提醒。
 - 更新清单、更新说明和更新包均 **优先使用 docs 下载源，失败时回退 GitHub Releases**。docs 若返回有效但尚未同步的旧清单，不会额外查询 GitHub。

@@ -6,11 +6,11 @@ The automated assembly-repair engine is **LGZ** (**Linking Inter-assembly Units 
 
 Implementation and new script names use `lgz_*`. Existing `grt_*` Python imports, generated shell entry points and `--grt-*` CLI options remain supported aliases; these naming aliases preserve persisted LGZ stage IDs. The separate numbered-layout and refinement-package changes are described below. This migration applies to the current source checkout; use the legacy names with Server archives published before the corresponding source-asset refresh. See [Server naming compatibility](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md).
 
-> **Current source tree**: see the [refinement guide](REFINEMENT.md) for four post-LGZ engines, numbered workspaces, legacy migration and refined App packages. The v2.0.21 download below installs the published release, not the new output layout described here.
+For the four refinement tools, numbered outputs and legacy workspace migration in v2.0.22, see the [refinement guide](REFINEMENT.md).
 
 ## Quick start
 
-On your Linux server, download the GPM Server tools (source package) from [Release v2.0.21](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.21), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
+On your Linux server, download the GPM Server tools (source package) from [Release v2.0.22](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.22), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
 
 ```bash
 # 1. Download into the tools directory; keep your project working directory
@@ -20,15 +20,15 @@ SERVER="$HOME/bin/GPM_Server"  # Custom paths are supported; do not overwrite an
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.21_source.tar.gz
+  archive=GPM_Server_2.0.22_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.21/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.22/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.21 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.22 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -51,11 +51,7 @@ bash "$SERVER/run.sh" \
   -o ./gpm_server
 ```
 
-The published v2.0.21 downloaded above ends with a `Final delivery packages` summary. Its legacy-layout
-delivery files are `gpm_server.tar.gz` (Full: FASTA + report) and
-`gpm_server.light.tar.gz` (Light: FASTA omitted, report included). Both contain the complete
-`gpm_server/report/` directory; no separate report ZIP is created. The local report
-remains available at `gpm_server/report/report.html`.
+For new jobs, find the FASTAs and publication index in `05_final/` and the project Full / Light archives in `07_delivery/`. Open `06_report/report.html` to inspect the delivered paths and their evidence. Existing jobs retain their original layout.
 
 Report tables embed up to 200 preview rows with exact full counts and source paths;
 full audit details remain in the Server workspace. This keeps HTML and App report

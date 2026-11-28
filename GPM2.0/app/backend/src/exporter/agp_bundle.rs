@@ -181,7 +181,7 @@ fn emit(out: &mut impl Write, targets: &[(String, i64)], sequence: &[u8]) -> Res
 fn write_components(
     conn: &Connection,
     project: i64,
-    plan: &BTreeMap<String, (Component, i64)>,
+    plan: &AgpComponentInventory,
     out: &mut impl Write,
 ) -> Result<()> {
     let mut disk: BTreeMap<PathBuf, Records> = BTreeMap::new();

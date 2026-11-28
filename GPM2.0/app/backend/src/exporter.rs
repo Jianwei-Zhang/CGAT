@@ -316,12 +316,14 @@ fn build_final_path_agp(
     Ok(plan_final_path_agp(conn, project_id, records, false)?.0)
 }
 
+type AgpComponentInventory = BTreeMap<String, (Component, i64)>;
+
 fn plan_final_path_agp(
     conn: &Connection,
     project_id: i64,
     records: &[FinalPathFastaRecord],
     qualified: bool,
-) -> Result<(String, BTreeMap<String, (Component, i64)>)> {
+) -> Result<(String, AgpComponentInventory)> {
     validate_project_exists(conn, project_id)?;
     if records.is_empty() {
         bail!("at least one final-path AGP record is required");

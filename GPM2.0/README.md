@@ -8,7 +8,7 @@ Server implementation and new script names use `lgz_*`. Existing `grt_*` Python 
 
 GPM2.0 combines reference-anchored results from multiple de novo assemblies in one workflow for import, inspection, lightweight editing, and Final Path export.
 
-> The current feature branch adds [post-LGZ refinement](server/REFINEMENT.md), numbered paths and explicit legacy migration. Published v2.0.21 downloads are unchanged. Linux x86_64 synthetic runs and offline browser checks passed; native ARM64 verification is pending.
+For the four refinement tools, numbered outputs and legacy workspace migration in v2.0.22, see the [refinement guide](server/REFINEMENT.md).
 
 ## Architecture
 
@@ -25,7 +25,7 @@ Installers for `win-x86`, `win-arm64`, `mac-x86`, and `mac-arm64` are available 
 
 ### 1. Download the tools and create the environment
 
-On your Linux server, download the Server tools (source package) from [Release v2.0.21](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.21), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
+On your Linux server, download the Server tools (source package) from [Release v2.0.22](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.22), or the [official docs](https://riceome.hzau.edu.cn/cgat/downloads), then verify, extract into the default or custom directory, and install:
 
 New installations default to `~/bin/GPM_Server`; existing installations keep their actual paths. The subshell below does not change your working directory, so project outputs stay outside the tools directory. Without AI, use the commands below; the [Server README](server/README.md#installation-prompt-for-your-ai-agent) also provides an agent installation prompt.
 
@@ -36,15 +36,15 @@ SERVER="$HOME/bin/GPM_Server"  # Custom paths are supported; do not overwrite an
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.21_source.tar.gz
+  archive=GPM_Server_2.0.22_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.21/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.22/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.21 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.22 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -199,12 +199,12 @@ The current source executes the plan serially and validates checkpoints before r
 
 | Result / delivery | Path and use |
 | --- | --- |
-| LGZ-only baseline | `05_final/00_lgz/`, explicitly unrefined; archives at `07_delivery/00_lgz/gpm_server[.light].tar.gz`. |
-| Per-tool refinement | E.g. `05_final/01_degap/assembly.fa`, `final_path.json` and `provenance.json`; archives at `07_delivery/01_degap/gpm_server.degap[.light].tar.gz`. Other tools use fixed numbered directories. |
-| Full / Light | Every tool has both modes. Full includes source sequences for reconstruction/FASTA export; Light omits FASTA while retaining indexes, sources and path lineage. Import each into an independent matching new App project. |
+| LGZ baseline | `05_final/<out>.lgz.fa`; later refinements do not replace it. |
+| Tool results | `05_final/<out>.<tool>.fa`; see `05_final/results.tsv` for published FASTAs. |
+| Full / Light | One project archive pair in `07_delivery/` includes published automatic results. Full includes source sequences; Light keeps indexes, source identities and path lineage. Manual batches have separate patches. |
 | Report entry | `06_report/report.html` overview → `01_lgz` process report, `02_refinement/<tool>/report.html`, job diagnostics and `03_comparison/<batch>/`. |
 
-Brackets denote two files, not literal names. Parallel pigz `tar.gz` is the default; `--archive-format zip` selects ZIP. New archives are not scattered beside the workspace and never recursively include `07_delivery`. An LGZ-only run or bare tool directory is not a successful refinement receipt.
+Earlier numbered jobs keep their per-tool directories. Parallel pigz `tar.gz` is the default; `--archive-format zip` selects ZIP. New archives are not scattered beside the workspace and never recursively include `07_delivery`. An LGZ-only run or bare tool directory is not a successful refinement receipt.
 
 The LGZ process report retains failures, interruptions, unexecuted stages and explicit cache records; its history is `.runtime/history/reports/`, and full diagnostics are `.runtime/logs/run_all.log`. Copy its whole report directory to regenerate offline with `python3 /path/to/report/render_report.py`; see [report format and scope](server/REPORT.md). Refinement reports use every original gap as their own denominator, not the LGZ process report's ≥100-N threshold. Open `06_report/report.html` for refinement status, failure reasons and diagnostics. The pinned DEGAP interactive reports were verified offline in the workspace and in extracted Full and Light archives. The [refinement guide](server/REFINEMENT.md) covers saved-setting replacement, exact pins, consumed reads, genuine final paths and migration commands.
 
@@ -277,7 +277,7 @@ The package preserves the primary and auxiliary dataset roles established during
 
 ### In-app updates (updater-enabled builds)
 
-This feature is being implemented; it has not been released as part of this change. The following workflow applies to a signed, updater-enabled build. Users of older builds without an updater must manually install the first updater-enabled version once.
+The following workflow applies to a signed, updater-enabled build. Users of older builds without an updater must manually install the first updater-enabled version once.
 
 - Open **App settings → App updates** at the bottom of the settings panel to see the current version and **Check for updates**. The App will also check in the background and notify you when a newer version is available.
 - Update metadata, release notes and packages use the **docs download source first**, falling back to **GitHub Releases** on failure. A valid but not-yet-synchronized docs manifest does not trigger an additional GitHub check.

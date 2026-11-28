@@ -6,11 +6,11 @@
 
 Server 实现与新脚本名称使用 `lgz_*`。已有 `grt_*` Python 导入、生成脚本入口及 `--grt-*` 参数继续作为兼容别名，命名别名保留 LGZ 持久化阶段 ID；独立的编号布局和精修包协议变化见下文。 本命名迁移适用于当前源码；在对应 Server 源码附件刷新前，较早发布的安装目录仍应使用旧名称。详见[Server 命名兼容说明](https://github.com/Jianwei-Zhang/CGAT/blob/master/GPM2.0/docs/lgz-server-implementation.md)。
 
-> **当前源码**：LGZ 后四工具精修、编号工作区、旧目录迁移和 App 精修包见[使用指南](REFINEMENT_zh.md)。下方 v2.0.21 下载命令安装的是已发布版本，不包含这里的新产出结构。
+v2.0.22 的四工具精修、编号结果目录和旧工作区迁移见[精修指南](REFINEMENT_zh.md)。
 
 ## 快速开始
 
-在 Linux 服务端依次执行以下命令：从 [Release v2.0.21](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.21) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
+在 Linux 服务端依次执行以下命令：从 [Release v2.0.22](https://github.com/Jianwei-Zhang/CGAT/releases/tag/v2.0.22) 下载 GPM Server 工具包（源码），默认解压到 `~/bin/GPM_Server`（也可自定义），然后安装和运行。官网直连下载失败时回退 GitHub；skill 安装器和更新器也遵循此顺序，并校验版本与摘要。下载摘要见官网或 Release 的 SHA-256 清单。
 
 ```bash
 # 1. 下载并解压到工具目录，不改变当前项目目录
@@ -20,15 +20,15 @@ SERVER="$HOME/bin/GPM_Server"  # 可改为自定义路径；已有安装不要�
   mkdir -p "$(dirname "$SERVER")"
   mkdir "$SERVER"
   cd "$SERVER"
-  archive=GPM_Server_2.0.21_source.tar.gz
+  archive=GPM_Server_2.0.22_source.tar.gz
   curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/$archive" ||
+    "https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/$archive" ||
     curl -fL --connect-timeout 8 --max-time 60 -o "$archive" \
-      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.21/$archive"
+      "https://github.com/Jianwei-Zhang/CGAT/releases/download/v2.0.22/$archive"
   curl -fL --connect-timeout 8 --max-time 30 -o SHA256SUMS \
-    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.21/SHA256SUMS ||
+    https://riceome.hzau.edu.cn/cgat/downloads/v2.0.22/SHA256SUMS ||
     curl -fL --connect-timeout 8 --max-time 30 \
-      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.21 |
+      https://api.github.com/repos/Jianwei-Zhang/CGAT/releases/tags/v2.0.22 |
       python3 -c 'import json,sys; r=json.load(sys.stdin); print("\n".join(a["digest"].removeprefix("sha256:")+"  "+a["name"] for a in r["assets"] if a["name"].endswith("_source.tar.gz")))' > SHA256SUMS
   grep "  $archive$" SHA256SUMS | sha256sum -c -
   tar -xzf "$archive" --strip-components=1
@@ -51,10 +51,7 @@ bash "$SERVER/run.sh" \
   -o ./gpm_server
 ```
 
-下方下载的已发布 v2.0.21 成功结束时显示 `Final delivery packages` 摘要，按其旧布局交付
-`gpm_server.tar.gz`（Full，含 FASTA 和报告）与 `gpm_server.light.tar.gz`（Light，不含 FASTA、
-包含报告）两个文件；两者都内置完整的 `gpm_server/report/` 目录，不再单独生成
-报告 ZIP。本地报告仍可在 `gpm_server/report/report.html` 直接打开。
+新任务的 FASTA 与发布清单位于 `05_final/`，项目级 Full / Light 交付包位于 `07_delivery/`。打开 `06_report/report.html` 查看交付路径与精修证据。旧任务保留原布局。
 
 报告表格最多内嵌前 200 行预览，并标明准确总行数与来源路径；全量审计明细仍保留在
 Server 工作目录中，不再反复塞入 HTML 和 App 报告快照。搜索与分页只针对已标注的预览。

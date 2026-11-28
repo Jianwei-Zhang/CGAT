@@ -411,8 +411,9 @@ class Runner:
 
     def _stream_child(self, unit: PlanUnit, child: subprocess.Popen[str]) -> None:
         assert child.stdout is not None
-        for raw_line in child.stdout:
-            self._child_line(unit, raw_line.rstrip("\r\n"))
+        with child.stdout as output:
+            for raw_line in output:
+                self._child_line(unit, raw_line.rstrip("\r\n"))
 
     def _child_line(self, unit: PlanUnit, line: str) -> None:
         line = plain(line)

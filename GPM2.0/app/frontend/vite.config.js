@@ -22,7 +22,27 @@ export function macLocalViewIpcPolicy(platform = process.env.TAURI_ENV_PLATFORM 
 }
 
 export default defineConfig({
-  build: { rollupOptions: { input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), localView: fileURLToPath(new URL("./local-view.html", import.meta.url)) } } },
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        localView: fileURLToPath(new URL("./local-view.html", import.meta.url)),
+      },
+      output: {
+        // Split at existing static module boundaries. The popup keeps its tiny
+        // shared IPC helper; PDF export stays lazy and isn't part of these groups.
+        manualChunks: {
+          "local-view-ipc": ["./src/ui/pages/assembly/subview-native-identity.js"],
+          "final-path-drag": ["./src/ui/pages/assembly/final-path-append-drag-runtime.js"],
+          "assembly-controls": ["./src/ui/pages/assembly/bindings.js"],
+          "project-preview": ["./src/ui/pages/project-preview-preparation.js"],
+          "assembly-page": ["./src/ui/pages/assembly-page.js"],
+          "subview-fragments": ["./src/ui/pages/assembly/subview-fragment-sync-runtime.js"],
+          "track-rendering": ["./src/ui/pages/assembly/render-tracks.js"],
+        },
+      },
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 5174,

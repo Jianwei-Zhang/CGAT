@@ -404,8 +404,8 @@ fn refined_light_import_keeps_provenance_but_does_not_claim_sequences_available(
 }
 
 #[test]
-fn previous_workspace_recovers_verified_effect_without_reinterpreting_its_final_path()
--> Result<()> {
+fn previous_workspace_recovers_verified_effect_without_reinterpreting_its_final_path() -> Result<()>
+{
     let temp = materialize(true);
     let (outcome, _) =
         crate::importer::import_from_extracted_bundle(&temp.path().join("refined.degap"))?;
@@ -417,7 +417,11 @@ fn previous_workspace_recovers_verified_effect_without_reinterpreting_its_final_
     let effects = load_grt_project_view(db)?.auto_refinement_effects;
     assert_eq!(effects.len(), 1);
     assert_eq!(
-        (effects[0].closed, effects[0].partial, effects[0].original_gaps),
+        (
+            effects[0].closed,
+            effects[0].partial,
+            effects[0].original_gaps
+        ),
         (0, 1, 1)
     );
     let project = initialize_grt_project(db, "Legacy refinement")?;
@@ -428,9 +432,11 @@ fn previous_workspace_recovers_verified_effect_without_reinterpreting_its_final_
     assert_eq!(load_grt_final_path(db)?, original);
     let conn = crate::db::open_workspace_db(db)?;
     assert_eq!(
-        conn.query_row("SELECT COUNT(*) FROM grt_auto_refinement_effect", [], |row| {
-            row.get::<_, i64>(0)
-        })?,
+        conn.query_row(
+            "SELECT COUNT(*) FROM grt_auto_refinement_effect",
+            [],
+            |row| { row.get::<_, i64>(0) }
+        )?,
         0
     );
     Ok(())
@@ -472,7 +478,9 @@ fn legacy_effect_recovery_keeps_missing_corrupt_or_mismatched_evidence_unknown()
             }
         }
         assert!(
-            load_grt_project_view(db)?.auto_refinement_effects.is_empty(),
+            load_grt_project_view(db)?
+                .auto_refinement_effects
+                .is_empty(),
             "{mode}"
         );
     }
