@@ -132,7 +132,9 @@ class RunAllRunnerTests(unittest.TestCase):
             server = self.make_workspace(root, [(f"chr:{name}", "exit 99") for name in names])
             environment = self.configure_chromosome_inputs(server, root, names)
             options = server / "metadata/prepare_options.tsv"
-            options.write_text(options.read_text().replace("threads\t12", "threads\t2"))
+            # Even when references are exclusive, chromosome-local jobs still overlap.
+            options.write_text(options.read_text().replace("threads\t12", "threads\t2")
+                               + "reference_schedule\texclusive\n")
             worker = root / "alignment.py"
             worker.write_text('''import os, time
 from pathlib import Path
@@ -192,6 +194,40 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
             self.assertEqual(invalid.returncode, 2, invalid.stdout + invalid.stderr)
             self.assertEqual([r["state"] for r in read_status(server / "logs/status.tsv")],
                              ["failed", "interrupted"])
+
+    def test_exclusive_references_keep_ds_order_full_budget_and_valid_checkpoints(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            server = self.make_workspace(root, [])
+            names = ["ds1", "ds2"]
+            env = self.configure_reference_inputs(server, root, names)
+            env["TEST_WORKSPACE"] = str(server)
+            plan = ["unit_id\tcommand_relpath\tdetail_log_relpath"]
+            for priority, name in enumerate(names, 1):
+                run = server / f"runs/{name}_vs_ref"
+                run.mkdir(parents=True, exist_ok=True)
+                rel = f"runs/{name}_vs_ref/command.sh"
+                # Higher priority for ds2 would start it first in the shared group.
+                (run / "alignment_tasks.json").write_text(json.dumps({"version": 3, "tasks": [
+                    {"command": rel, "priority": priority, "max_threads": 1}]}))
+                command = ("set -eu\nmkdir \"$TEST_WORKSPACE/live\"\n"
+                           f'echo "{name}:$GPM_TASK_THREADS" >> "$TEST_WORKSPACE/calls"\n'
+                           "sleep .05\nrmdir \"$TEST_WORKSPACE/live\"\n"
+                           "printf 'query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t10\\t10\\t60\\tcg:Z:10M\\n' > result.paf\n"
+                           "echo fixture > tool_version.txt\n")
+                (server / rel).write_text(command)
+                plan.append(f"ref:{name}\t{rel}\tlogs/run_all.log")
+            (server / ".run_all/plan.tsv").write_text("\n".join(plan)+"\n")
+            def launch(*args):
+                result = subprocess.run(["python3", str(RUNNER), "--server-dir", str(server),
+                                         "--log-style", "detailed", *args], env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+                return result.stdout
+            launch("--reference-schedule", "exclusive", "--threads", "4")
+            budget = min(4, len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1)
+            self.assertEqual((server/"calls").read_text().splitlines(), [f"{n}:{budget}" for n in names])
+            self.assertEqual(launch("--reference-schedule", "shared").count("[SKIP_VALID]"), 2)
+            self.assertEqual(len((server/"calls").read_text().splitlines()), 2)
 
     def test_minimap2_assertion_keeps_failure_and_partial_paf_in_serial_and_parallel(self):
         assertion = "minimap2: align.c:301: mm_update_extra: Assertion qoff == r->qe - r->qs && toff == r->re - r->rs failed."

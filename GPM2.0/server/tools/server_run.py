@@ -35,7 +35,7 @@ ALIASES = {
     "--lgz-step2-mummer-scope": "--grt-step2-mummer-scope",
 }
 SINGLE_OPTIONS = {
-    "--out", "--threads", "--score", "--archive-format", "--gapfill-tools",
+    "--out", "--threads", "--reference-schedule", "--score", "--archive-format", "--gapfill-tools",
     "--minimap-preset", "--minimap-batch", "--minimap-filter", "--cen", "--cen-min-len",
     "--cen-min-identity", "--reads", "--reads-type", "--reads-qc", "--grt-qc-memory-gb",
     "--grt-kmer-size", "--max-fill", "--self-m", "--self-n",
@@ -70,14 +70,14 @@ def parse_options(argv: list[str], cwd: Path) -> dict[str, list[list[str]]]:
             values = [str((cwd / value).resolve()) for value in values]
         elif key in PATH_OPTIONS or key == "--out":
             values[-1] = str((cwd / values[-1]).resolve())
-        if key in ({"--max-fill", "--self-m", "--self-n", *RESOURCE_OPTIONS} - {"--minimap-batch"}) and not re.fullmatch(r"[1-9][0-9]*", values[0]):
+        if key in ({"--max-fill", "--self-m", "--self-n", *RESOURCE_OPTIONS} - {"--minimap-batch", "--reference-schedule"}) and not re.fullmatch(r"[1-9][0-9]*", values[0]):
             raise RunnerError(f"{key} must be a positive integer")
         if key in {"--minimap-batch", "--minimap-filter"}:
             try:
                 values[0] = (batch_size if key == "--minimap-batch" else seed_fraction)(values[0])
             except ValueError as exc:
                 raise RunnerError(str(exc)) from exc
-        allowed = {"--reads-type": {"hifi", "ont"}, "--grt-execution-profile": {"baseline", "optimized"},
+        allowed = {"--reference-schedule": {"shared", "exclusive"}, "--reads-type": {"hifi", "ont"}, "--grt-execution-profile": {"baseline", "optimized"},
                    "--grt-step2-mummer-scope": {"full", "gap-screen"},
                    "--q0-supplement-scope": {"auto", "full", "decision_frontier_repair", "positive_threshold"}}
         if key in allowed and values[0] not in allowed[key]:

@@ -154,7 +154,7 @@ printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/01_inputs/02_assemblies/ds_add
     --ref ref_add_options "$ref" \
     --ds ds_add "$ds" \
     --skip-self \
-    --score 71 \
+    --score 71 --reference-schedule exclusive \
     --minimap-preset asm5 \
     --tel TTAGGG 2 \
     --cen "$cen" \
@@ -175,6 +175,7 @@ if grep -Eq '^(blastn_|winnowmap_)' "$metadata_path"; then
 fi
 assert_prepare_option "$metadata_path" minimap_preset asm5
 assert_prepare_option "$metadata_path" threads 10
+assert_prepare_option "$metadata_path" reference_schedule exclusive
 assert_prepare_option "$metadata_path" skip_self true
 assert_prepare_option "$metadata_path" self_alignment_scope none
 assert_prepare_option "$metadata_path" tel_enabled true

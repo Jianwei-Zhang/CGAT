@@ -66,6 +66,22 @@ class ResourceResumeTests(unittest.TestCase):
             self.assertEqual(direct.returncode, 0, direct.stdout + direct.stderr)
             self.assertEqual((workspace / "budgets.txt").read_text().split()[1], "120")
 
+    def test_reference_schedule_is_persisted_validated_and_resettable_on_resume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workspace = self.workspace(root)
+            options = workspace / "metadata/prepare_options.tsv"
+            initial = options.read_bytes()
+            (workspace / "commands/only.sh").write_text("exit 0\n")
+            with self.assertRaisesRegex(server_run.RunnerError, "reference-schedule"):
+                server_run.parse_options(["--reference-schedule", "typo"], root)
+            for mode in ("exclusive", "shared"):
+                args = ["-o", str(workspace), "--reference-schedule", mode]
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(server_run.execute(args, root), 0)
+                self.assertEqual(resources.read_resources(workspace)["effective"]["reference_schedule"], mode)
+                self.assertEqual(options.read_bytes(), initial)
+
     def test_busy_workspace_cannot_change_resources(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -88,6 +104,9 @@ class ResourceResumeTests(unittest.TestCase):
                 resources.update_resources(workspace, {"--threads": [["64"]]}, "old-runtime")
             self.assertFalse((workspace / ".run_all/resources.json").exists())
             (runtime / "run_resources.py").write_text("# staged helper\n")
+            with self.assertRaisesRegex(ValueError, "predates --reference-schedule"):
+                resources.update_resources(workspace, {"--reference-schedule": [["exclusive"]]}, "old-runner")
+            self.assertFalse((workspace / ".run_all/resources.json").exists())
             plan = workspace / ".run_all/plan.tsv"
             plan.write_text(plan.read_text().replace("only", "grt_step23"))
             with self.assertRaisesRegex(ValueError, "legacy combined"):

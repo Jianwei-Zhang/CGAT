@@ -17,6 +17,7 @@ source "${SCRIPT_DIR}/lib/workspace_paths.sh"
 
 WORK_ROOT="$(pwd)/gpm_server"
 THREADS="10"
+REFERENCE_SCHEDULE="shared"
 ARCHIVE_FORMAT="tar.gz"
 MINIMAP_PRESET="asm10"
 MINIMAP_BATCH="1G"
@@ -56,6 +57,7 @@ Usage:
     [-K|--minimap-batch <bases>] \
     [-f|--minimap-filter <fraction>] \
     [--threads|-t <thread_budget>] \
+    [--reference-schedule shared|exclusive] \
     [--archive-format tar.gz|zip] \
     [--skip-self] \
     [--tel <motif> <min_repeat>] \
@@ -91,6 +93,7 @@ Behavior:
   - Initial-reference mapping: -K/--minimap-batch defaults to 1G; try 500M if memory is insufficient (not a RAM limit)
   - Explicit -f/--minimap-filter 0.01 preserves the chosen filter and bypasses automatic calibration; may change alignments
   - Without -f, eligible large initial-reference asm10 tasks use bounded internal calibration; other inputs keep preset filtering
+  - --reference-schedule exclusive runs initial assembly-to-reference mappings in DS order, one at a time with the whole thread budget; default: shared
   - Supports --threads/-t to choose the total compute-thread budget, default: 10
   - Independent reference and chromosome-local alignments share this budget
   - Default delivery: tar.gz compressed with pigz using the thread budget; --archive-format zip keeps ZIP output
@@ -448,6 +451,7 @@ write_prepare_options_metadata() {
     printf 'self_min_chain_score\t%s\n' "$SELF_MIN_CHAIN_SCORE"
     printf 'self_minimizers\t%s\n' "$SELF_MINIMIZERS"
     printf 'threads\t%s\n' "$THREADS"
+    if [[ "$REFERENCE_SCHEDULE" != shared ]]; then printf 'reference_schedule\t%s\n' "$REFERENCE_SCHEDULE"; fi
     printf 'archive_format\t%s\n' "$ARCHIVE_FORMAT"
     printf 'skip_self\t%s\n' "$SKIP_SELF"
     printf 'self_alignment_scope\t%s\n' "$self_alignment_scope"
@@ -845,6 +849,11 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--max-fill requires <bp>"
       [[ "$2" =~ ^[1-9][0-9]*$ ]] || die "Invalid --max-fill '$2'. Use a positive integer."
       LGZ_REFILL_MAX_LENGTH="$2"
+      shift 2
+      ;;
+    --reference-schedule)
+      [[ $# -ge 2 ]] || die "$1 requires shared or exclusive"
+      case "$2" in shared|exclusive) REFERENCE_SCHEDULE="$2" ;; *) die "Invalid $1: $2" ;; esac
       shift 2
       ;;
     --threads|-t)

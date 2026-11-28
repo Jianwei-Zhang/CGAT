@@ -26,13 +26,13 @@ import sys
 import tempfile
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
 from run_progress import ProgressDisplay, plain
 from workspace_layout import WorkspaceLayout, workspace_path
-from run_resources import execution_threads, read_resources, resource_environment
+from run_resources import execution_threads, read_resources, reference_schedule, resource_environment
 from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
                                   changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
@@ -484,7 +484,7 @@ class Runner:
             self.refinement_stop_timer = None
         self.refinement_child = None
 
-    def _run_alignment_group(self, units: list[PlanUnit], plans: dict[str, AlignmentPlan], threads: int) -> int:
+    def _run_alignment_group(self, units: list[PlanUnit], plans: dict[str, AlignmentPlan], threads: int, *, exclusive_ref: bool = False) -> int:
         """Run independent leaf commands; publish checkpoints per original unit."""
         cpu_count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
         budget = max(1, min(threads, cpu_count))
@@ -543,7 +543,12 @@ class Runner:
             tasks.extend(unit_tasks)
         if not tasks:
             return 0
-        dispatcher = AdaptiveDispatcher() if any(
+        if exclusive_ref:
+            # Only this DS is admitted. Ignore the prepared query-count CPU cap,
+            # not the allocation affinity, task lifecycle or checkpoint contract.
+            assert len(units) == 1 and units[0].unit_id.startswith("ref:")
+            tasks = [replace(task, max_threads=budget, max_concurrent=1) for task in tasks]
+        dispatcher = AdaptiveDispatcher() if not exclusive_ref and any(
             task.largest_fraction is not None for task in tasks
         ) else None
         allocations = {}
@@ -753,6 +758,9 @@ class Runner:
             self.progress.header(self.run_id, mode, self.server_dir, threads)
             log_handle.write(separator + "\n")
             resources = read_resources(self.server_dir)
+            ref_mode = reference_schedule(resources["effective"].get("reference_schedule", options.get("reference_schedule", "shared")))
+            if ref_mode == "exclusive":
+                self._event("RESOURCES", None, "initial reference alignments: exclusive, one dataset at a time in plan order")
             if resources["effective"]:
                 self._event("RESOURCES", None, json.dumps(resources, sort_keys=True))
             if mode == "resume":
@@ -804,7 +812,8 @@ class Runner:
                     if first_plan is not None:
                         group = [unit]
                         plans = {unit.unit_id: first_plan}
-                        for candidate in self.units[unit_index + 1:]:
+                        exclusive_ref = kind == "ref" and ref_mode == "exclusive"
+                        for candidate in (() if exclusive_ref else self.units[unit_index + 1:]):
                             if candidate.unit_id.split(":", 1)[0] != kind:
                                 break
                             candidate_plan = load_task_plan(self.server_dir, candidate.unit_id, candidate.command_relpath)
@@ -812,7 +821,7 @@ class Runner:
                                 break
                             group.append(candidate)
                             plans[candidate.unit_id] = candidate_plan
-                        result = self._run_alignment_group(group, plans, int(threads))
+                        result = self._run_alignment_group(group, plans, int(threads), exclusive_ref=exclusive_ref)
                         handled.update(candidate.unit_id for candidate in group)
                         if result:
                             return result
@@ -1093,6 +1102,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ont", nargs="+", action="extend")
     parser.add_argument("--gapfill-tools")
     parser.add_argument("--threads", "-t", type=int)
+    parser.add_argument("--reference-schedule", choices=("shared", "exclusive"))
     return parser.parse_args()
 
 
@@ -1117,11 +1127,16 @@ def main() -> int:
             supplied["--gapfill-tools"] = [[args.gapfill_tools]]
         _, request = resolve(server_dir, supplied)
         preflight(request)
+        changes = {}
         if args.threads is not None:
             if args.threads < 1:
                 raise RunnerError("--threads must be positive")
+            changes["--threads"] = [[str(args.threads)]]
+        if args.reference_schedule is not None:
+            changes["--reference-schedule"] = [[args.reference_schedule]]
+        if changes:
             from run_resources import update_resources
-            update_resources(server_dir, {"--threads": [[str(args.threads)]]}, run_id)
+            update_resources(server_dir, changes, run_id)
         save_request(server_dir, supplied, run_id)
         ensure_plan(server_dir)
         units = load_plan(server_dir)
