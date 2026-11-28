@@ -94,3 +94,13 @@ class ReviewedBytesTests(unittest.TestCase):
     def test_scientific_successor_cannot_use_owner_engineering_pins(self):
         core=Path(__file__).resolve().parents[3]/"server/tools/lgz_core"
         self.assertEqual({n for n,h in exact.OWNER_FILES.items() if exact.digest(core/n)!=h}, {"q0_admission.py"})
+
+class FinalSciencePacketTests(unittest.TestCase):
+    def test_pinned_delta_and_historical_lineage_are_distinct(self):
+        core=Path(__file__).resolve().parents[3]/"server/tools/lgz_core"
+        self.assertEqual({n:exact.digest(core/n) for n in exact.FINAL_FILES},exact.FINAL_FILES)
+        self.assertNotEqual(exact.FINAL_REVISION,exact.SOURCE_REVISION)
+        with self.assertRaisesRegex(ValueError,"lineage"):
+            exact.validate_final_change(Path("."),dict(source_occupancy_change=dict(schema=exact.FINAL_SCHEMA,
+                runtime_revision=exact.FINAL_REVISION,baseline_revision=exact.SOURCE_REVISION),
+                previous_job=43224098,git_revision=exact.FINAL_REVISION))

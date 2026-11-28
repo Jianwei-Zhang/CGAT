@@ -213,7 +213,7 @@ class CandidatePreparationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'differs from reviewed'):
             prep.validate_continuity_change(self.bundle, manifest)
         for name, expected in prep.CONTINUITY_FILES.items():
-            if name in ('q0_admission.py', 'q0_collinear.py'):
+            if name in ('q0_admission.py', 'q0_collinear.py', 'q0_reference_locus.py'):
                 self.assertNotEqual(prep.digest(core/name), expected)  # not authorized by this historical packet
             else:
                 self.assertEqual(prep.digest(core/name), expected)

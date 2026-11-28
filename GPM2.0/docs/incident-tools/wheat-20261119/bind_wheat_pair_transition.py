@@ -13,6 +13,10 @@ source_change=authorization.get('schema')=='q0_cross_chromosome_source_occupancy
 if source_change:
     from q0_exact_engineering_transition import SOURCE_TRANSITION
     parent,pin,job='q0-owner-transition.TjrxmZGI',SOURCE_TRANSITION,43224098
+if authorization.get("schema")=="q0_local_chain_un_carriers_v1":
+    from q0_exact_engineering_transition import FINAL_TRANSITION
+    source_change=True
+    parent,pin,job="q0-source-transition.zdQDidQW",FINAL_TRANSITION,43257228
 previous=base/parent/'transition.json'
 if p.digest(previous)!=pin:
     raise ValueError('retired transition changed; inspect instead of restaging')

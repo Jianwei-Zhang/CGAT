@@ -21,6 +21,9 @@ import tempfile
 SOURCE_REVISION = "adfe5e31831bc995aaec127a5ab98c1b65a37567"
 SOURCE_PARENT = "9291117613910937da5f4f9c3c57beadb7885254"
 SOURCE_ARCHIVE = "36c1573bf59a8fa6427fbb8e71d6c3a963ee9b821b16666dd2b27b3800daa560"
+FINAL_REVISION = "12a970248e04018a676462987c500932e540dd5a"
+FINAL_SELECTOR = "q0-selector-fff8b28ccba5244af193d4bb"
+FINAL_ARCHIVE = "75e965cd24f93099da7fd107564d1d3e2eb20bbc435d2a0fb3d621fa1483031b"
 MINIMUM_SOURCE_BP = 11_000_000_000
 MAIN_GROUPS = {str(n) + genome for n in range(1, 8) for genome in "ABD"}
 GROUPS = MAIN_GROUPS | {"Un"}
@@ -144,7 +147,10 @@ def verify_validation_source(config, source):
     need(source["engine_commit"] == config.get("runtime_revision", config["engine_revision"])
          and source["path_policy"]["reference_locus_padding_bp"] == 100000,
          "wrong production validation engine/padding")
-    if config.get("runtime_revision") == SOURCE_REVISION:
+    if config.get("runtime_revision") == FINAL_REVISION:
+        need(source.get("scientific_baseline_commit") == SOURCE_REVISION and source.get("tools_sha256") == FINAL_ARCHIVE
+             and source.get("selector_identity") == FINAL_SELECTOR, "wrong calibrated science source")
+    elif config.get("runtime_revision") == SOURCE_REVISION:
         need(source.get("scientific_baseline_commit") == SOURCE_PARENT
              and source.get("tools_sha256") == SOURCE_ARCHIVE
              and source.get("selector_identity") == "q0-selector-37bb033a42a3772eae997621", "wrong source-ownership validation")
@@ -236,7 +242,22 @@ def verify(config, root):
         for name, values in metrics.items():
             need(all(report["groups"][name][k] == v for k, v in values.items()), "report differs from sealed paths: " + name)
         new_conflicts = new_cross_conflicts(conflicts, prior_conflicts)
-        verdict = hard_gates(metrics, overlaps, new_conflicts)
+        calibrated = config.get("runtime_revision") == FINAL_REVISION
+        if calibrated:
+            from wheat_reference_release_gate import cross_audit
+            from wheat_source_collision_controls import calibrated_controls, validate_admission_occupancy
+            validate_admission_occupancy(admitted.placements)
+            decisions = cross_audit(owner.parent, new_conflicts)
+            controls = calibrated_controls(owner, metrics, paths)
+            # JSON round trip normalizes source-coordinate tuples to arrays.
+            need(json.loads(json.dumps(controls)) == json.loads((owner/"result/source-control-audit.json").read_text()), "control report mismatch")
+            write_once(root / "calibrated-gates.json", {"net_cross_conflicts":decisions, "controls":controls})
+            need(controls["passed"], "intact slice, coverage or NG50 control regression")
+            verdict = hard_gates(metrics, overlaps, [r for r in decisions if r["verdict"] == "unsupported_primary"])
+            verdict.update(source_controls=controls, cross_chromosome_admission_overlaps=0,
+                           raw_net_cross_conflicts=len(decisions), unsupported_primary_conflicts=0)
+        else:
+            verdict = hard_gates(metrics, overlaps, new_conflicts)
         if config.get("runtime_revision") == SOURCE_REVISION:
             from wheat_source_collision_controls import control_audit, validate_admission_occupancy
             validate_admission_occupancy(admitted.placements)
@@ -258,6 +279,13 @@ def verify_engineering_binding(config, transition, install):
     engineering = transition.get("exact_engineering_change")
     revision = config.get("runtime_revision")
     ownership = transition.get("source_occupancy_change")
+    if revision == FINAL_REVISION:
+        need(engineering is None and isinstance(ownership,dict) and ownership.get("schema")=="q0_local_chain_un_carriers_v1"
+             and ownership.get("runtime_revision")==install.get("source_revision")==FINAL_REVISION
+             and ownership.get("baseline_revision")==SOURCE_REVISION and ownership["candidate_archive"]["sha256"]==FINAL_ARCHIVE,
+             "wrong calibrated transition")
+        bound(ownership["candidate_archive"])
+        return
     if revision == SOURCE_REVISION or ownership is not None:
         need(engineering is None and isinstance(ownership, dict)
              and ownership.get("schema") == "q0_cross_chromosome_source_occupancy_v1"
@@ -302,6 +330,10 @@ def main():
         try:
             verdict, allocation = verify(config, root)
             need(digest(path) == config_sha, "relay config changed")
+            if config.get("runtime_revision") == FINAL_REVISION:
+                # The legacy formal entry executes absolute minimap2/nucmer paths.
+                # A cache-only *validator* cannot authorize that unrestricted owner.
+                raise ValueError("formal 55-unit owner does not enforce cache-only mapper execution")
             write_once(root / "gate-go.json", {**verdict, "config_sha256": config_sha})
             proof = root / "formal-allocation.json"; write_once(proof, allocation)
             transition = json.loads(bound(config["transition"]).read_text())

@@ -67,7 +67,12 @@ def validate_continuity_change(bundle, manifest):
         engineering = validate(bundle, manifest)
     if source is not None:
         from q0_exact_engineering_transition import SOURCE_FILES, validate_source_change
-        validate_source_change(bundle, manifest)
+        if source.get("schema") == "q0_local_chain_un_carriers_v1":
+            from q0_exact_engineering_transition import validate_final_change, FINAL_FILES
+            validate_final_change(bundle, manifest)
+            SOURCE_FILES = {**SOURCE_FILES, **FINAL_FILES}
+        else:
+            validate_source_change(bundle, manifest)
     if (declaration != CONTINUITY_CHANGE or manifest.get('q0_supplement_scope') != THRESHOLD_PROFILE
             or source is None and engineering is None and manifest.get('git_revision') != CONTINUITY_CHANGE['engine_revision']):
         raise ValueError('invalid explicit continuous Q0 policy authorization')

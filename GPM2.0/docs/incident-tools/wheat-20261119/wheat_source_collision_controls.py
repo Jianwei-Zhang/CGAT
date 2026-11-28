@@ -28,7 +28,7 @@ class FreshStore(Store):
         super().save_group(index,chromosome,search)
         if chromosome == GROUPS[-1]: raise ControlsSaved()
 
-def metrics(owner, kit):
+def metrics(owner, kit, geometry=False):
     from refresh_whole_wheat_cached_demand import SN, REQ, FINAL
     sel=owner/'selection'; sha=whole.sha256_file(owner/'kit.sha256'); whole.require(sha==kit,'wrong kit')
     binding=['whole-wheat-local-supplement-v1',SN,REQ,FINAL,sha,EVIDENCE,32]
@@ -40,7 +40,11 @@ def metrics(owner, kit):
     out={}
     for i,k in enumerate(GROUPS,1):
         path=store.load_group(i,k).path
-        if k in CONTROLS: out[k]=whole.group_metrics(by_chr[k],path)
+        if k in CONTROLS:
+            out[k]=whole.group_metrics(by_chr[k],path)
+            if geometry:
+                from wheat_reference_release_gate import slices
+                out[k]["geometry"]=slices(path)
     if kit == OLD_KIT:
         whole.require(store.previous == OLD_GROUP_009, "changed baseline through 3D")
     return dict(placements=len(rows),counts=dict(Counter(p.chromosome for p in rows)),groups=out)
@@ -89,6 +93,21 @@ def control_audit(owner, candidate):
     return compare(metrics(old, OLD_KIT)["groups"], candidate)
 
 
+def calibrated_controls(owner, candidate, paths):
+    from wheat_reference_release_gate import slices, control_group, POLICY
+    old = Path((owner/"baseline-owner").read_text().strip())
+    whole.require(old == owner.parent/OLD_OWNER and old.resolve() == old, "wrong control owner")
+    before = metrics(old, OLD_KIT, geometry=True)["groups"]
+    # Read the same pinned reference FAI in the validator and independent relay.
+    base = owner.parent
+    snap, root, _, _, _ = whole.frozen.bind(base/"q0-latest-fork-20261123-1435/control/snapshot.json",base/"q0-source-part-lookup-20261121-1600/source-part-lookup.json")
+    ref, = whole.frozen.prep.table(root, "metadata/reference.tsv", ("fai_relpath",))
+    f, = [r for r in snap["files"] if r["path"] == ref["fai_relpath"]]
+    lengths = {k:int(n) for k,n,*_ in (l.split("\t") for l in whole.frozen.bounded(root/f["path"], 16<<20, f["sha256"]).decode().splitlines())}
+    groups = {k:control_group(before[k]["geometry"], slices(paths[k]), before[k], candidate[k], lengths[k]) for k in CONTROLS}
+    return dict(policy=POLICY,baseline_job=43225037, baseline_group_009=OLD_GROUP_009, groups=groups, passed=all(r["passed"] for r in groups.values()))
+
+
 def full():
     del sys.argv[1]
     base, stage, owner = map(Path, sys.argv[1:])
@@ -96,7 +115,11 @@ def full():
     seed_readonly_inputs(base, stage, owner)
     whole.main()  # No FreshStore patch: select through Un and audit all 22 groups.
     report = json.loads((owner/"result/production22-audit.json").read_text())
-    result = control_audit(owner, report["groups"])
+    if report["selector_identity"] == "q0-selector-fff8b28ccba5244af193d4bb":
+        _, paths, _ = whole.read_selection(owner, sorted(report["groups"]))
+        result = calibrated_controls(owner, report["groups"], paths)
+    else:
+        result = control_audit(owner, report["groups"])
     with (owner/"result/source-control-audit.json").open("x") as stream:
         json.dump(result, stream, indent=2)
     print("SOURCE_CONTROL_AUDIT", json.dumps(result), flush=True)

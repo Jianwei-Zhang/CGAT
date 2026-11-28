@@ -128,3 +128,38 @@ def validate_source_change(bundle, manifest):
         for path in (bundle/folder).glob("*.py"):
             need(path.read_bytes() == new[base+path.name], "transition file differs from source archive: " + path.name)
     return auth
+
+# Separate scientific authorization. None of the historical pins are replaced.
+FINAL_SCHEMA = "q0_local_chain_un_carriers_v1"
+FINAL_REVISION = "12a970248e04018a676462987c500932e540dd5a"
+FINAL_ARCHIVE = "75e965cd24f93099da7fd107564d1d3e2eb20bbc435d2a0fb3d621fa1483031b"
+FINAL_SELECTOR = "q0-selector-fff8b28ccba5244af193d4bb"
+FINAL_TRANSITION = "78222225c7f8ab08faaae2075ca97c5ffd3a86eec78463f04102e57c1569b163"
+FINAL_JOURNAL = "c8d25ca836a4fdfb9f2d232d4d6ccbfc5a58f1eb2200c99ad5349a78588b461c"
+FINAL_FILES = {"q0_admission.py":"24ce14151d00c39a10b569a48a6da95296af0db3515ba92337d218484cb13c3c",
+               "q0_collinear.py":"32c33d70d7512493c3bdd81b847970156404e8cadb49a02f891cd902d384af05",
+               "q0_reference_locus.py":"9df8dc8a84529b0dc59cc0ed31559827ff8ae154d1924ab2400e89cf70293627"}
+FINAL_QUALIFICATION = "2e298f78c2467828a91191eb01ff737d18e39aca6feabe67f98eb28bb0bb04d5"
+
+
+def validate_final_change(bundle, manifest):
+    auth = manifest["source_occupancy_change"]
+    need(auth["schema"] == FINAL_SCHEMA and manifest["git_revision"] == auth["runtime_revision"] == FINAL_REVISION
+         and auth["baseline_revision"] == SOURCE_REVISION and manifest["previous_job"] == 43257228
+         and not manifest.get("exact_engineering_change"), "wrong final scientific lineage")
+    parent = checked(manifest["previous_transition"])
+    need(digest(parent) == FINAL_TRANSITION and digest(parent.parent/"installation/receipt.json") == FINAL_JOURNAL,
+         "not the installed source-occupancy parent")
+    for key, pin in (("baseline_archive",SOURCE_EVIDENCE["candidate_archive"]),("candidate_archive",FINAL_ARCHIVE),
+                     ("qualification", FINAL_QUALIFICATION)):
+        need(digest(checked(auth[key])) == pin, "wrong final evidence: " + key)
+    proof = json.loads(checked(auth["qualification"]).read_text())
+    need(proof["passed"] is True and proof["mapper_calls"] == 0 and proof["selector"] == FINAL_SELECTOR,
+         "real cached qualification failed")
+    old,new = (contents(checked(auth[k])) for k in ("baseline_archive","candidate_archive"))
+    prefix = "tools/lgz_core/"
+    need({k for k in old.keys() | new.keys() if old.get(k)!=new.get(k)} == {prefix+k for k in FINAL_FILES},
+         "unreviewed final archive delta")
+    for folder, base in (("runtime",prefix),("support","tools/")):
+        for path in (bundle/folder).glob("*.py"):
+            need(path.read_bytes() == new[base+path.name], "candidate runtime differs from archive: "+path.name)
