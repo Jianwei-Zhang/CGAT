@@ -1,0 +1,19 @@
+#!/bin/bash
+#DSUB -n jm19_q0_native_13frames
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-46
+#DSUB -D "43061388=SUCCEEDED"
+#DSUB -R "cpu=2,mem=16384MB"
+#DSUB -o check_%J.out
+set -eo pipefail
+umask 077
+arm=$(dirname "$PWD");b=$(dirname "$arm");h="$b/q0-bound-first-demand.8xpsAJ"
+sha256sum --quiet -c kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-native-frames.XXXXXXXX);trap 'rm -rf -- "$w"' EXIT
+mkdir "$w/helpers"; printf '%s  %s\n' 9d0971e43033a2be9124a7956cfa41a9832c3c9d760f2768701e5090c5f7300d "$h/controls.sha256" | sha256sum -c --quiet -
+while read -r pin f; do case "$f" in *.py) cp "$h/$f" "$w/helpers/$f";printf '%s  %s\n' "$pin" "$w/helpers/$f" |sha256sum -c --quiet -;; esac; done < "$h/controls.sha256"
+(cd "$arm" && sha256sum --quiet -c kit.sha256);tar -xzf "$arm/tools.tgz" -C "$w";mkdir result
+PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 PYTHONPATH="$w/tools:$w/helpers" python3 -Bu crosscheck_native_4d_frontiers.py "$b" "$b/q0-native-decision-recheck.PSicdbtB" "$arm" "$PWD/result"
+sha256sum result/crosscheck.json

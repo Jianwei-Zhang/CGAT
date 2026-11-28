@@ -1,0 +1,25 @@
+{
+  "schema": "wheat_1A_old_overhang_loss_recovery_v1",
+  "results": {
+    "validated_initial_backbone": {
+      "old_exclusive_end_spanning_missing_bp": 78636768,
+      "now_covered_bp": 63676178,
+      "still_uncovered_bp": 14960590
+    },
+    "common_anchor_refined": {
+      "old_exclusive_end_spanning_missing_bp": 78636768,
+      "now_covered_bp": 63911249,
+      "still_uncovered_bp": 14725519
+    }
+  },
+  "note": "Exact old category-exclusive reference intervals, not candidate source-length sums. Backbone recovery includes changed admission; it is not all attributable to new overlap cuts.",
+  "inputs": {
+    "blockers.json": "0c22fe25d692dfb2c3bcae70bcddd5459c33b9cad06fa31462290e89cac97d92",
+    "frozen-placements.jsonl.gz": "65a4755dfa5e393592d52b97371486047ffb1b261d27277dfe53b90da935d6b1",
+    "baseline-path.json": "fde9c9af2f8afd512c176c241759e4e50279fdd03a5f4bdd05492413f0bb2bb2",
+    "selected-input-placements.jsonl.gz": "6d107e0a36d698d32186d65f9603cacc41cd4741a194fcf4681feb078c7fc707",
+    "validated_initial_backbone-path.json.gz": "966e5bb822e3d4f8a4413204b8cf26bce8f95488546f2fef9f58de6315edc220",
+    "common_anchor_refined-path.json.gz": "7e82b9d9ed8e8ff7665ec11b5ec73a11a77548b51979e52cfc5e612b64227463"
+  },
+  "method": "Old no_end_spanning category reference union minus baseline selected reference union and all other missing-category unions; compare this exact exclusive set with current selected-slice anchor projections."
+}

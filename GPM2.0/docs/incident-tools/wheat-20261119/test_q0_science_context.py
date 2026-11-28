@@ -94,6 +94,20 @@ class TransitionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'dependency'):
             with self.opened('stager'):source.write_text('# changed source')
 
+    def test_only_explicit_readless_threshold_may_install_layout_support(self):
+        self.prepared()
+        package=self.work/'metadata/package.tsv';package.parent.mkdir();package.write_text('reads_qc_enabled\nfalse\n')
+        self.record['q0_supplement_scope']='positive_threshold'
+        self.record['proof_repair_package']=self.row(package)
+        source=self.root/'workspace_layout.py';source.write_text('# support\n')
+        target=self.work/'.prepare_lib/tools/workspace_layout.py';target.write_bytes(source.read_bytes())
+        self.record['runtime'].append({'relative':str(target.relative_to(self.work)),
+                                      'source':self.row(source),'new_sha256':context.digest(source)})
+        with self.opened('reader',True):pass
+        self.record['q0_supplement_scope']='decision_frontier_repair'
+        with self.assertRaisesRegex(ValueError,'runtime path'):
+            with self.opened('reader',True):pass
+
     def test_runtime_path_cannot_escape_allowed_slice(self):
         self.prepared();row=self.record['runtime'][0]
         for relative in ('../oops.py','/tmp/oops.py','.prepare_lib/tools/run_all_runner.py',

@@ -1,0 +1,30 @@
+{
+  "schema": "wheat_reference_funnel_terminal_audit_v1",
+  "job_id": "43099133",
+  "state": "SUCCEEDED",
+  "start": "2026-11-26T20:17:17+08:00",
+  "end": "2026-11-26T20:41:21+08:00",
+  "wall_seconds": 1444,
+  "analysis_seconds": 1429.3,
+  "terminal_reverified_at": "2026-11-26T20:42:47+08:00",
+  "remote_report": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-two-funnels-20261126.0Pop2292/reference-funnel.json",
+  "report_sha256": "2a13c270f75f7aff4ecc67b1a6f64b980c2c4c7bdd3db34e2abb203584e52dd7",
+  "sources_processed": 38267,
+  "reference_bp": 14547261565,
+  "frozen_admission_reference_union_bp": 5108838629,
+  "net_reference_to_admission_difference_bp": 9438422936,
+  "account_identity": "14547261565 - 14491791211 - 0 + 5053368275 = 5108838629",
+  "all_per_chr_sums_checked": true,
+  "mapper_calls": 0,
+  "formal_workspace_modified": false,
+  "formal_Q0_LGZ": "NOT_STARTED; hold remains",
+  "interpretation": [
+    "The largest direct-seed filter loss is the whole-source unique chr/strand group requirement: 11580434089 reference bp. This is not the final net loss; later admission rescue gains 5053368275 bp.",
+    "Complexity alone removes 6206930 reference bp in actual sequential ordering. High-MAPQ-group and collinearity gates then remove 1999909 and 8234207 bp, conditional on passing uniqueness; these small marginal values do not prove relaxation irrelevant in another ordering.",
+    "All-locus competition removes 1110892914 bp. The field cross_ABD_extra_after_same_subgenome_bp=256545019 is a same-category-first counterfactual, including cross-category competition with Un; it is not an independent additive pure A/B/D causal loss.",
+    "Raw PAF envelope coverage 13879033075 bp is not equivalent to validated paired-base coverage 13657405768 bp; unaligned reference includes possible reference Ns and does not alone establish missing input DNA.",
+    "No ablation removing the uniqueness gate was performed. Coverage gain and scientific correctness after relaxing it remain unmeasured.",
+    "1A search replay shows only 64914 bp reference gain with reference-slot priority, not recovery of the main admitted-to-selected gap.",
+    "The monitoring estimate of 20-40 minutes remaining at 20:40 was overly conservative. The source-count progress file last updated at 36502 and was not a reliable end-of-job progress indicator; terminal scheduler and final report are authoritative."
+  ]
+}

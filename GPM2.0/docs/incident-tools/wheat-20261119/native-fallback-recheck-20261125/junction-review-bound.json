@@ -1,0 +1,38 @@
+{
+  "counts": {
+    "geometry_pairs_with_possible_local_probe": 24,
+    "supported_at_unproven_join": 3331,
+    "two_end_candidates": 3083
+  },
+  "eligible_local_windows_upper": 24,
+  "first_seen_group_counts": {
+    "1A": 0,
+    "1B": 1,
+    "1D": 0,
+    "2A": 1,
+    "2B": 1,
+    "2D": 0,
+    "3A": 0,
+    "3B": 2,
+    "3D": 1,
+    "4A": 0,
+    "4B": 1,
+    "4D": 0,
+    "5A": 0,
+    "5B": 0,
+    "5D": 14,
+    "6A": 1,
+    "6B": 1,
+    "6D": 0,
+    "7A": 0,
+    "7B": 0,
+    "7D": 1,
+    "Un": 0
+  },
+  "mapper_starts": 0,
+  "query_bp_upper": 46882,
+  "questions": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "selection_chain": "5c4b0771b6a8112396adc21c710e748c3aaad44db11c0f5dc77edca8ec9aa31b",
+  "target_bp_upper": 48000,
+  "unknown_joins": 3622
+}

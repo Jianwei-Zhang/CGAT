@@ -1,0 +1,16 @@
+#!/bin/bash
+#DSUB -n jm19_q0_pair_scope
+#DSUB -aa
+#DSUB -q x86
+#DSUB -nl agent-X86-46
+#DSUB -R "cpu=1,mem=4096MB"
+#DSUB -o pairs_%J.out
+set -eo pipefail
+umask 077
+owner=$(dirname "$PWD");b=$(dirname "$owner");sha256sum -c --quiet kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-pair-scope.XXXXXXXX); trap 'rm -rf -- "$w"' EXIT
+(cd "$owner"; sha256sum -c --quiet kit.sha256);tar -xzf "$owner/tools.tgz" -C "$w"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 PYTHONPATH="$w/tools:$PWD"
+python3 -Bu probe_wheat_native_pair_scope.py mask "$b" "$PWD/historical.json" "$PWD/result"
+sha256sum result/native.json result/pair-mask.json.gz

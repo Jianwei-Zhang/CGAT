@@ -7,7 +7,9 @@ no paths, and localized demand. Retain it for subsequent verified mapping and pu
 """
 import argparse
 import csv
+from contextlib import nullcontext
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -126,14 +128,31 @@ def draft_stage_plan(src, manifest):
     return [r for r in rows if r['path'] != rel], by_name[rel]
 
 
-def stage_and_draft(control, expected, workspace, rate_mib):
+def draft_thread_options(reader, requested=None):
+    """A fresh fork may use its explicit run budget; never guess from node size."""
+    from run_resources import execution_threads, positive
+    ceiling = None if requested is None else positive(requested, 'threads')
+    budget = execution_threads(ceiling or 1)
+    if ceiling is not None:
+        budget = min(budget, ceiling)
+    if hasattr(os, 'sched_getaffinity'):
+        budget = min(budget, len(os.sched_getaffinity(0)))
+    if budget == 1:
+        return {}  # also preserves the original frozen selector's no-keyword call
+    require('threads' in inspect.signature(reader).parameters,
+            'frozen threshold runtime does not support parallel first requests; use one thread or a new fork')
+    return {'threads':budget}
+
+
+def stage_and_draft(control, expected, workspace, rate_mib, threads=None, *, capture_3b=False, selection=None, placement_only=False):
     from lgz_core import q0_preparation as prep, q0_threshold_prepare as threshold
     from lgz_core.q0_threshold_acceptance import record
+    options = draft_thread_options(threshold.initial_questions, threads)  # reject incompatible requests before staging
     ctrl=control.resolve(strict=True);snapshot=small(ctrl/'snapshot.json');require(sha(snapshot)==expected,'unbound fork manifest');s=json.loads(snapshot);root=workspace.resolve();src=Path(s['source']).resolve(strict=True)
     require(root.parent==Path('/tmp') and root.name.startswith('cgat-wheat-fork-') and not root.exists() and 0<rate_mib<=128,'fork requires a new, private node-local workspace');require(not ctrl.is_relative_to(src) and not src.is_relative_to(ctrl),'fork control overlaps source')
     staged, deferred = draft_stage_plan(src,s); planned=s['total_bytes']-deferred['size']
     require(shutil.disk_usage(root.parent).free>=planned+72*1024**3,'insufficient local disk reserve');root.mkdir(mode=0o700)
-    write(ctrl/'started.json',{'source_run':s['source_run'],'snapshot_sha256':expected,'workspace':str(root),'hostname':socket.gethostname(),'pid':os.getpid(),'revision':s['revision'],'profile':s['profile'],'time':time.time()}); done=0;last=0
+    write(ctrl/'started.json',{'source_run':s['source_run'],'snapshot_sha256':expected,'workspace':str(root),'hostname':socket.gethostname(),'pid':os.getpid(),'thread_budget':options.get('threads',1),'revision':s['revision'],'profile':s['profile'],'time':time.time()}); done=0;last=0
     for row in staged:
         copy_bound(member(src,row['path']),member(root,row['path']),row,rate_mib*1024**2);done+=row['size']
         if done-last>=1024**3:print('STAGED',done,'/',planned,flush=True);last=done
@@ -149,19 +168,56 @@ def stage_and_draft(control, expected, workspace, rate_mib):
                               'snapshot_sha256':expected,'files':len(staged),'bytes':done,'deferred_for_formal_q0':[deferred],
                               'hostname':socket.gethostname(),'workspace':str(root),'time':time.time()})
     print('VERIFIED_DRAFT_INPUTS; REFERENCE_FASTA_DEFERRED; BEGIN_GLOBAL_THRESHOLD_DRAFT',flush=True)
-    ds=prep.table(root,'metadata/datasets.tsv',('dataset_name','fasta_relpath'));seqs=prep._dataset_sequences(root,ds); ref=prep.table(root,'metadata/reference.tsv',('fai_relpath',))[0]; lengths={k:int(n) for k,n,*_ in (x.split('\t') for x in (root/ref['fai_relpath']).read_text().splitlines())}; assignments=prep.table(root,'metadata/chr_assignments.tsv',('dataset_name','seq_name','assigned_chr_name')); inventory={(s.dataset,s.contig):len(dna) for s,dna in seqs.items()}; require(all(a['assigned_chr_name'] in lengths and inventory.get((a['dataset_name'],a['seq_name']))==int(a['seq_length_bp']) for a in assignments),'assignment source or length differs')
+    ds=prep.table(root,'metadata/datasets.tsv',('dataset_name','fasta_relpath'))
+    print(f'DRAFT_FASTA_START datasets={len(ds)}',flush=True)
+    fasta_started=time.monotonic()
+    seqs=prep._dataset_sequences(root,ds)
+    print(f'DRAFT_FASTA_READY sequences={len(seqs)} elapsed_s={time.monotonic()-fasta_started:.2f}',flush=True)
+    ref=prep.table(root,'metadata/reference.tsv',('fai_relpath',))[0]; lengths={k:int(n) for k,n,*_ in (x.split('\t') for x in (root/ref['fai_relpath']).read_text().splitlines())}; assignments=prep.table(root,'metadata/chr_assignments.tsv',('dataset_name','seq_name','assigned_chr_name')); inventory={(s.dataset,s.contig):len(dna) for s,dna in seqs.items()}; require(all(a['assigned_chr_name'] in lengths and inventory.get((a['dataset_name'],a['seq_name']))==int(a['seq_length_bp']) for a in assignments),'assignment source or length differs')
     from unittest.mock import patch
     reader_name = "read_retained_paf" if hasattr(threshold, "read_retained_paf") else "read_paf"
     base_reader=getattr(threshold,reader_name)
+    files_read = records_read = 0
+    read_seconds = 0.0
     def observed(path,**kw):
+        nonlocal files_read, records_read, read_seconds
+        started = time.monotonic()
         print('DRAFT_PAF_START',kw['artifact'],flush=True);n=0
         for hit in base_reader(path,**kw):n+=1;yield hit
-        print('DRAFT_PAF_COMPLETE',kw['artifact'],n,flush=True)
-    with patch.object(threshold,reader_name,observed):
-        need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'])
+        elapsed = time.monotonic() - started
+        files_read += 1; records_read += n; read_seconds += elapsed
+        print('DRAFT_PAF_COMPLETE',kw['artifact'],n,flush=True)  # historical monitor format
+        print(f'DRAFT_PAF_TIME files={files_read}/{len(s["alignments"])+len(ds)} rows={n} '
+              f'total_rows={records_read} file_s={elapsed:.2f} cumulative_s={read_seconds:.2f}',flush=True)
+    recording = nullcontext()
+    if capture_3b:
+        from capture_wheat_3b_geometry import observe
+        recording = observe(ctrl, expected, Path(__file__).resolve())
+    checkpoints = nullcontext()
+    if selection is not None:
+        from wheat_selection_checkpoint import opened, PlacementSaved
+        checkpoints = opened(selection, ctrl, expected, s['revision'], options.get('threads', 1), placement_only)
+    require(not placement_only or selection is not None, 'placement-only requires a persistent selection checkpoint')
+    with recording, checkpoints as store, patch.object(threshold,reader_name,observed):
+        if store is None:
+            need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],**options)
+        else:
+            try:
+                need,has_path=threshold.initial_questions(root,seqs,lengths,assignments,s['alignments'],
+                                                         selection_checkpoint=store,**options)
+            except PlacementSaved as done:
+                require(placement_only, 'unexpected placement-only exit')
+                write(ctrl/'placement-complete.json', {'revision':s['revision'], 'snapshot_sha256':expected,
+                      'admission_sha256':str(done), 'stage':'global_placement_only', 'published_q0':False})
+                print('GLOBAL_PLACEMENT_CHECKPOINT_ONLY', done, flush=True)
+                return
     write(ctrl/'global-first-request.json',{'schema':'wheat_threshold_global_first_request_v1','snapshot_sha256':expected,'revision':s['revision'],'threshold_contract':prep.supplement_policy('positive_threshold')['decision_frontier'],'has_path':has_path,'request':record(need),'published_q0':False,'mapper_calls':0});print('GLOBAL_FIRST_REQUEST',None if need is None else len(need),'sources; has_path',has_path,flush=True)
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__); subs=p.add_subparsers(dest='op',required=True);q=subs.add_parser('freeze');q.add_argument('workspace',type=Path);q.add_argument('log',type=Path);q.add_argument('run_id');q.add_argument('control',type=Path);q.add_argument('revision');q=subs.add_parser('run');q.add_argument('control',type=Path);q.add_argument('snapshot_sha');q.add_argument('workspace',type=Path);q.add_argument('--rate-mib',type=int,default=80)
-    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib)
+    q.add_argument('--threads', type=int, help='fork CPU ceiling; honors GPM_RUN_THREADS, otherwise defaults to one when omitted')
+    q.add_argument('--capture-3b-geometry', action='store_true', help='save prefilter geometry for offline incident replay; not a resume checkpoint')
+    q.add_argument('--selection-checkpoints', type=Path, help='private same-version placement and chromosome checkpoints')
+    q.add_argument('--placement-only', action='store_true', help='checkpoint global placement and exit without producing a path/request')
+    a=p.parse_args();freeze(a.workspace,a.log,a.run_id,a.control,a.revision) if a.op=='freeze' else stage_and_draft(a.control,a.snapshot_sha,a.workspace,a.rate_mib,a.threads,capture_3b=a.capture_3b_geometry,selection=a.selection_checkpoints,placement_only=a.placement_only)

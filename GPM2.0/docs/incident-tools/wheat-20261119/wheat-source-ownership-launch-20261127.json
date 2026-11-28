@@ -1,0 +1,138 @@
+{
+  "as_of": "2026-11-27T22:12:51+08:00",
+  "engine": "adfe5e31831bc995aaec127a5ab98c1b65a37567",
+  "operations": "0c2df84fff940ef7849336013e8567d0a47d94d7",
+  "installation": {
+    "continuous_q0_policy_change": {
+      "admission_policy_version": 2,
+      "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+      "path_policy_version": 3,
+      "reference_locus_padding_bp": 100000,
+      "schema": "q0_continuity_2064cb4c_v1"
+    },
+    "status": "continuity_engine_installed_and_one_original_parent_verified",
+    "transition_sha256": "78222225c7f8ab08faaae2075ca97c5ffd3a86eec78463f04102e57c1569b163",
+    "source_revision": "adfe5e31831bc995aaec127a5ab98c1b65a37567",
+    "checkpoint_files_unchanged": 25,
+    "protected_control_files_unchanged": true,
+    "representative_parent": {
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+      "input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+      "unit_id": "q0_chr:Un"
+    },
+    "all_25_parent_payloads_revalidated": false,
+    "formal_main_started": false,
+    "mapper_calls": 0,
+    "formal_launch_deferred_to_conditional_relay": true,
+    "reader_declaration_sha256": "2b998828fc115a6ec43e52c1f7c15a53a315240a75809de27976996ada30d8b0",
+    "installation_receipt_sha256": "c8d25ca836a4fdfb9f2d232d4d6ccbfc5a58f1eb2200c99ad5349a78588b461c"
+  },
+  "relay_config": {
+    "schema": "wheat_continuity_conditional_relay_v1",
+    "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+    "runtime_revision": "adfe5e31831bc995aaec127a5ab98c1b65a37567",
+    "validation_job": {
+      "job_id": 43257235,
+      "name": "jm19_q0_production22_cached",
+      "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-cross.hAxVb2kt"
+    },
+    "install_job": {
+      "job_id": 43257228,
+      "name": "jm19_q0_continuity_install",
+      "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-transition.zdQDidQW"
+    },
+    "transition": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-transition.zdQDidQW/transition.json",
+      "sha256": "78222225c7f8ab08faaae2075ca97c5ffd3a86eec78463f04102e57c1569b163"
+    },
+    "transition_kit": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-transition.zdQDidQW/kit.sha256",
+      "sha256": "8b10e84eea6f2b8f97d76f958c08cfc7bf14500461b098d9f50a43966b10fe02"
+    },
+    "validation_source": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-cross.hAxVb2kt/production-source.json",
+      "sha256": "4aee4f0f2b32c68b3ef1d6fe65df370aafff60d58c695a5d5195b8a48d7aff59"
+    },
+    "validation_kit": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-cross.hAxVb2kt/kit.sha256",
+      "sha256": "063eca43f84fead37be0b99cb1641aa3e960eb6542b303cdda70abf1d864614f"
+    }
+  },
+  "relay_owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-relay.zyKG1e1w",
+  "scheduler": {
+    "43257228": {
+      "jobId": "43257228",
+      "jobName": "jm19_q0_continuity_install",
+      "state": "SUCCEEDED",
+      "execPath": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-transition.zdQDidQW",
+      "taskExecNodes": "agent-X86-45",
+      "queue": "x86"
+    },
+    "43257235": {
+      "jobId": "43257235",
+      "jobName": "jm19_q0_production22_cached",
+      "state": "RUNNING",
+      "execPath": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-cross.hAxVb2kt",
+      "taskExecNodes": "agent-X86-34",
+      "queue": "x86"
+    },
+    "43257236": {
+      "jobId": "43257236",
+      "jobName": "jm19_q0_formal_continuity",
+      "state": "WAITING",
+      "execPath": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-source-relay.zyKG1e1w",
+      "taskExecNodes": null,
+      "queue": "x86"
+    }
+  },
+  "dependency": {
+    "originalCondition": "43257228=ENDED&&43257235=ENDED",
+    "parsingCondition": "(43257228=ENDED)&&(43257235=ENDED)",
+    "depSatisfied": false,
+    "logicalRelations": "AND",
+    "depJobList": [
+      "43257228",
+      "43257235"
+    ],
+    "children": [
+      {
+        "originalCondition": "43257228=ENDED",
+        "parsingCondition": "43257228=ENDED",
+        "expectedState": "ENDED",
+        "depSatisfied": true,
+        "depJobList": [
+          "43257228"
+        ],
+        "children": []
+      },
+      {
+        "originalCondition": "43257235=ENDED",
+        "parsingCondition": "43257235=ENDED",
+        "expectedState": "ENDED",
+        "depSatisfied": false,
+        "depJobList": [
+          "43257235"
+        ],
+        "children": []
+      }
+    ]
+  },
+  "scope": "Launch snapshot, not scientific acceptance. Frozen PAFs; new full admission and groups 1A through Un; no mapper. Four original gates plus strict per-control coverage and continuity. Formal launch remains conditional.",
+  "control_baseline": {
+    "job": 43225037,
+    "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-owner.Jww3W4bC",
+    "kit_sha256": "913cb78bba0b14904d5b15f58806f4ea69858d91a98e95237b6430d48e547b2b",
+    "group_009_trailer": "4526c992c919a4d9a49d62add2d2c60a86f74d8be13e2053fb054683971f56d5",
+    "controls": [
+      "1A",
+      "3B",
+      "3D"
+    ],
+    "policy": "Each: selected_reference_bp and source_slice_n50 >= baseline; slices <= baseline; all measurements positive. Do not average."
+  },
+  "qualification": {
+    "compared_git_files": 313,
+    "targeted_tests": 48
+  },
+  "progress": "WHOLE_CORE_PLAN_READY 61000, 103 immutable base input links; no formal start intent"
+}

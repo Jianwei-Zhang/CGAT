@@ -1,0 +1,85 @@
+{
+  "admission_fields": {
+    "ambiguous": "f6c93f4dd0cb875617143c5a3d588690e8af8a22b842cbe3adb58e79851b4894",
+    "placements": "74bbdc84ed3fd9271999d2367490309437ba14c2fa10972e4eedfb978b1594b1",
+    "records": "74053cb7974eb20a24cc54e3f773e72d59e8d6035819709fd9469fa411500365",
+    "unplaced": "643dbc21c2c32a032c4d5e49ec0a6aacad0177167f4f77d4a1710f3a6a284e73"
+  },
+  "arm_sha256": {
+    "1": "555f0761c3978d03f4d62d5a4e55862fcfc4e5c97257583772a51e61fd02feb8",
+    "8": "bd2b655e37c383100d7805ef0ecdb6bc88fc2163342d84046f99b1b35af2e22d"
+  },
+  "evidence_inputs": {
+    "load_s": 72.491,
+    "pair_rows": 1212752,
+    "parts": 766,
+    "source_bp": 1074672025
+  },
+  "historical": "2916252571014e63f9fbfd47e898d82027ab651df7eec8af5edd52e0be73c442",
+  "host": "agent-X86-04",
+  "mapper_starts": 0,
+  "matched_formal_fields": [
+    "ambiguous",
+    "has_path",
+    "occupied",
+    "paths",
+    "placements",
+    "records",
+    "request",
+    "sequences",
+    "unplaced"
+  ],
+  "parallel": {
+    "admission_s": 333.45,
+    "pair_rounds": {
+      "1": [
+        52,
+        260
+      ],
+      "2": [
+        343,
+        12
+      ],
+      "3": [
+        143,
+        147
+      ],
+      "4": [
+        13,
+        53
+      ]
+    },
+    "pre_pair_index_s": 189.11,
+    "screen_worker_parts": 34
+  },
+  "published_q0": false,
+  "python": "3.10.12",
+  "revision": "4cbd93ba18c0c0502f5049ea6968a79ffbb60cf9",
+  "schema": "wheat_4d_formal_placement_budget_v1",
+  "scientific": "97b691e496c4b01319d83cda9ee055b14b4efd6c17dc377d34adb082f8287223",
+  "scope": "Frozen pre-supplement wheat 4D. Single-node same-input serial vs 8-thread placement only. Cold sibling processes; file staging/PAF decoding once, graph/ranking once outside the placement timing. Not a full wheat or production publication timing.",
+  "selector": "q0-selector-bf7f797e301335e1e641552b",
+  "serial": {
+    "admission_s": 347.769,
+    "pair_rounds": {
+      "1": [
+        312,
+        0
+      ],
+      "2": [
+        355,
+        0
+      ],
+      "3": [
+        290,
+        0
+      ],
+      "4": [
+        66,
+        0
+      ]
+    },
+    "pre_pair_index_s": 212.436,
+    "screen_worker_parts": 0
+  }
+}

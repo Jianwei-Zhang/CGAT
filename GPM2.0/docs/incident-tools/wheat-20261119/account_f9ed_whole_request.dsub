@@ -1,0 +1,36 @@
+#!/bin/bash
+#DSUB -n jm19_f9ed_first_demand
+#DSUB -q x86
+#DSUB -aa
+#DSUB -R "cpu=5,mem=32768MB"
+#DSUB -D "43054692=SUCCEEDED"
+#DSUB -o account_%J.out
+# Submit only after the producer has published its real whole-wheat request.
+set -eo pipefail
+umask 077
+base="$HOME/cgat-reads-debug/jm19-compare-614589f-20261118"
+run="$base/q0-request-ready.f9ed324f"; old="$base/q0-latest-fork-20261123-1435"
+helpers="$base/q0-bound-first-demand.8xpsAJ"
+cd "$run/accounting"
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+[[ $(cat "$run/whole.jobid") == 43054692 && -s "$run/control/global-first-request.json" ]]
+printf '%s  %s\n' \
+  4d3004700480d36254bd414dbac58a2c1831a7f0a0634be69e68fc65b060e1b9 "$run/control/started.json" \
+  e6456b2f31aba63d60149e33e21790ea4aa178d6f948acdc1dcef04c7b976aef "$run/latest.tgz" \
+  9d180274e7eaebb40a301a3bc886d0245a689b12dded4b52e080d805ea77dd65 "$old/runtime.tar.gz" \
+  9d0971e43033a2be9124a7956cfa41a9832c3c9d760f2768701e5090c5f7300d "$helpers/controls.sha256" \
+  8fecb64dac534800a00e457a0e70bcfe7856df195a1f24f458740553295e04b2 account_repaired_wheat_request.py | sha256sum -c --quiet -
+# Reuse the frozen historical helpers, not that directory's older entrypoint or scheduler settings.
+work=$(mktemp -d /tmp/wheat-first-demand.XXXXXX); trap 'rm -rf -- "$work"' EXIT
+mkdir "$work/current" "$work/old" "$work/helpers"
+while read -r pin name; do
+  case "$name" in account_repaired_wheat_request.py|account.dsub) continue ;; esac
+  cp -- "$helpers/$name" "$work/helpers/$name"
+  printf '%s  %s\n' "$pin" "$work/helpers/$name" | sha256sum -c --quiet -
+done < "$helpers/controls.sha256"
+tar -xzf "$run/latest.tgz" -C "$work/current"; tar -xzf "$old/runtime.tar.gz" -C "$work/old"
+mkdir result  # do not overwrite an earlier report or partial attempt
+PYTHONPATH="$work/current/GPM2.0/server/tools:$work/helpers" python3 -Bu account_repaired_wheat_request.py bind "$base" "$run/control" "$PWD/result"
+PYTHONPATH="$work/old/GPM2.0/server/tools:$work/helpers" python3 -Bu account_repaired_wheat_request.py count "$base" "$run/control" "$PWD/result"
+sha256sum result/first-demand.json

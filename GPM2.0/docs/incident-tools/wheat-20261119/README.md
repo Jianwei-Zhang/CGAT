@@ -4,6 +4,35 @@ This directory preserves a tested onsite recovery policy, not a production
 scheduler default. See `../../wheat-remote-handoff-20261118.md` for the dated
 incident, job IDs and receipts. Do not run a historical submission blindly.
 
+### Running the historical diagnostic tests
+
+Three modules replay the pre-integration backbone: `test_wheat_continuity_refinement`,
+`test_wheat_indexed_anchor_support` and `test_wheat_top_chain_locus`. They instrument
+old join and coverage implementations. The later production implementation does not
+contain the same join source or union hooks. Use `6a4e15b8` (the parent of `2064cb4c`)
+for those three modules only. Run the others against the current Server tools.
+From the repository root, with Bash:
+
+```bash
+(
+  set -euo pipefail
+  repo=$(git rev-parse --show-toplevel)
+  frozen=$(mktemp -d)
+  trap 'rm -rf -- "$frozen"' EXIT
+  git -C "$repo" archive 6a4e15b8c48767cf24c50fc879172f7fccd785b3 GPM2.0/server/tools | tar -x -C "$frozen"
+  cd "$repo/GPM2.0/docs/incident-tools/wheat-20261119"
+  historical=(test_wheat_continuity_refinement test_wheat_indexed_anchor_support test_wheat_top_chain_locus)
+  current=()
+  for file in test*.py; do
+    name=${file%.py}
+    case " ${historical[*]} " in *" $name "*) continue ;; esac
+    current+=("$name")
+  done
+  PYTHONPATH="$repo/GPM2.0:$repo/GPM2.0/server/tools" python3 -B -m unittest "${current[@]}"
+  PYTHONPATH="$frozen/GPM2.0/server/tools" python3 -B -m unittest "${historical[@]}"
+)
+```
+
 `memory_admission.py` subclasses the existing `alignment_tasks.AdaptiveDispatcher`.
 It changes admission only: long/unknown mappings run alone, small mappings retain
 a two-process limit, and the existing per-task thread allocation is unchanged.
@@ -1042,3 +1071,15 @@ wrapper paths intentionally still point into the previous `...1110/plan/native/`
 directory: retaining those immutable specs/guards is what preserves old receipts.
 The active admission/owner plan is the new `343f1d...` revision, not the old
 backfill dispatcher. Continue monitoring both main jobs and final provenance.
+
+### Independent wheat first-request fork: CPU budget
+
+For a **new** `fork_wheat_q0.py run`, pass the CPU budget of that job with
+`--threads N`, or export its existing `GPM_RUN_THREADS`. With both, the fork
+uses the smaller budget and respects process affinity. Without either it uses
+one CPU, not the size of the host. The threshold selector separately decides
+whether the evidence and memory bounds justify spawning workers; small drafts
+remain serial. The budget is recorded in `started.json`, not in the scientific
+first-request receipt. A frozen selector without parallel support rejects a
+multicore request *before* staging; its ordinary single-core call still works.
+This does not update or restart an existing fork, including `43023751`.

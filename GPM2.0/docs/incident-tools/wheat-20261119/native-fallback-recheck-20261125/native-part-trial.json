@@ -1,0 +1,60 @@
+{
+  "calibration": "e6e03e3850fd47d10bc6cd263a2ceb1be70a04fe3c99d721f7b7ec293f1ffbd8",
+  "combined_bytes": 9145342,
+  "combined_sha256": "6b04d86a3488c3dabc69d5909af2554af687b8a396f7811d6086c3e06e785fbb",
+  "mapping": "b43c87a03d6f9b3e7cb33aea22293086f88e95a961d6149f47303736b5231538",
+  "original_full_mapper_s": 656.136,
+  "original_full_sha256": "6b04d86a3488c3dabc69d5909af2554af687b8a396f7811d6086c3e06e785fbb",
+  "original_staging_s": 92.976,
+  "panel": "15fd2e5a2ff25b04b67648285b012a1c713a120174419e8a92e3b98bc63a3c02",
+  "parallel_mapper_and_part_hash_s": 179.058,
+  "parts": [
+    {
+      "bytes": 2334587,
+      "matches_original": true,
+      "native_s": 171.949,
+      "paf_sha256": "5a37493816feab92290230d9b5f2c6464c0cb2d522e0484c845cafbfcd10b3ad",
+      "part": 1,
+      "peak_rss_gb": 29.962,
+      "records_checked_by_digest": 8355,
+      "subprocess_s": 172.749
+    },
+    {
+      "bytes": 2202292,
+      "matches_original": true,
+      "native_s": 172.496,
+      "paf_sha256": "fdd4b61f393491a18f06dcb9cfcda5239fd9d6fb30418c93bd71aff2f263d98a",
+      "part": 2,
+      "peak_rss_gb": 29.962,
+      "records_checked_by_digest": 7906,
+      "subprocess_s": 173.095
+    },
+    {
+      "bytes": 2443583,
+      "matches_original": true,
+      "native_s": 178.378,
+      "paf_sha256": "c37092b4accd58e1fd7ba8c6982887cdc0dcb85b6ff2ed46e6a102af89868863",
+      "part": 3,
+      "peak_rss_gb": 29.962,
+      "records_checked_by_digest": 8717,
+      "subprocess_s": 179.05
+    },
+    {
+      "bytes": 2164880,
+      "matches_original": true,
+      "native_s": 163.691,
+      "paf_sha256": "5df647c00e0951df3140e22a49a5ec49e0913d05ca7ddc1f44e86a71952f1a3d",
+      "part": 4,
+      "peak_rss_gb": 29.962,
+      "records_checked_by_digest": 7775,
+      "subprocess_s": 164.257
+    }
+  ],
+  "scope": "Paired three short control queries, same native target partitions and parameters apart from threads. Staging differs and cache warmth is not controlled. Not the two long parents or a production receipt.",
+  "stage_and_verify_s": 101.607,
+  "threads_per_mapper": 8,
+  "tool_sha256": "cb7e8f228d516fe4632a2250d09d1635ddd7aa95588c9fd5442d1dbe6e9a20a3",
+  "total_mapper_threads": 32,
+  "total_wall_s": 282.134,
+  "whole_paf_identical": true
+}

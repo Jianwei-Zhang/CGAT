@@ -1,0 +1,67 @@
+{
+  "scope": "bounded reference-only workload; no assembly pair links or assignment demand, no mapper or whole-wheat Q0 conclusion",
+  "selector": "16 names per dataset at sorted mid-quantiles among 1.0\u20132.4 Mb sources, chosen before reading hits",
+  "sources": 32,
+  "parts": 32,
+  "sequence_bp": 52039310,
+  "access": {
+    "fasta_bytes": 52484630,
+    "paf_bytes": 2165162,
+    "records": 8643
+  },
+  "trials": [
+    {
+      "cores": 1,
+      "seconds": 8.378337167203426,
+      "additional_rss_kib_sampled": 21216,
+      "offloaded_sources": 0,
+      "serial_screen_seconds": 8.221709959208965,
+      "largest_source_screen_seconds": 0.47548556327819824
+    },
+    {
+      "cores": 2,
+      "seconds": 5.744406953454018,
+      "additional_rss_kib_sampled": 58512,
+      "offloaded_sources": 12
+    },
+    {
+      "cores": 4,
+      "seconds": 3.5339686423540115,
+      "additional_rss_kib_sampled": 107716,
+      "offloaded_sources": 22
+    },
+    {
+      "cores": 8,
+      "seconds": 2.432507775723934,
+      "additional_rss_kib_sampled": 241092,
+      "offloaded_sources": 25
+    },
+    {
+      "cores": 8,
+      "seconds": 2.3326189666986465,
+      "additional_rss_kib_sampled": 243796,
+      "offloaded_sources": 26
+    },
+    {
+      "cores": 4,
+      "seconds": 3.7084844782948494,
+      "additional_rss_kib_sampled": 109464,
+      "offloaded_sources": 21
+    },
+    {
+      "cores": 2,
+      "seconds": 5.6230258494615555,
+      "additional_rss_kib_sampled": 37988,
+      "offloaded_sources": 12
+    },
+    {
+      "cores": 1,
+      "seconds": 8.537398859858513,
+      "additional_rss_kib_sampled": 1152,
+      "offloaded_sources": 0,
+      "serial_screen_seconds": 8.291581153869629,
+      "largest_source_screen_seconds": 0.45375221967697144
+    }
+  ],
+  "all_decisions_equal": true
+}

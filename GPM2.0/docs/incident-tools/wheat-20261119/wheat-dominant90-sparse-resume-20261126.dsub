@@ -1,0 +1,31 @@
+#!/bin/bash
+#DSUB -n jm19_1A_dominant_sparse_resume
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-46
+#DSUB -R "cpu=8,mem=98304MB"
+#DSUB -o dominant_sparse_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c dominant-sparse-kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+owner=$PWD
+code=$(mktemp -d /tmp/wheat-dominant-sparse-code.XXXXXXXX)
+tar -xzf tools.tgz -C "$code"
+export PYTHONPATH="$code/tools:$owner"
+python3 -Bu - "$owner" "$(dirname "$owner")" <<'PYRUN'
+import json,sys,subprocess
+from pathlib import Path
+from collections import Counter
+from unittest.mock import patch
+from wheat_sparse_pair_graph_readonly import sparse_constructor,paths,selection,need,write,digest
+owner,base=map(Path,sys.argv[1:])
+need(owner.resolve().parent==base.resolve() and owner.name.startswith('q0-local-chain-'),'wrong owner')
+proof=json.loads((owner/'sparse-graph-baseline-proof.json').read_text());stats=Counter();constructor,original_pin,new_pin=sparse_constructor(stats)
+need(proof['original_constructor_sha256']==original_pin and proof['sparse_constructor_ast_sha256']==new_pin and proof['baseline_full_winner_equal'] and proof['baseline_coverage_atoms_and_units_equal'],'sparse baseline proof differs')
+with patch.object(subprocess,'Popen',side_effect=RuntimeError('external process forbidden')),patch.object(paths.PathGraph,'__init__',constructor):selection.run(base,owner,('dominant90',))
+write(owner/'sparse-dominant90-final-proof.json',{'baseline_proof_sha256':digest(owner/'sparse-graph-baseline-proof.json'),'constructor_ast_sha256':new_pin,'dominant_pair_counts':dict(stats),'selection_report_sha256':digest(owner/'candidate-selection-dominant90.json'),'resumed_dense_job':'43099350','evidence_cache_reused':True,'scientific_gate_changes':False})
+print('DOMINANT_SPARSE_DONE',json.dumps(dict(stats)),flush=True)
+PYRUN
+sha256sum candidate-selection-dominant90.json sparse-dominant90-final-proof.json

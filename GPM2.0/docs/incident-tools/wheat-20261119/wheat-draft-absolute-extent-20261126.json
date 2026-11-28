@@ -1,0 +1,263 @@
+{
+  "decision": "Hold automatic full-flow launch: equality of two sparse drafts alone does not prove adequate whole-wheat coverage.",
+  "formal_q0_started": false,
+  "groups": {
+    "1A": {
+      "admitted_count": 383,
+      "admitted_reference_union_bp": 129162948,
+      "gap_count": 146,
+      "gap_placeholder_bp": 14600,
+      "reference_bp": 594102056,
+      "selected_reference_union_bp": 42204808,
+      "selected_slices": 154,
+      "selected_source_bp": 48574190
+    },
+    "1B": {
+      "admitted_count": 712,
+      "admitted_reference_union_bp": 254162232,
+      "gap_count": 186,
+      "gap_placeholder_bp": 18600,
+      "reference_bp": 689851870,
+      "selected_reference_union_bp": 69146655,
+      "selected_slices": 194,
+      "selected_source_bp": 81948094
+    },
+    "1D": {
+      "admitted_count": 245,
+      "admitted_reference_union_bp": 179234879,
+      "gap_count": 84,
+      "gap_placeholder_bp": 8400,
+      "reference_bp": 495453186,
+      "selected_reference_union_bp": 76164641,
+      "selected_slices": 94,
+      "selected_source_bp": 80701320
+    },
+    "2A": {
+      "admitted_count": 596,
+      "admitted_reference_union_bp": 281486262,
+      "gap_count": 229,
+      "gap_placeholder_bp": 22900,
+      "reference_bp": 780798557,
+      "selected_reference_union_bp": 58075059,
+      "selected_slices": 238,
+      "selected_source_bp": 81677815
+    },
+    "2B": {
+      "admitted_count": 626,
+      "admitted_reference_union_bp": 118008573,
+      "gap_count": 230,
+      "gap_placeholder_bp": 23000,
+      "reference_bp": 801256715,
+      "selected_reference_union_bp": 41349669,
+      "selected_slices": 236,
+      "selected_source_bp": 60727431
+    },
+    "2D": {
+      "admitted_count": 307,
+      "admitted_reference_union_bp": 369731745,
+      "gap_count": 77,
+      "gap_placeholder_bp": 7700,
+      "reference_bp": 651852609,
+      "selected_reference_union_bp": 138939386,
+      "selected_slices": 81,
+      "selected_source_bp": 147296784
+    },
+    "3A": {
+      "admitted_count": 431,
+      "admitted_reference_union_bp": 193800741,
+      "gap_count": 176,
+      "gap_placeholder_bp": 17600,
+      "reference_bp": 750843639,
+      "selected_reference_union_bp": 85107000,
+      "selected_slices": 184,
+      "selected_source_bp": 101078178
+    },
+    "3B": {
+      "admitted_count": 800,
+      "admitted_reference_union_bp": 339281633,
+      "gap_count": 217,
+      "gap_placeholder_bp": 21700,
+      "reference_bp": 830829764,
+      "selected_reference_union_bp": 148428877,
+      "selected_slices": 225,
+      "selected_source_bp": 160299658
+    },
+    "3D": {
+      "admitted_count": 281,
+      "admitted_reference_union_bp": 286281120,
+      "gap_count": 101,
+      "gap_placeholder_bp": 10100,
+      "reference_bp": 615552423,
+      "selected_reference_union_bp": 95634512,
+      "selected_slices": 108,
+      "selected_source_bp": 100416624
+    },
+    "4A": {
+      "admitted_count": 555,
+      "admitted_reference_union_bp": 213315169,
+      "gap_count": 155,
+      "gap_placeholder_bp": 15500,
+      "reference_bp": 744588157,
+      "selected_reference_union_bp": 54064043,
+      "selected_slices": 165,
+      "selected_source_bp": 67023797
+    },
+    "4B": {
+      "admitted_count": 584,
+      "admitted_reference_union_bp": 380318857,
+      "gap_count": 182,
+      "gap_placeholder_bp": 18200,
+      "reference_bp": 673617499,
+      "selected_reference_union_bp": 120858770,
+      "selected_slices": 189,
+      "selected_source_bp": 131384240
+    },
+    "4D": {
+      "admitted_count": 192,
+      "admitted_reference_union_bp": 184401162,
+      "gap_count": 69,
+      "gap_placeholder_bp": 6900,
+      "reference_bp": 509857067,
+      "selected_reference_union_bp": 101435773,
+      "selected_slices": 73,
+      "selected_source_bp": 106896422
+    },
+    "5A": {
+      "admitted_count": 639,
+      "admitted_reference_union_bp": 211279904,
+      "gap_count": 190,
+      "gap_placeholder_bp": 19000,
+      "reference_bp": 709773743,
+      "selected_reference_union_bp": 147925588,
+      "selected_slices": 197,
+      "selected_source_bp": 160627694
+    },
+    "5B": {
+      "admitted_count": 887,
+      "admitted_reference_union_bp": 189323031,
+      "gap_count": 285,
+      "gap_placeholder_bp": 28500,
+      "reference_bp": 713149757,
+      "selected_reference_union_bp": 71553978,
+      "selected_slices": 294,
+      "selected_source_bp": 91647503
+    },
+    "5D": {
+      "admitted_count": 658,
+      "admitted_reference_union_bp": 298977319,
+      "gap_count": 96,
+      "gap_placeholder_bp": 9600,
+      "reference_bp": 566080677,
+      "selected_reference_union_bp": 107250113,
+      "selected_slices": 99,
+      "selected_source_bp": 114746944
+    },
+    "6A": {
+      "admitted_count": 427,
+      "admitted_reference_union_bp": 210861697,
+      "gap_count": 159,
+      "gap_placeholder_bp": 15900,
+      "reference_bp": 618079260,
+      "selected_reference_union_bp": 82129499,
+      "selected_slices": 167,
+      "selected_source_bp": 93122096
+    },
+    "6B": {
+      "admitted_count": 799,
+      "admitted_reference_union_bp": 189015485,
+      "gap_count": 283,
+      "gap_placeholder_bp": 28300,
+      "reference_bp": 720988478,
+      "selected_reference_union_bp": 56369688,
+      "selected_slices": 291,
+      "selected_source_bp": 66296694
+    },
+    "6D": {
+      "admitted_count": 241,
+      "admitted_reference_union_bp": 224750587,
+      "gap_count": 71,
+      "gap_placeholder_bp": 7100,
+      "reference_bp": 473592718,
+      "selected_reference_union_bp": 111885219,
+      "selected_slices": 76,
+      "selected_source_bp": 120874590
+    },
+    "7A": {
+      "admitted_count": 678,
+      "admitted_reference_union_bp": 183481784,
+      "gap_count": 147,
+      "gap_placeholder_bp": 14700,
+      "reference_bp": 736706236,
+      "selected_reference_union_bp": 52028831,
+      "selected_slices": 159,
+      "selected_source_bp": 59311462
+    },
+    "7B": {
+      "admitted_count": 847,
+      "admitted_reference_union_bp": 314370912,
+      "gap_count": 270,
+      "gap_placeholder_bp": 27000,
+      "reference_bp": 750620385,
+      "selected_reference_union_bp": 130746396,
+      "selected_slices": 280,
+      "selected_source_bp": 143345169
+    },
+    "7D": {
+      "admitted_count": 432,
+      "admitted_reference_union_bp": 349492925,
+      "gap_count": 135,
+      "gap_placeholder_bp": 13500,
+      "reference_bp": 638686055,
+      "selected_reference_union_bp": 89824669,
+      "selected_slices": 142,
+      "selected_source_bp": 98394573
+    },
+    "Un": {
+      "admitted_count": 498,
+      "admitted_reference_union_bp": 8099664,
+      "gap_count": 134,
+      "gap_placeholder_bp": 13400,
+      "reference_bp": 480980714,
+      "selected_reference_union_bp": 5115007,
+      "selected_slices": 145,
+      "selected_source_bp": 6178452
+    }
+  },
+  "mapper_calls": 0,
+  "new_summary_sha256": "d23a49af479b6c9b81916518e8034d4044ea31b5c97229c5d0ce1624138fc9d4",
+  "schema": "wheat_draft_absolute_extent_v1",
+  "scope": "Actual reference anchor unions, not bounding hulls. 100-N unknown-join placeholders are not measured biological gap lengths. Draft and formal selection share the ranking function, but these are not formal Q0 outputs. Admission loss and path exclusion require separate diagnosis; no cause inferred from these totals alone.",
+  "selection_calls": 0,
+  "selection_chain": "71bb5f8721e2f621f94ba01886464c7ec649ffc0c5d900d8853a6363e7a629ed",
+  "totals": {
+    "admitted_count": 11818,
+    "admitted_reference_union_bp": 5108838629,
+    "admitted_source_union_bp": 7408304472,
+    "gap_count": 3622,
+    "gap_placeholder_bp": 362200,
+    "reference_bp": 14547261565,
+    "selected_reference_covered_fraction": 0.12966276660194223,
+    "selected_reference_union_bp": 1886238181,
+    "selected_slices": 3791,
+    "selected_source_bp": 2122569730,
+    "selected_source_vs_reference_fraction": 0.14590854234083472
+  },
+  "provenance": {
+    "producer_tools_sha256": "19cebdc7667d912f6d3ace4a59783d3e49fbb02e668ff5f5efbb50c618c27ad2",
+    "comparison_helper_sha256": "3ca75d54df5a4680d59e879800f757bd22426ea856b6296a4fef51956b2534fc",
+    "checkpoint_reader_sha256": "ee15ca3032344729505abea30036c2799d8a06fb8d702db589d62de98a9445f4",
+    "auditor_sha256": "161472dedf880b4eaa11056f7810c699b4acdc796cfbe1f484a36747054815b0",
+    "source_dataset_extent": {
+      "JM19_flye_ABD": {
+        "admitted_source_union_bp": 5559539480,
+        "selected_slice_bp": 1295132249
+      },
+      "JM19_hifiasm": {
+        "admitted_source_union_bp": 1848764992,
+        "selected_slice_bp": 827437481
+      }
+    },
+    "native_mapper_started": false,
+    "formal_main_submitted": false
+  }
+}

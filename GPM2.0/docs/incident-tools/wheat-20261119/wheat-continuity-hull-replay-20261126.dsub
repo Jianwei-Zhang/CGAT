@@ -1,0 +1,18 @@
+#!/bin/bash
+#DSUB -n jm19_1A_cached_hull_replay
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=4,mem=40960MB"
+#DSUB -o hull_replay_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c hull-kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+owner=$PWD
+code=$(mktemp -d /tmp/wheat-hull-code.XXXXXXXX)
+tar -xzf tools.tgz -C "$code"
+export PYTHONPATH="$code/tools:$owner"
+python3 -Bu wheat_continuity_hull_replay_readonly.py "$(dirname "$owner")" "$owner" "$owner" --workers 4
+sha256sum hull-replay.json

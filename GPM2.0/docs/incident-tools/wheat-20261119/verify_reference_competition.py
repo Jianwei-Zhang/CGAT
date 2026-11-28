@@ -30,9 +30,18 @@ def panel(path,pin):
     results=[]; reference=new._reference_groups
     for fn in (old._reference_groups,reference):
         screen=sha256();elapsed=0;parts=anchors=ambiguous=0
-        def capture(data,part,policy):
+        def capture(data,part,policy,*,evidence_ids=None):
             nonlocal elapsed,parts,anchors,ambiguous
-            start=monotonic(); g,high,mask=fn(data,part,policy);elapsed+=monotonic()-start;parts+=1
+            start=monotonic()
+            if evidence_ids is None:
+                g,high,mask=fn(data,part,policy)
+            elif fn is reference:
+                g,high,mask=fn(data,part,policy,evidence_ids=evidence_ids)
+            else:
+                g,high,mask=fn(data,part,policy)
+                # The frozen comparator predates fused reporting; reproduce its owner pass.
+                evidence_ids.extend(h.evidence_id for h in data.reference_hits.get(part.source, ()) if h.query.intersection(part.interval))
+            elapsed+=monotonic()-start;parts+=1
             record=[part.segment_id,[(k,[(a.source.start,a.source.end,a.reference.start,a.reference.end,a.evidence_id) for a in vs]) for k,vs in sorted(g.items())],sorted(high),[(i.start,i.end) for i in mask]];screen.update(encode(record)+b'\n');anchors+=sum(map(len,g.values()));ambiguous+=len(mask);return g,high,mask
         with patch.object(new,'_reference_groups',capture): r=arm(path,pin)
         d={'has_path':r['has_path'],'request':r['request']};results.append({'has_path':r['has_path'],'request_sha256':sha256(encode(d)).hexdigest(),'part_screens_sha256':screen.hexdigest(),'parts':parts,'anchors':anchors,'ambiguous_intervals':ambiguous,'reference_screen_seconds':elapsed,'draft_seconds':r['seconds']})

@@ -1,0 +1,19 @@
+#!/bin/bash
+#DSUB -n jm19_q0_panel_readout
+#DSUB -q x86
+#DSUB -nl agent-X86-45
+#DSUB -aa
+#DSUB -D "43065579=SUCCEEDED"
+#DSUB -R "cpu=8,mem=32768MB"
+#DSUB -o readout_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c kit.sha256
+exec 9>readout.lock; flock -n 9
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+b=$(dirname "$PWD"); controls="$b/q0-shortlist-panel-20261126.GgIkTAZM"; frozen="$b/q0-whole-updated.We9jf3UC"
+printf '%s  %s\n' 8ecec1cd21d0240dad8fe6e9fe8f3cd2d45e0d690f2e3931f404d88bfbc1985c "$controls/panel.json" | sha256sum --quiet -c -
+code=$(mktemp -d /tmp/wheat-panel-readout.XXXXXXXX); trap 'rm -rf -- "$code"' EXIT
+tar -xzf tools.tgz -C "$code"; export PYTHONPATH="$code/GPM2.0/server/tools:$PWD" PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+python3 -Bu assess_wheat_shortlist_panel.py "$frozen/selection" "$frozen/result" "$b/q0-source-part-lookup-20261121-1600/source-part-lookup.json" "$controls" "$PWD/readout.json"
+sha256sum readout.json

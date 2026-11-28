@@ -1,0 +1,145 @@
+{
+  "schema": "wheat_1A_no_slot_classification_v1",
+  "frozen_summary_sha256": "d23a49af479b6c9b81916518e8034d4044ea31b5c97229c5d0ce1624138fc9d4",
+  "baseline_full_path_equal": true,
+  "unselected": 229,
+  "no_reference_order_slot": 200,
+  "baseline_metrics": {
+    "source_bp": 48574190,
+    "reference_union_bp": 42204808,
+    "slices": 154,
+    "gap_count": 146,
+    "gap_placeholder_bp": 14600,
+    "score": [
+      48574190,
+      -146,
+      -146,
+      -153,
+      -154,
+      35145537
+    ]
+  },
+  "graph_pickle_sha256": "b620ed9b1b52cdfd472aa64b3da11a62e0c5c8d8ba6247d972ad879226a75c8a",
+  "counts": {
+    "no_qualified_pair_blocks_to_selected": 86,
+    "valid_but_not_score_improving": 30,
+    "no_pair_evidence_to_selected": 18,
+    "no_end_spanning_pair_evidence": 55,
+    "no_two_sided_compatible_join_slot": 10,
+    "crossed_or_empty_cut_veto": 1
+  },
+  "elapsed_s": 20.26757893501781,
+  "mapper_calls": 0,
+  "formal_workspace_modified": false,
+  "limitations": [
+    "This diagnoses insertion into the frozen winner, not global impossibility or all replacements.",
+    "99% central-reference trimming is a sensitivity flag, not proof that omitted anchors are biologically erroneous.",
+    "Maximum chain uses source-disjoint actual anchors and may conservatively omit partially overlapping legitimate anchors.",
+    "Aggregate candidate bp can overlap and is not net recoverable genome coverage."
+  ],
+  "full_report_remote": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-chain-20261126.nyLKgP1a/blockers.json",
+  "full_report_sha256": "0c22fe25d692dfb2c3bcae70bcddd5459c33b9cad06fa31462290e89cac97d92",
+  "chain_reference_slot_restored_count": 0,
+  "central_99pct_reference_slot_restored_count": 3,
+  "actual_duplicate_veto_probe_count": 0,
+  "edge_forensics": {
+    "blocker_report_sha256": "0c22fe25d692dfb2c3bcae70bcddd5459c33b9cad06fa31462290e89cac97d92",
+    "elapsed_s": 21.26665670098737,
+    "formal_workspace_modified": false,
+    "graph_sha256": "b620ed9b1b52cdfd472aa64b3da11a62e0c5c8d8ba6247d972ad879226a75c8a",
+    "limitations": [
+      "Minimum endpoint crop is for one directed pair, not proof of a valid complete two-sided path insertion.",
+      "Zero observed anchor loss does not prove discarded source bases biologically dispensable.",
+      "Reference-consistency veto is an exact coordinate check on every paired block of an alignment; this audit does not relax it.",
+      "No pair evidence in the parent classification means no identity-passing pair evidence in this frozen graph, not absence of every raw PAF row."
+    ],
+    "mapper_calls": 0,
+    "minimum_trim_le_bp_counts": {
+      "10": 2,
+      "100": 3,
+      "1000": 3,
+      "10000": 16,
+      "100000": 35,
+      "1000000": 45
+    },
+    "no_end_count": 55,
+    "schema": "wheat_1A_pair_edge_forensics_v1",
+    "unqualified_subreasons": {
+      "insufficient_joint_supported_anchor_bp": 8,
+      "orientation_or_local_coordinate_overlap": 20,
+      "supported_but_no_coordinate_unique_pair_block": 35,
+      "whole_alignment_reference_consistency_veto": 23
+    },
+    "zero_anchor_loss_crop_count": 3,
+    "full_report_remote": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-local-chain-20261126.nyLKgP1a/pair-edge-forensics.json",
+    "full_report_sha256": "0c8123aed7ae4feb829ea191fcea2c9bdc0f073303d3ebeee35aa1e6e1894f36"
+  },
+  "largest_endpoint_examples": [
+    {
+      "minimum_trim": {
+        "candidate_is_left": false,
+        "evidence_id": "q0-paf-4571897bc63dda4b18ad03d7",
+        "left": "q0-placement-e9532353c35ffe49181ddd90",
+        "left_tail_bp": 686915,
+        "pair_end_gate_passes_after_exact_crop": true,
+        "right": "q0-placement-42748f09abd1a85a5c3d818a",
+        "right_head_bp": 2551412,
+        "total_trim_bp": 3238327,
+        "trimmed_supported_anchor_bp": 3064614
+      },
+      "original_class": "no_end_spanning_pair_evidence",
+      "pair_chain_options": 22,
+      "placement_id": "q0-placement-42748f09abd1a85a5c3d818a",
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_69"
+      ],
+      "source_bp": 27316235,
+      "zero_anchor_loss_crop_available": false
+    },
+    {
+      "minimum_trim": {
+        "candidate_is_left": false,
+        "evidence_id": "q0-paf-0a0ef701601f73fdbca744e1",
+        "left": "q0-placement-fa1d83e6710a9a7331f0bb93",
+        "left_tail_bp": 29062,
+        "pair_end_gate_passes_after_exact_crop": true,
+        "right": "q0-placement-cbde22ea5d34e9e5d5df2a61",
+        "right_head_bp": 519020,
+        "total_trim_bp": 548082,
+        "trimmed_supported_anchor_bp": 520013
+      },
+      "original_class": "no_end_spanning_pair_evidence",
+      "pair_chain_options": 6,
+      "placement_id": "q0-placement-cbde22ea5d34e9e5d5df2a61",
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_5425"
+      ],
+      "source_bp": 24570149,
+      "zero_anchor_loss_crop_available": false
+    },
+    {
+      "minimum_trim": {
+        "candidate_is_left": false,
+        "evidence_id": "q0-paf-b52f7930822ebe4ee7f53e1b",
+        "left": "q0-placement-c00c85bd6d399a23a4044fcf",
+        "left_tail_bp": 349,
+        "pair_end_gate_passes_after_exact_crop": true,
+        "right": "q0-placement-e79a56da1a7950b57cdcfb5b",
+        "right_head_bp": 326049,
+        "total_trim_bp": 326398,
+        "trimmed_supported_anchor_bp": 326047
+      },
+      "original_class": "no_end_spanning_pair_evidence",
+      "pair_chain_options": 10,
+      "placement_id": "q0-placement-e79a56da1a7950b57cdcfb5b",
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_3963"
+      ],
+      "source_bp": 5995027,
+      "zero_anchor_loss_crop_available": false
+    }
+  ]
+}

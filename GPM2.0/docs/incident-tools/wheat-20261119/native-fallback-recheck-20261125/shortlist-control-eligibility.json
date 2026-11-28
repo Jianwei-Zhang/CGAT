@@ -1,0 +1,108 @@
+{
+  "limits": "Old PAF rows on retained/excluded targets, not results of re-mapping. Short control candidates are selected overlap endpoints with retained partners, not independently reproduced joins or a matched validation of the retired parents.",
+  "mapper_starts": 0,
+  "native_receipts": [
+    {
+      "flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join",
+        "-m",
+        "2000"
+      ],
+      "queries": 61,
+      "receipt_sha256": "ba5553ff1640cd1feff0db518b671baabed44fba84e02c7992e30a1cb76dd50a",
+      "retained_targets_present": 3755,
+      "retired_parents_as_queries": 0,
+      "selected_slices_from_queries": 0,
+      "target_bases": 31691147817,
+      "targets": 38117,
+      "task": "q0-map-2b19c2c859bdfb5f2e9177e8"
+    },
+    {
+      "flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "queries": 150,
+      "receipt_sha256": "994bfaa20bd68d035bedb7d8abacf616d826ebbb0bdc9c2cdc0b1e13b561245e",
+      "retained_targets_present": 3755,
+      "retired_parents_as_queries": 0,
+      "selected_slices_from_queries": 0,
+      "target_bases": 31691147817,
+      "targets": 38117,
+      "task": "q0-map-8024dde83cbf20e7ffa6d8ee"
+    },
+    {
+      "flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "queries": 9,
+      "receipt_sha256": "c36e5d98b8cbeac165865060565ed8c8953824f42baafa9c7db2e94b1ec7679f",
+      "retained_targets_present": 3755,
+      "retired_parents_as_queries": 0,
+      "selected_slices_from_queries": 0,
+      "target_bases": 31691147817,
+      "targets": 38117,
+      "task": "q0-map-a2e519761e94eff6ca09e121"
+    },
+    {
+      "flags": [
+        "-D",
+        "-P",
+        "--dual=yes",
+        "--no-long-join"
+      ],
+      "queries": 1418,
+      "receipt_sha256": "26e6cb45d97322add5409035f06cdbeed6a2f367ea5ceb6ee5aed3b0e57442f3",
+      "retained_targets_present": 0,
+      "retired_parents_as_queries": 0,
+      "selected_slices_from_queries": 292,
+      "target_bases": 3830448,
+      "targets": 52,
+      "task": "q0-map-b30137a13323db8a99874448"
+    }
+  ],
+  "new_selector_replays": 0,
+  "nine_query_original_paf": {
+    "original_paf_sha256": "ad1b16bf2ca4ef52b001e9dff2400c2aceacd7fb2a85e63ff38849867bbb01e7",
+    "queries_with_any_original_hit": 9,
+    "queries_with_hits_only_to_excluded_targets": 3,
+    "query_coverage_ge_90pct_identity_ge_98pct_rows": {
+      "excluded": 286,
+      "kept": 27
+    },
+    "rows": {
+      "excluded": 26179,
+      "kept": 669
+    },
+    "strand_rows": {
+      "excluded:+": 11962,
+      "excluded:-": 14217,
+      "kept:+": 92,
+      "kept:-": 577
+    },
+    "task": "q0-map-a2e519761e94eff6ca09e121"
+  },
+  "original_bp": 31706122489,
+  "original_targets": 38267,
+  "prospective_short_controls": {
+    "distinct_query_sources_by_relative_strand": {
+      "+": 97,
+      "-": 172
+    },
+    "distinct_selected_sequence_joins": 142,
+    "maximum_query_bp": 500000
+  },
+  "questions": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "retained_bp": 2302475263,
+  "retained_targets": 3755,
+  "schema": "wheat_shortlist_control_eligibility_v1",
+  "selection_chain": "5c4b0771b6a8112396adc21c710e748c3aaad44db11c0f5dc77edca8ec9aa31b"
+}

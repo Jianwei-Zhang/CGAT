@@ -1,0 +1,20 @@
+#!/bin/bash
+#DSUB -n jm19_q0_indirect_ab
+#DSUB -q x86
+#DSUB -nl agent-X86-46
+#DSUB -aa
+#DSUB -R "cpu=32,mem=131072MB"
+#DSUB -o indirect_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c kit.sha256
+exec 9>panel.lock; flock -n 9
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+base=$(dirname "$PWD"); frozen="$base/q0-whole-updated.We9jf3UC";lookup="$base/q0-source-part-lookup-20261121-1600/source-part-lookup.json"
+code=$(mktemp -d /tmp/wheat-indirect-code.XXXXXXXX);trap 'rm -rf -- "$code"' EXIT
+tar -xzf tools.tgz -C "$code";export PYTHONPATH="$code/GPM2.0/server/tools:$PWD" PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+python3 -Bu review_wheat_frozen_group.py panel-stage 16
+python3 -Bu run_wheat_shortlist_panel.py "$base" 32
+python3 -Bu assess_wheat_shortlist_panel.py "$frozen/selection" "$frozen/result" "$lookup" "$PWD" "$PWD/readout.json"
+python3 -Bu readmit_wheat_panel.py "$PWD" "$PWD"
+sha256sum mapping.json common.json readout.json readmission.json

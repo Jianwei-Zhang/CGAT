@@ -52,7 +52,7 @@
       "manifest_sha256": "e439368c7ed88fbbdeec92911a8752c574ae2db48a0564ecaa103a27c26738ed"
     }
   },
-  "handoff_base_sha256": "4b4fe9b3818101a18be03a8e273f27fbe4c8228d142ef23a3db64456520df75c",
+  "handoff_base_sha256": "7fac36225e8e80aba61a334e0a736a3c07ad1f502dd4a34856c90524983321e1",
   "production_ready": false,
   "customer_configuration_required": false,
   "approximate_output_admission": "bounded_native_window_projection_v1",

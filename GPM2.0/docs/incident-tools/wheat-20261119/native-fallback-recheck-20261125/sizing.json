@@ -1,0 +1,29 @@
+{
+  "audits": {
+    "expanded": "4a12d60b9ad40dead8ab5e750688f012a4625a78d138efbb18aed30b99629a8f",
+    "known": "7c33ccedc2c24c2cb18c54f5e6c5c25ca220bfdeb45d13f455e085ad3a2d56ff"
+  },
+  "mapper_calls": 0,
+  "parts": {
+    "expanded": {
+      "contexts": 35688,
+      "nonempty": 35501,
+      "raw_bytes": 5627847771,
+      "raw_rows": 19598408
+    },
+    "known": {
+      "contexts": 23590,
+      "nonempty": 23451,
+      "raw_bytes": 3750496959,
+      "raw_rows": 13194559
+    }
+  },
+  "schema": "frozen_wheat_cached_raw_volume_v1",
+  "scope": "Original qualifying exact raw only. Not all raw rows survive original-core projection; not current Q0 memory or wall time.",
+  "total": {
+    "contexts": 59278,
+    "nonempty": 58952,
+    "raw_bytes": 9378344730,
+    "raw_rows": 32792967
+  }
+}

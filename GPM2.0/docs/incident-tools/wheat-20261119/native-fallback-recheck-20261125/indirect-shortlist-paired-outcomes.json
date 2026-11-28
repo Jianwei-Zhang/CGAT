@@ -1,0 +1,118 @@
+{
+  "cases": [
+    {
+      "chromosome": "1A",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": false,
+      "stratum": "indirect-1A--"
+    },
+    {
+      "chromosome": "1A",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": false,
+      "stratum": "indirect-1A-+"
+    },
+    {
+      "chromosome": "4A",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": false,
+      "fresh_selects_old_reduced": false,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": false,
+      "partner_retained": true,
+      "query_has_direct_demand": false,
+      "stratum": "indirect-4A--"
+    },
+    {
+      "chromosome": "7D",
+      "fixed_offers_old_full": true,
+      "fixed_offers_old_reduced": true,
+      "fixed_same_available_cuts": true,
+      "fresh_request_delta": {
+        "full_only_bp": 0,
+        "full_only_in_frozen_demand_bp": 0,
+        "reduced_only_bp": 0,
+        "reduced_only_in_frozen_demand_bp": 0,
+        "same": true
+      },
+      "fresh_same_paths": true,
+      "fresh_same_placements": true,
+      "fresh_selects_old_full": true,
+      "fresh_selects_old_reduced": true,
+      "frozen_kind": "sequence_overlap",
+      "original_background_selects_old": true,
+      "partner_retained": true,
+      "query_has_direct_demand": false,
+      "stratum": "indirect-7D--"
+    }
+  ],
+  "decision": "withhold_replacement_bounded_panel_only",
+  "evidence": {
+    "common": "d4d4b1c6780d863753100cf365723ecf6719c499ae20a88114ca21ed1c873f8d",
+    "fixed_readout": "01dfe6fb60cf02439475e8f94adb41056c5a5f4fca7fc1c7e916ee99a85a4866",
+    "fresh_readmission": "1fbc430979cff164b6f5855225642a8829f72685d5afc433e212d99724fe33fa",
+    "mapping": "b43c87a03d6f9b3e7cb33aea22293086f88e95a961d6149f47303736b5231538",
+    "neighborhoods": "fa5f6891eb1b5423ade9214b1acb7bd9f59d269dd5e8d4697e9a632303f2bd1c"
+  },
+  "full_over_reduced_mapper_time": 9.231,
+  "geometry": {
+    "full_rows_to_excluded": 31157,
+    "retained_only_full": 695,
+    "retained_only_reduced": 3066,
+    "retained_shared": 901
+  },
+  "heldout_old_pair_rows": 49,
+  "included_target_selection_s": 0.0408,
+  "limits": "Preregistered short queries, not the retired parents. Timings are single serial-arm measurements on one node, not whole-workflow speedup. Request deltas are per local cohort and must not be summed as whole-wheat totals. A missing frozen junction in both arms is not a successful positive control.",
+  "mapper_s": {
+    "full": 656.136,
+    "reduced": 71.078
+  },
+  "panel": "15fd2e5a2ff25b04b67648285b012a1c713a120174419e8a92e3b98bc63a3c02",
+  "questions": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "schema": "wheat_paired_native_control_summary_v1",
+  "shared_prepare_verify_extract_s": 92.976
+}

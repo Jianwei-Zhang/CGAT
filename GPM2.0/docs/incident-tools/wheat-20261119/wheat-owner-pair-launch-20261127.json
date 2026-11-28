@@ -1,0 +1,122 @@
+{
+  "observed": "2026-11-27T15:06:07+08:00",
+  "engine_revision": "9291117613910937da5f4f9c3c57beadb7885254",
+  "selector_identity": "q0-selector-31c9ea524e91993f32bcea5c",
+  "qualification_job": 43223376,
+  "qualification_receipt": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-owner-exact.HfFWfCef/qualification.json",
+    "sha256": "4f4c75412dc71cb39637430f759b28f4fa20cfd70a2ba9f7c56109756c44dbce"
+  },
+  "qualification_summary": {
+    "baseline_output_sha256": "eb50499368308cef375a82619bb043a8d679b9a17238582c75c2556bee7f9a47",
+    "baseline_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+    "baseline_tools_sha256": "4252ccb4ad2040f045efc73c1ba82aa8b05b1a340096c97b997d0c2d3588c57c",
+    "candidate_output_sha256": "eb50499368308cef375a82619bb043a8d679b9a17238582c75c2556bee7f9a47",
+    "candidate_selector_identity": "q0-selector-31c9ea524e91993f32bcea5c",
+    "candidate_tools_sha256": "e1b5b25cf6fe0e565cef2bcc8efd6e67714b4ba01fba43ec2d4f6e74f66faed0",
+    "checkpoint_bytes": 9488762,
+    "checkpoint_output_sha256": "99f36fc6fc16535e315aa4d6d0511b2c0028789bc00f3293d9e4a8af1d199b2a",
+    "field_exact_equal": true,
+    "formal_workspace_modified": false,
+    "input_sha256": "ff00e2329fc9d1b8f60c9ed0d1fdb6e19faf4cf19d961d73475b697a45324aee",
+    "mapper_calls": 0,
+    "output_bytes": 44439406,
+    "owner_only_verified": true,
+    "placements": 25,
+    "records": 162,
+    "schema": "wheat_owner_pair_qualification_v1"
+  },
+  "retired": [
+    {
+      "jobId": "43138343",
+      "jobName": "jm19_q0_formal_continuity",
+      "state": "FAILED",
+      "exitMessage": "Job was terminated by xbzhang26",
+      "endTime": "2026-11-27T06:54:25Z",
+      "execPath": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-pair-relay-20261127.dKNh0GKv"
+    },
+    {
+      "jobId": "43138341",
+      "jobName": "jm19_q0_production22_cached",
+      "state": "FAILED",
+      "exitMessage": "Job was terminated by xbzhang26",
+      "endTime": "2026-11-27T06:55:04Z",
+      "execPath": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-pair-20261127.GmsUEBFn"
+    }
+  ],
+  "conditional_relay": {
+    "schema": "wheat_continuity_conditional_relay_v1",
+    "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+    "runtime_revision": "9291117613910937da5f4f9c3c57beadb7885254",
+    "validation_job": {
+      "job_id": 43225037,
+      "name": "jm19_q0_production22_cached",
+      "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-owner.Jww3W4bC"
+    },
+    "install_job": {
+      "job_id": 43224098,
+      "name": "jm19_q0_continuity_install",
+      "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-owner-transition.TjrxmZGI"
+    },
+    "transition": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-owner-transition.TjrxmZGI/transition.json",
+      "sha256": "dbd07f2d31489146a63471e1484d500ae0407b4918c85657e38f6b1f213f09c4"
+    },
+    "transition_kit": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-owner-transition.TjrxmZGI/kit.sha256",
+      "sha256": "956e5369464bbcb726bd74664270033a39bbef6704d0ff7b0e3ebe0a3d2e317e"
+    },
+    "validation_source": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-owner.Jww3W4bC/production-source.json",
+      "sha256": "a07a2860c20e3e3c702fa284a88854b41d0caa36d3c7a7c9decbf23d297b9c29"
+    },
+    "validation_kit": {
+      "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-owner.Jww3W4bC/kit.sha256",
+      "sha256": "913cb78bba0b14904d5b15f58806f4ea69858d91a98e95237b6430d48e547b2b"
+    }
+  },
+  "relay_id": 43225040,
+  "relay_owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-owner-relay.rG2rK0rq",
+  "relay_kit": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-owner-relay.rG2rK0rq/relay-kit.sha256",
+    "sha256": "920e076227a2ed7aef175aa82f74948e487402f930beef0ef8b978eacb541fb0"
+  },
+  "installation": {
+    "continuous_q0_policy_change": {
+      "admission_policy_version": 2,
+      "engine_revision": "2064cb4cfd51b5c886f60af19f020caf0b18950f",
+      "path_policy_version": 3,
+      "reference_locus_padding_bp": 100000,
+      "schema": "q0_continuity_2064cb4c_v1"
+    },
+    "status": "continuity_engine_installed_and_one_original_parent_verified",
+    "transition_sha256": "dbd07f2d31489146a63471e1484d500ae0407b4918c85657e38f6b1f213f09c4",
+    "source_revision": "9291117613910937da5f4f9c3c57beadb7885254",
+    "checkpoint_files_unchanged": 25,
+    "protected_control_files_unchanged": true,
+    "representative_parent": {
+      "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+      "input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+      "unit_id": "q0_chr:Un"
+    },
+    "all_25_parent_payloads_revalidated": false,
+    "formal_main_started": false,
+    "mapper_calls": 0,
+    "formal_launch_deferred_to_conditional_relay": true,
+    "reader_declaration_sha256": "bc0d1dfc021fdb0c784fb102401c95a5c410f98634705ea6001f395a179bd0f0",
+    "installation_receipt_sha256": "4693c2774cf7be523e6c6854292a45cfd84f09ceb048cb48d39fe2c44e84b1ae"
+  },
+  "whole_allocation": {
+    "path": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-whole-local-maps.production22-owner.Jww3W4bC/allocation.json",
+    "sha256": "18c03e6f2a97776d18cdce451a7d074aab79c07e50adf4f787f59003d75621a1"
+  },
+  "validation_node": "agent-X86-34",
+  "validation_state": "RUNNING",
+  "relay_state": "WAITING",
+  "formal_started": false,
+  "tests": {
+    "scientific": 167,
+    "engineering": 8,
+    "incident": 140
+  }
+}

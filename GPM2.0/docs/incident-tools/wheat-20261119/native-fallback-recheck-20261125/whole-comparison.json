@@ -1,0 +1,69 @@
+{
+  "counts_by_id_relation": {
+    "absent_id_unproven_join": 2626,
+    "absent_id_weak_placement": 80,
+    "new_id_unproven_join": 3302,
+    "new_id_weak_placement": 144,
+    "retained_id_unproven_join": 320,
+    "retained_id_weak_placement": 310
+  },
+  "frame_contact_unique": {
+    "unproven_join": 86,
+    "weak_placement": 12
+  },
+  "jobs": {
+    "43061436": {
+      "ended_utc": "2026-11-25T20:03:45Z",
+      "seconds_between_scheduler_timestamps": 23885,
+      "started_utc": "2026-11-25T13:25:40Z",
+      "state": "SUCCEEDED"
+    },
+    "43061453": {
+      "ended_utc": "2026-11-25T20:04:57Z",
+      "seconds_between_scheduler_timestamps": 70,
+      "started_utc": "2026-11-25T20:03:47Z",
+      "state": "SUCCEEDED"
+    }
+  },
+  "old_question_ids": 3336,
+  "parents": [
+    {
+      "direct_query_issues": {},
+      "historical_frames": 5,
+      "historical_target_contact": {
+        "unproven_join": 39,
+        "weak_placement": 5
+      },
+      "outside_these_frames": {
+        "unproven_join": 3583,
+        "weak_placement": 449
+      },
+      "parent": "JM19flyeA_contig_4549"
+    },
+    {
+      "direct_query_issues": {},
+      "historical_frames": 8,
+      "historical_target_contact": {
+        "unproven_join": 56,
+        "weak_placement": 8
+      },
+      "outside_these_frames": {
+        "unproven_join": 3566,
+        "weak_placement": 446
+      },
+      "parent": "ptg000010l"
+    }
+  ],
+  "private_frame_links_sha256": "5518b461e67e9f45adab0ea7e9cc28bf4561547bfc495f4c1f822ed14b5ff9b9",
+  "question_detail_sha256": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "schema": "wheat_verified_whole_native_recheck_aggregate_v1",
+  "scope": "Source alignment inputs frozen; existing PAFs only. Frames may overlap. Disappearing IDs or request bases do not prove closure. Per-chromosome graph and ranking times are logged phase seconds for two different evidence inputs, not a speed benchmark. No new mapper, no published Q0.",
+  "sha256": {
+    "pair-scope-whole-after.json": "3b7afc392e8b04fe993ae9b66ef4b555a1ca831c9fad4f4dba193c3f0824b956",
+    "whole-by-group.tsv": "6138a7b8ecb46c70faa63cc71ccecc0070891c874d73d3230ed2a78b4b4925e9",
+    "whole-coordinate-change.json": "771bcc5f2490cc4f8d9d240399793eb38cdc604baaf88e3a7b88f3720e2949a3",
+    "whole-updated-demand.json": "ef67a79f96a87adb9cd13d86c652b0fe4c6b769a717d5ddadda9196414eabffa"
+  },
+  "source_comparison_sha256": "d03288f586c6ac4c6dccfb86a39c78f4e371c2ef232f776e6aac53a8f5a7fa0a",
+  "updated_question_ids": 4076
+}

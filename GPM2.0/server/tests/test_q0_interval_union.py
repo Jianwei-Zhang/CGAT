@@ -2,9 +2,10 @@ import random
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from server.tools.lgz_core.q0_catalog import (_IntervalUnion, CandidateCatalog,
-    add_pairwise_candidates, build_catalog)
+    add_pairwise_candidates, build_catalog, interval_rows)
 from server.tools.lgz_core.q0_alignments import parse_paf_line
 from server.tools.lgz_core.q0_sources import Interval, SourceKey, merged_intervals, split_source
 
@@ -23,6 +24,21 @@ class IntervalUnionTests(unittest.TestCase):
         gaps = _IntervalUnion(); gaps.extend([Interval(11, 20), Interval(0, 10)] * 2000)
         self.assertEqual(tuple(gaps), (Interval(0, 10), Interval(11, 20)))
         self.assertLess(len(gaps._pending), 1024)
+
+    def test_materialize_once_and_allocate_only_extended_runs(self):
+        # Touching intervals coalesce, contained ones do not extend the run,
+        # and the one-base hole between 8 and 9 must survive serialization.
+        items = [Interval(9, 11), Interval(0, 4), Interval(3, 5),
+                 Interval(1, 2), Interval(5, 8), Interval(9, 11)]
+        expected = interval_rows(iter(items))
+        acc = _IntervalUnion()
+        acc.extend(items)
+        with patch("server.tools.lgz_core.q0_catalog.Interval", wraps=Interval) as allocate, \
+             patch("server.tools.lgz_core.q0_catalog.merged_intervals", side_effect=AssertionError):
+            self.assertEqual(interval_rows(acc), expected)
+            self.assertEqual(interval_rows(acc), [[0, 8], [9, 11]])
+            self.assertEqual(interval_rows(_IntervalUnion()), [])
+            allocate.assert_called_once_with(0, 8)
 
     def test_already_represented_intervals_do_not_reenter_the_sort_buffer(self):
         acc = _IntervalUnion(); acc.extend([Interval(0, 10000)] * 1024)
@@ -71,7 +87,12 @@ class IntervalUnionTests(unittest.TestCase):
             with self.subTest(mapqs=mapqs), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp); path = root / "runs/ds_vs_ref/result.paf"; path.parent.mkdir(parents=True)
                 path.write_text("".join(f"q\t100\t0\t100\t+\tchr\t200\t0\t100\t100\t100\t{mq}\tcg:Z:100M\n" for mq in mapqs))
-                catalog = build_catalog(root, {SourceKey("ds", "q"): "A" * 100}, {"chr": 200}, [])
+                progress = []
+                catalog = build_catalog(root, {SourceKey("ds", "q"): "A" * 100}, {"chr": 200}, [],
+                                        progress=progress.append)
+                self.assertIn("materializing candidates 0/1", progress[0])
+                self.assertIn("candidate rows ready 1/1", progress[-2])
+                self.assertIn("catalog ready; candidates=1", progress[-1])
                 row = catalog.payload["candidates"][0]
                 self.assertEqual(row["maximum_available_mapq"], maximum)
                 self.assertEqual(len(row["reference_evidence_ids"]), len(mapqs))

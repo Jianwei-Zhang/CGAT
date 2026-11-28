@@ -1,0 +1,25 @@
+#!/bin/bash
+#DSUB -n jm19_q0_issue_scope
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-46
+#DSUB -R "cpu=2,mem=16384MB"
+#DSUB -o scope_%J.out
+set -eo pipefail
+umask 077
+b="$HOME/cgat-reads-debug/jm19-compare-614589f-20261118"; run="$b/q0-request-ready.44e274a7"
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-issue-scope.XXXXXXXX); trap 'rm -rf -- "$w"' EXIT
+sha256sum --quiet -c kit.sha256
+cp "$run/latest.tgz" "$run/wheat_selection_checkpoint.py" "$w/"
+printf '%s  %s\n' 0f06edd183467d950cd99d5c11ca8ed23ff57aaeacce96a6580b7527573dac28 "$w/latest.tgz" ee15ca3032344729505abea30036c2799d8a06fb8d702db589d62de98a9445f4 "$w/wheat_selection_checkpoint.py" | sha256sum -c --quiet -
+tar -xzf "$w/latest.tgz" -C "$w"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 PYTHONPATH="$w/GPM2.0/server/tools:$w:$PWD"
+mkdir result
+python3 -Bu - "$b" "$PWD/result" <<'PY'
+import sys
+from pathlib import Path
+from wheat_dispatch_scope import questions_from_store, observed
+b,o=map(Path,sys.argv[1:]);questions_from_store(b,o);observed(b,o)
+PY
+sha256sum result/known.json

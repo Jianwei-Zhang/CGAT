@@ -1,0 +1,163 @@
+{
+  "formal_workspace_modified": false,
+  "loop_report_sha256": "bcab3dc094aee5deaa57dc3823039b705d1b4e7a818e4f2ad1606374c7ececad",
+  "mapper_calls": 0,
+  "results": {
+    "chain_10_locus_100000": {
+      "metrics": {
+        "gap_count": 70,
+        "gap_placeholder_bp": 7000,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 380690016,
+        "score": [
+          524473879,
+          -70,
+          -70,
+          -67,
+          -71,
+          220288873
+        ],
+        "slice_N50_bp": 63202776,
+        "slices": 71,
+        "source_bp": 524473879
+      },
+      "reference_order_flags": [],
+      "reopened_native_graph_and_path_verified": true,
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 253542694
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 316041910
+        }
+      }
+    },
+    "chain_10_locus_1000000": {
+      "metrics": {
+        "gap_count": 69,
+        "gap_placeholder_bp": 6900,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 354012519,
+        "score": [
+          496021180,
+          -69,
+          -69,
+          -66,
+          -70,
+          220288873
+        ],
+        "slice_N50_bp": 63202776,
+        "slices": 70,
+        "source_bp": 496021180
+      },
+      "reference_order_flags": [],
+      "reopened_native_graph_and_path_verified": true,
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 253542694
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 316041910
+        }
+      }
+    },
+    "chain_10_native_equivalence": {
+      "metrics": {
+        "gap_count": 58,
+        "gap_placeholder_bp": 5800,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 285705339,
+        "score": [
+          372696581,
+          -58,
+          -58,
+          -55,
+          -59,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 59,
+        "source_bp": 372696581
+      },
+      "reference_order_flags": [],
+      "reopened_native_graph_and_path_verified": true,
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 253542694
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 316041910
+        }
+      }
+    },
+    "same_admission_locus_100000": {
+      "metrics": {
+        "gap_count": 106,
+        "gap_placeholder_bp": 10600,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 344179178,
+        "score": [
+          429902619,
+          -106,
+          -106,
+          -105,
+          -107,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 107,
+        "source_bp": 429902619
+      },
+      "reference_order_flags": [],
+      "reopened_native_graph_and_path_verified": true,
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 222272638
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 246799488
+        }
+      }
+    },
+    "same_admission_locus_1000000": {
+      "metrics": {
+        "gap_count": 105,
+        "gap_placeholder_bp": 10500,
+        "max_slice_bp": 220288873,
+        "reference_union_bp": 341260656,
+        "score": [
+          424974313,
+          -105,
+          -105,
+          -104,
+          -106,
+          220288873
+        ],
+        "slice_N50_bp": 220288873,
+        "slices": 106,
+        "source_bp": 424974313
+      },
+      "reference_order_flags": [],
+      "reopened_native_graph_and_path_verified": true,
+      "risk": {
+        "conflict_flags": [],
+        "independent_biological_truth": false,
+        "reference_union_bp": {
+          "same_group_same_orientation": 222272638
+        },
+        "source_union_bp": {
+          "same_group_same_orientation": 246799488
+        }
+      }
+    }
+  },
+  "schema": "wheat_locus_loop_independent_audit_v1"
+}

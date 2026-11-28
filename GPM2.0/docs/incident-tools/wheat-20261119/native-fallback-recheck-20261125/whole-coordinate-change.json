@@ -1,0 +1,16 @@
+{
+  "after_is_bounded": true,
+  "after_questions_sha256": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "before_request_sha256": "f9229b186ff3587d6929cb8f6116e61f03086f9807b08c51af089d653032be77",
+  "both_sources": 2662,
+  "new_interval_bases": 14375932,
+  "new_only_interval_bases": 3361832,
+  "new_sources": 3755,
+  "old_interval_bases": 12751155,
+  "old_only_interval_bases": 1737055,
+  "old_sources": 3111,
+  "only_new_sources": 1093,
+  "only_old_sources": 449,
+  "same_source_coordinates": true,
+  "shared_interval_bases": 11014100
+}

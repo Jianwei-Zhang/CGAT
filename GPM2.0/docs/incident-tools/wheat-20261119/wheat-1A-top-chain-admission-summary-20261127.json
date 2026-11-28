@@ -1,0 +1,260 @@
+{
+  "elapsed_s": 80.05883800238371,
+  "formal_workspace_modified": false,
+  "full_report_owner": "q0-top-chain-locus-20261127.CTotPSFG",
+  "full_report_sha256": "0b872615ce554c1d357cc795720fe9c214d52e7fa0949d6c5fdb1522c948a581",
+  "mapper_calls": 0,
+  "maximum_single_foreign_group_support_over_main": 0.25,
+  "minimum_carried_support_fraction": 0.2,
+  "minimum_chain_bp": 500000,
+  "outputs": {
+    "top-chain-10-placements.jsonl.gz": "587aebf86f685ac0037b417f9c2c2dab4b78b04d8232ebddf31835e662883e07",
+    "top-chain-5-placements.jsonl.gz": "bd811e1449412e99b45abf2d1ab7de59de3015551ea9ed145490c86e6a6558d4"
+  },
+  "processed_sources": 16826,
+  "schema": "wheat_1A_top_chain_admission_v1",
+  "screened_cache_sha256": "9c4fbfeef67122e8ad827b436b400cb09e47fe53830b4305a4659eafcf82b2f6",
+  "source_highlights": [
+    {
+      "foreign_barrier_count": 0,
+      "foreign_cluster_count": 1513,
+      "key": [
+        "1A",
+        "+"
+      ],
+      "main_chain_bp": 31815631,
+      "regions": [
+        {
+          "accepted_ratios": [
+            "10",
+            "5"
+          ],
+          "high_mapq_bp": 31815631,
+          "interval": [
+            0,
+            63202776
+          ],
+          "main_bp": 31815631,
+          "max_foreign_chain_bp": 605174,
+          "max_foreign_group_support_bp": 1568283,
+          "strongest_competitors": [
+            {
+              "chain_bp": 605174,
+              "group": [
+                "1A",
+                "-"
+              ],
+              "group_support_bp": 610005
+            },
+            {
+              "chain_bp": 228439,
+              "group": [
+                "5A",
+                "+"
+              ],
+              "group_support_bp": 1478276
+            },
+            {
+              "chain_bp": 205165,
+              "group": [
+                "7A",
+                "-"
+              ],
+              "group_support_bp": 1370289
+            }
+          ]
+        }
+      ],
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_254"
+      ]
+    },
+    {
+      "foreign_barrier_count": 169,
+      "foreign_cluster_count": 1573,
+      "key": [
+        "1A",
+        "-"
+      ],
+      "main_chain_bp": 605174,
+      "regions": [
+        {
+          "accepted_ratios": [],
+          "high_mapq_bp": 605174,
+          "interval": [
+            10589091,
+            14121551
+          ],
+          "main_bp": 605174,
+          "max_foreign_chain_bp": 79240,
+          "max_foreign_group_support_bp": 167010,
+          "strongest_competitors": [
+            {
+              "chain_bp": 79240,
+              "group": [
+                "Un",
+                "-"
+              ],
+              "group_support_bp": 167010
+            },
+            {
+              "chain_bp": 60066,
+              "group": [
+                "5A",
+                "-"
+              ],
+              "group_support_bp": 160875
+            },
+            {
+              "chain_bp": 57270,
+              "group": [
+                "5A",
+                "+"
+              ],
+              "group_support_bp": 107747
+            }
+          ]
+        }
+      ],
+      "source": [
+        "JM19_flye_ABD",
+        "JM19flyeA_contig_254"
+      ]
+    },
+    {
+      "foreign_barrier_count": 197,
+      "foreign_cluster_count": 9011,
+      "key": [
+        "1A",
+        "+"
+      ],
+      "main_chain_bp": 618667,
+      "regions": [
+        {
+          "accepted_ratios": [],
+          "high_mapq_bp": 613270,
+          "interval": [
+            109393065,
+            185378396
+          ],
+          "main_bp": 617961,
+          "max_foreign_chain_bp": 23465217,
+          "max_foreign_group_support_bp": 23515029,
+          "strongest_competitors": [
+            {
+              "chain_bp": 23465217,
+              "group": [
+                "1A",
+                "-"
+              ],
+              "group_support_bp": 23515029
+            },
+            {
+              "chain_bp": 354288,
+              "group": [
+                "7A",
+                "+"
+              ],
+              "group_support_bp": 4335297
+            },
+            {
+              "chain_bp": 345861,
+              "group": [
+                "5A",
+                "-"
+              ],
+              "group_support_bp": 4009226
+            }
+          ]
+        }
+      ],
+      "source": [
+        "JM19_hifiasm",
+        "ptg000020l"
+      ]
+    },
+    {
+      "foreign_barrier_count": 0,
+      "foreign_cluster_count": 8773,
+      "key": [
+        "1A",
+        "-"
+      ],
+      "main_chain_bp": 144347139,
+      "regions": [
+        {
+          "accepted_ratios": [
+            "10",
+            "5"
+          ],
+          "high_mapq_bp": 144344241,
+          "interval": [
+            0,
+            263669096
+          ],
+          "main_bp": 144347139,
+          "max_foreign_chain_bp": 618667,
+          "max_foreign_group_support_bp": 9307346,
+          "strongest_competitors": [
+            {
+              "chain_bp": 618667,
+              "group": [
+                "1A",
+                "+"
+              ],
+              "group_support_bp": 1667862
+            },
+            {
+              "chain_bp": 508326,
+              "group": [
+                "7A",
+                "+"
+              ],
+              "group_support_bp": 9307346
+            },
+            {
+              "chain_bp": 502329,
+              "group": [
+                "5A",
+                "+"
+              ],
+              "group_support_bp": 9145701
+            }
+          ]
+        }
+      ],
+      "source": [
+        "JM19_hifiasm",
+        "ptg000020l"
+      ]
+    }
+  ],
+  "source_receipt_sha256": "638dbf33ea1ea2390bd6b432ee3b82bdefae16f2b4ecec7e6cfae130f9ec1478",
+  "variants": {
+    "10": {
+      "combined_reference_bp": 421658502,
+      "new_reference_bp": 59417831,
+      "old_q0_conflict_placements": [],
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 402032573
+      },
+      "placements": 61,
+      "reference_bp": 419939211,
+      "source_bp_sum": 1149357881,
+      "sources": 58
+    },
+    "5": {
+      "combined_reference_bp": 421665851,
+      "new_reference_bp": 59425180,
+      "old_q0_conflict_placements": [],
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 402032573
+      },
+      "placements": 62,
+      "reference_bp": 419946560,
+      "source_bp_sum": 1154405324,
+      "sources": 58
+    }
+  }
+}

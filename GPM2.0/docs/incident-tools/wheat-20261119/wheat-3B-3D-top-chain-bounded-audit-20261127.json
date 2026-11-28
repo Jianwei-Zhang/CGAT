@@ -1,0 +1,673 @@
+{
+  "schema": "wheat_43136372_bounded_result_audit_v1",
+  "job": "43136372",
+  "scheduler_state": "SUCCEEDED",
+  "start": "2026-11-27T01:05:30+08:00",
+  "end": "2026-11-27T01:51:53+08:00",
+  "elapsed_wall_s": 2783,
+  "report_sha256": "70efc3daf077fab950cbb2977b011130072aa3396feb44a074b2297ef8fec2ea",
+  "admission_sha256": "03e6423723b2fc92f1f2a6d2afe06ec5f2b7db568f78c90d823bd8b8ec9a7358",
+  "one_a_report_sha256": "bcab3dc094aee5deaa57dc3823039b705d1b4e7a818e4f2ad1606374c7ececad",
+  "old_q0_sha256": "cd9069e54e64cce94ba7d4790afd2c575d85ffc227722b04eca56bf6e04ea847",
+  "audit_scope": "Local artifact hashes, saved-path source metrics, old-Q0 source overlaps, three-group physical source occupancy, and archived chain-support summaries. No graph reconstruction or biological truth claim.",
+  "policies": {
+    "1000000": {
+      "groups": {
+        "1A": {
+          "metrics": {
+            "gap_count": 69,
+            "gap_placeholder_bp": 6900,
+            "max_slice_bp": 220288873,
+            "reference_union_bp": 354012519,
+            "score": [
+              496021180,
+              -69,
+              -69,
+              -66,
+              -70,
+              220288873
+            ],
+            "slice_N50_bp": 63202776,
+            "slices": 70,
+            "source_bp": 496021180
+          },
+          "risk": {
+            "conflict_flags": [],
+            "independent_biological_truth": false,
+            "reference_union_bp": {
+              "same_group_same_orientation": 253542694
+            },
+            "source_union_bp": {
+              "same_group_same_orientation": 316041910
+            }
+          },
+          "path_sha256": "fc53e58a42eb2dca471a018571b2dd346f070bf31ecf56179daa59fc3abe0aa1",
+          "reference_gain_vs_baseline_bp": 120113935,
+          "reference_loss_vs_baseline_bp": 743322
+        },
+        "3B": {
+          "metrics": {
+            "gap_count": 98,
+            "gap_placeholder_bp": 9800,
+            "max_slice_bp": 56415588,
+            "reference_union_bp": 633784741,
+            "score": [
+              768980082,
+              -98,
+              -98,
+              -91,
+              -99,
+              56415588
+            ],
+            "slice_N50_bp": 17842876,
+            "slices": 99,
+            "source_bp": 768980082
+          },
+          "risk": {
+            "conflict_flags": [
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-708de4f3941710d5b6eec88d",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000449l"
+                ],
+                "source_bp": 936974
+              },
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-af07ed6d0d75e0487ea0da87",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000508l"
+                ],
+                "source_bp": 643821
+              },
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-4fa985dfece27519eba15472",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000447l"
+                ],
+                "source_bp": 1438860
+              }
+            ],
+            "independent_biological_truth": false,
+            "reference_union_bp": {
+              "same_group_opposite_orientation": 2192434,
+              "same_group_same_orientation": 551149892
+            },
+            "source_union_bp": {
+              "same_group_opposite_orientation": 3019655,
+              "same_group_same_orientation": 666453063
+            }
+          },
+          "path_sha256": "5ae7aa1f1eeb62e09713c4cc4d43ccd64a155608a89a019103366221228b31d2",
+          "reference_gain_vs_baseline_bp": 495796857,
+          "reference_loss_vs_baseline_bp": 10440993,
+          "frozen_metrics": {
+            "gap_count": 217,
+            "gap_placeholder_bp": 21700,
+            "max_slice_bp": 22945670,
+            "reference_union_bp": 148428877,
+            "score": [
+              160299658,
+              -217,
+              -217,
+              -223,
+              -225,
+              22945670
+            ],
+            "slice_N50_bp": 15667328,
+            "slices": 225,
+            "source_bp": 160299658
+          }
+        },
+        "3D": {
+          "metrics": {
+            "gap_count": 59,
+            "gap_placeholder_bp": 5900,
+            "max_slice_bp": 68660094,
+            "reference_union_bp": 515020421,
+            "score": [
+              577062079,
+              -59,
+              -59,
+              -53,
+              -60,
+              68660094
+            ],
+            "slice_N50_bp": 30037343,
+            "slices": 60,
+            "source_bp": 577062079
+          },
+          "risk": {
+            "conflict_flags": [
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-069ae528a25b8d2307924cf8",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000664l"
+                ],
+                "source_bp": 965672
+              }
+            ],
+            "independent_biological_truth": false,
+            "reference_union_bp": {
+              "same_group_opposite_orientation": 915206,
+              "same_group_same_orientation": 251583956
+            },
+            "source_union_bp": {
+              "same_group_opposite_orientation": 965672,
+              "same_group_same_orientation": 296948774
+            }
+          },
+          "path_sha256": "c4bc50452fb0cb566045b3a4561fb86a7eabfc8bc05951e79bd89e161320e59e",
+          "reference_gain_vs_baseline_bp": 421153661,
+          "reference_loss_vs_baseline_bp": 1767752,
+          "frozen_metrics": {
+            "gap_count": 101,
+            "gap_placeholder_bp": 10100,
+            "max_slice_bp": 66039582,
+            "reference_union_bp": 95634512,
+            "score": [
+              100416624,
+              -101,
+              -101,
+              -106,
+              -108,
+              66039582
+            ],
+            "slice_N50_bp": 66039582,
+            "slices": 108,
+            "source_bp": 100416624
+          }
+        }
+      },
+      "independently_recounted_cross_group_source_conflicts": [],
+      "totals": {
+        "source_bp": 1842063341,
+        "reference_union_bp": 1502817681,
+        "slices": 229
+      },
+      "sealed_policy_gate_passed": false
+    },
+    "100000": {
+      "groups": {
+        "1A": {
+          "metrics": {
+            "gap_count": 70,
+            "gap_placeholder_bp": 7000,
+            "max_slice_bp": 220288873,
+            "reference_union_bp": 380690016,
+            "score": [
+              524473879,
+              -70,
+              -70,
+              -67,
+              -71,
+              220288873
+            ],
+            "slice_N50_bp": 63202776,
+            "slices": 71,
+            "source_bp": 524473879
+          },
+          "risk": {
+            "conflict_flags": [],
+            "independent_biological_truth": false,
+            "reference_union_bp": {
+              "same_group_same_orientation": 253542694
+            },
+            "source_union_bp": {
+              "same_group_same_orientation": 316041910
+            }
+          },
+          "path_sha256": "d596437335b18223c2aec78d0470ba64bcf70376d51b375bef90fcc5ba4119c5",
+          "reference_gain_vs_baseline_bp": 146791432,
+          "reference_loss_vs_baseline_bp": 743322
+        },
+        "3B": {
+          "metrics": {
+            "gap_count": 100,
+            "gap_placeholder_bp": 10000,
+            "max_slice_bp": 56415588,
+            "reference_union_bp": 642487432,
+            "score": [
+              778206162,
+              -100,
+              -100,
+              -93,
+              -101,
+              56415588
+            ],
+            "slice_N50_bp": 17631120,
+            "slices": 101,
+            "source_bp": 778206162
+          },
+          "risk": {
+            "conflict_flags": [
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-708de4f3941710d5b6eec88d",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000449l"
+                ],
+                "source_bp": 936974
+              },
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-af07ed6d0d75e0487ea0da87",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000508l"
+                ],
+                "source_bp": 643821
+              },
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-4fa985dfece27519eba15472",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000447l"
+                ],
+                "source_bp": 1438860
+              }
+            ],
+            "independent_biological_truth": false,
+            "reference_union_bp": {
+              "same_group_opposite_orientation": 2192434,
+              "same_group_same_orientation": 557546611
+            },
+            "source_union_bp": {
+              "same_group_opposite_orientation": 3019655,
+              "same_group_same_orientation": 673129615
+            }
+          },
+          "path_sha256": "10ad759fb8e99511eaae757a56fc270880bfd005af645885f9fbe2aa0c642f70",
+          "reference_gain_vs_baseline_bp": 495796857,
+          "reference_loss_vs_baseline_bp": 1738302,
+          "frozen_metrics": {
+            "gap_count": 217,
+            "gap_placeholder_bp": 21700,
+            "max_slice_bp": 22945670,
+            "reference_union_bp": 148428877,
+            "score": [
+              160299658,
+              -217,
+              -217,
+              -223,
+              -225,
+              22945670
+            ],
+            "slice_N50_bp": 15667328,
+            "slices": 225,
+            "source_bp": 160299658
+          }
+        },
+        "3D": {
+          "metrics": {
+            "gap_count": 60,
+            "gap_placeholder_bp": 6000,
+            "max_slice_bp": 68660094,
+            "reference_union_bp": 516443728,
+            "score": [
+              578919898,
+              -60,
+              -60,
+              -54,
+              -61,
+              68660094
+            ],
+            "slice_N50_bp": 30037343,
+            "slices": 61,
+            "source_bp": 578919898
+          },
+          "risk": {
+            "conflict_flags": [
+              {
+                "category": "same_group_opposite_orientation",
+                "placement_id": "q0-placement-069ae528a25b8d2307924cf8",
+                "source": [
+                  "JM19_hifiasm",
+                  "ptg000664l"
+                ],
+                "source_bp": 965672
+              }
+            ],
+            "independent_biological_truth": false,
+            "reference_union_bp": {
+              "same_group_opposite_orientation": 915206,
+              "same_group_same_orientation": 251583956
+            },
+            "source_union_bp": {
+              "same_group_opposite_orientation": 965672,
+              "same_group_same_orientation": 296948774
+            }
+          },
+          "path_sha256": "a522de1b5ef8a26898071d0ccbf09bbcd0a13687a72d6b6948d4c068b01dfe3c",
+          "reference_gain_vs_baseline_bp": 421153661,
+          "reference_loss_vs_baseline_bp": 344445,
+          "frozen_metrics": {
+            "gap_count": 101,
+            "gap_placeholder_bp": 10100,
+            "max_slice_bp": 66039582,
+            "reference_union_bp": 95634512,
+            "score": [
+              100416624,
+              -101,
+              -101,
+              -106,
+              -108,
+              66039582
+            ],
+            "slice_N50_bp": 66039582,
+            "slices": 108,
+            "source_bp": 100416624
+          }
+        }
+      },
+      "independently_recounted_cross_group_source_conflicts": [],
+      "totals": {
+        "source_bp": 1881599939,
+        "reference_union_bp": 1539621176,
+        "slices": 233
+      },
+      "sealed_policy_gate_passed": false
+    }
+  },
+  "selected_orientation_conflicts": [
+    {
+      "source": [
+        "JM19_hifiasm",
+        "ptg000449l"
+      ],
+      "placement_id": "q0-placement-708de4f3941710d5b6eec88d",
+      "category": "same_group_opposite_orientation",
+      "source_bp": 936974,
+      "group": "3B",
+      "new_orientation": "-",
+      "source_interval_0based_halfopen": [
+        0,
+        936974
+      ],
+      "old_source_records": [
+        {
+          "interval": [
+            0,
+            18267482
+          ],
+          "group": "3B",
+          "orientation": "+"
+        }
+      ],
+      "reference_hull": [
+        131932166,
+        132871655
+      ],
+      "local_chain": {
+        "accepted_ratios": [
+          "10"
+        ],
+        "high_mapq_bp": 910992,
+        "interval": [
+          0,
+          936974
+        ],
+        "main_bp": 910992,
+        "max_foreign_chain_bp": 1095,
+        "max_foreign_group_support_bp": 1625
+      },
+      "same_group_old_orientation_competitor": {
+        "chain_bp": 0,
+        "group": [
+          "3B",
+          "+"
+        ],
+        "group_support_bp": 0
+      },
+      "interpretation": "Reference-supported local orientation change versus an old whole-contig orientation; not a cross-chromosome placement. Not independent evidence that splitting/reorienting this source interval is biologically safe."
+    },
+    {
+      "source": [
+        "JM19_hifiasm",
+        "ptg000508l"
+      ],
+      "placement_id": "q0-placement-af07ed6d0d75e0487ea0da87",
+      "category": "same_group_opposite_orientation",
+      "source_bp": 643821,
+      "group": "3B",
+      "new_orientation": "+",
+      "source_interval_0based_halfopen": [
+        0,
+        643821
+      ],
+      "old_source_records": [
+        {
+          "interval": [
+            0,
+            12141523
+          ],
+          "group": "3B",
+          "orientation": "-"
+        }
+      ],
+      "reference_hull": [
+        710638587,
+        711275045
+      ],
+      "local_chain": {
+        "accepted_ratios": [
+          "10"
+        ],
+        "high_mapq_bp": 579207,
+        "interval": [
+          0,
+          643821
+        ],
+        "main_bp": 579207,
+        "max_foreign_chain_bp": 8118,
+        "max_foreign_group_support_bp": 10752
+      },
+      "same_group_old_orientation_competitor": {
+        "chain_bp": 0,
+        "group": [
+          "3B",
+          "-"
+        ],
+        "group_support_bp": 0
+      },
+      "interpretation": "Reference-supported local orientation change versus an old whole-contig orientation; not a cross-chromosome placement. Not independent evidence that splitting/reorienting this source interval is biologically safe."
+    },
+    {
+      "source": [
+        "JM19_hifiasm",
+        "ptg000447l"
+      ],
+      "placement_id": "q0-placement-4fa985dfece27519eba15472",
+      "category": "same_group_opposite_orientation",
+      "source_bp": 1438860,
+      "group": "3B",
+      "new_orientation": "-",
+      "source_interval_0based_halfopen": [
+        1671755,
+        3110615
+      ],
+      "old_source_records": [
+        {
+          "interval": [
+            0,
+            10268428
+          ],
+          "group": "3B",
+          "orientation": "+"
+        }
+      ],
+      "reference_hull": [
+        763796174,
+        764542033
+      ],
+      "local_chain": {
+        "accepted_ratios": [
+          "10"
+        ],
+        "high_mapq_bp": 702235,
+        "interval": [
+          1671755,
+          3110615
+        ],
+        "main_bp": 702235,
+        "max_foreign_chain_bp": 29809,
+        "max_foreign_group_support_bp": 29809
+      },
+      "same_group_old_orientation_competitor": {
+        "chain_bp": 29809,
+        "group": [
+          "3B",
+          "+"
+        ],
+        "group_support_bp": 29809
+      },
+      "interpretation": "Reference-supported local orientation change versus an old whole-contig orientation; not a cross-chromosome placement. Not independent evidence that splitting/reorienting this source interval is biologically safe."
+    },
+    {
+      "source": [
+        "JM19_hifiasm",
+        "ptg000664l"
+      ],
+      "placement_id": "q0-placement-069ae528a25b8d2307924cf8",
+      "category": "same_group_opposite_orientation",
+      "source_bp": 965672,
+      "group": "3D",
+      "new_orientation": "+",
+      "source_interval_0based_halfopen": [
+        3517093,
+        4482765
+      ],
+      "old_source_records": [
+        {
+          "interval": [
+            0,
+            6127475
+          ],
+          "group": "3D",
+          "orientation": "-"
+        }
+      ],
+      "reference_hull": [
+        581929911,
+        582897811
+      ],
+      "local_chain": {
+        "accepted_ratios": [
+          "10"
+        ],
+        "high_mapq_bp": 915206,
+        "interval": [
+          3517093,
+          4482765
+        ],
+        "main_bp": 915206,
+        "max_foreign_chain_bp": 1779,
+        "max_foreign_group_support_bp": 2145
+      },
+      "same_group_old_orientation_competitor": {
+        "chain_bp": 0,
+        "group": [
+          "3D",
+          "-"
+        ],
+        "group_support_bp": 0
+      },
+      "interpretation": "Reference-supported local orientation change versus an old whole-contig orientation; not a cross-chromosome placement. Not independent evidence that splitting/reorienting this source interval is biologically safe."
+    }
+  ],
+  "admission_summary": {
+    "3B": {
+      "reference_length": 830829764,
+      "qualified_reference_bp": 710218910,
+      "outputs": {
+        "continuous75": {
+          "file": "3B-continuous75-placements.jsonl.gz",
+          "old_q0_conflict_placements": [],
+          "old_q0_reference_bp": {
+            "same_group_same_orientation": 589520986
+          },
+          "placements": 192,
+          "reference_bp": 648905557,
+          "sha256": "5310d199eb99311212e72304eaea8a5c1fdf9237ff2a4146e7e2bdb78033b981"
+        },
+        "top10": {
+          "file": "3B-top10-placements.jsonl.gz",
+          "old_q0_conflict_placements": [
+            "q0-placement-f46c59f62b26c3223a4d3570",
+            "q0-placement-a162b189550bd25201d7aef8",
+            "q0-placement-4fa985dfece27519eba15472",
+            "q0-placement-708de4f3941710d5b6eec88d",
+            "q0-placement-d491b0060279e0ac0c740626",
+            "q0-placement-ae04ca2ab39f43eed85a214d",
+            "q0-placement-af07ed6d0d75e0487ea0da87",
+            "q0-placement-53b5e12dcba0e9b9bb2bebc9",
+            "q0-placement-09dd121d0bd7b02524d2abb0",
+            "q0-placement-5e4a4ee4f74c42da7b00a384",
+            "q0-placement-6743f06fd2b655f0264a813c"
+          ],
+          "old_q0_reference_bp": {
+            "same_group_opposite_orientation": 11179091,
+            "same_group_same_orientation": 655499341
+          },
+          "placements": 221,
+          "reference_bp": 684054737,
+          "sha256": "9e67e4926bda094c3f4cb20e621b181185eb0266fad42a7b2aec5a799825b6e1"
+        }
+      }
+    },
+    "3D": {
+      "reference_length": 615552423,
+      "qualified_reference_bp": 574113610,
+      "outputs": {
+        "continuous75": {
+          "file": "3D-continuous75-placements.jsonl.gz",
+          "old_q0_conflict_placements": [],
+          "old_q0_reference_bp": {
+            "same_group_same_orientation": 279893339
+          },
+          "placements": 95,
+          "reference_bp": 533171594,
+          "sha256": "cc7ed456c021144132c452f5f179e4c9cc34e8ca58afc490d86825d5128427f5"
+        },
+        "top10": {
+          "file": "3D-top10-placements.jsonl.gz",
+          "old_q0_conflict_placements": [
+            "q0-placement-ba64e333c1fc8182089daddf",
+            "q0-placement-afdd6df2d4beaafd7cf77527",
+            "q0-placement-70afb929b2d7abdb956992d3",
+            "q0-placement-069ae528a25b8d2307924cf8"
+          ],
+          "old_q0_reference_bp": {
+            "same_group_opposite_orientation": 3168107,
+            "same_group_same_orientation": 278251925
+          },
+          "placements": 104,
+          "reference_bp": 566220800,
+          "sha256": "2f7636b5a1060f37a6ce19eae86d3894bd48d7aa67c31560b5ede7dca324b3a7"
+        }
+      }
+    }
+  },
+  "100kb_minus_1Mb": {
+    "source_bp": 39536598,
+    "reference_union_bp": 36803495,
+    "slices": 4
+  },
+  "decision": {
+    "preferred_candidate_padding_bp": 100000,
+    "production_default_finalized": false,
+    "production_integration_started": false,
+    "whole_wheat_22_group_validation_started": false,
+    "formal_q0_lgz": "HOLD",
+    "reason": "Both sealed scientific gates are false: 3B/3D admission orientation conflicts and four selected local orientation changes remain unresolved. Preserve flags; do not equate scheduler success with scientific acceptance. 100kb improves coverage with four more slices across three groups and no extra observed conflict or source reuse."
+  }
+}

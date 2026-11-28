@@ -1,0 +1,28 @@
+{
+  "all_planned_4D_queries": 754,
+  "demand_sources": 181,
+  "demand_spans": 300,
+  "fallback_parents": 0,
+  "group": "4D",
+  "mapper_calls_during_audit": 0,
+  "matching_original_raw_status": {
+    "verified": 447
+  },
+  "plan_sha256": "0c7e45935500147f51fe5616f73d6dff44a93af12d0a3b1853199b72d836ef73",
+  "prior_inventory_sha256": "3f4832fa0253841e5674cda0358f4344f514b4f9cab648a5e368fb8c60c7e794",
+  "query_members": 766,
+  "raw_bytes_verified": 77079066,
+  "raw_rows_verified": 249359,
+  "requested_by_axis_before_parent_fallback": {
+    "neither": 307,
+    "query": 67,
+    "target_only": 380
+  },
+  "scope": "All 754 original partial-plan windows with a query in the frozen 4D group and its first questions. Includes target contexts outside 4D. Does not include other query groups pointing into 4D, subsequent questions, native or repair tasks. Missing regional receipts are not negative alignments. No formal Q0 published.",
+  "scope_after_parent_rule": {
+    "neither": 307,
+    "observed_touched": 176,
+    "reconstructed_touched": 271
+  },
+  "selected_regions": 447
+}

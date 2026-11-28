@@ -1,0 +1,113 @@
+{
+  "schema": "wheat_one_group_search_replay_v1",
+  "group": "1A",
+  "summary": "d23a49af479b6c9b81916518e8034d4044ea31b5c97229c5d0ce1624138fc9d4",
+  "baseline_full_path_equal": true,
+  "admitted": 383,
+  "pair_links": 62248,
+  "results": {
+    "baseline": {
+      "seconds": 62.452,
+      "function_sha256": "e14d33bb3b24a5c3beae3ff010f4d31933c204d19a74196cd59f9d53e66badf8",
+      "metrics": {
+        "source_bp": 48574190,
+        "reference_union_bp": 42204808,
+        "slices": 154,
+        "gap_count": 146,
+        "gap_placeholder_bp": 14600,
+        "score": [
+          48574190,
+          -146,
+          -146,
+          -153,
+          -154,
+          35145537
+        ]
+      },
+      "logs": [
+        "ranking complete: evaluations=20000 local_rounds=2 search_s=62.20"
+      ],
+      "full_coverage_gate_passed": true,
+      "net_reference_bp_vs_baseline": 0,
+      "net_source_bp_vs_baseline": 0,
+      "added_placements": 0,
+      "removed_placements": 0,
+      "shared_orientation_changes": 0,
+      "shared_slice_changes": 0
+    },
+    "reference_first": {
+      "seconds": 51.857,
+      "function_sha256": "e563917e358b8bc853f7fddd9146d958b3cdb8e7d14aa402f4fbaf19f5abc8d1",
+      "metrics": {
+        "source_bp": 48726389,
+        "reference_union_bp": 42269722,
+        "slices": 161,
+        "gap_count": 153,
+        "gap_placeholder_bp": 15300,
+        "score": [
+          48726389,
+          -153,
+          -153,
+          -160,
+          -161,
+          35145537
+        ]
+      },
+      "logs": [
+        "ranking complete: evaluations=20000 local_rounds=2 search_s=51.63"
+      ],
+      "full_coverage_gate_passed": true,
+      "net_reference_bp_vs_baseline": 64914,
+      "net_source_bp_vs_baseline": 152199,
+      "added_placements": 7,
+      "removed_placements": 0,
+      "shared_orientation_changes": 0,
+      "shared_slice_changes": 0,
+      "fraction_of_unselected_reference_recovered": 0.0007464971076888259
+    },
+    "reference_first_balanced_budget": {
+      "seconds": 25.264,
+      "function_sha256": "73f69d4cbbc645ee90be1820cd6006823fbde2438cb07eb649119e5d88ec63cb",
+      "metrics": {
+        "source_bp": 48721199,
+        "reference_union_bp": 42264564,
+        "slices": 153,
+        "gap_count": 145,
+        "gap_placeholder_bp": 14500,
+        "score": [
+          48721199,
+          -145,
+          -145,
+          -152,
+          -153,
+          35145537
+        ]
+      },
+      "logs": [
+        "ranking complete: evaluations=15205 local_rounds=1 search_s=25.21"
+      ],
+      "full_coverage_gate_passed": true,
+      "net_reference_bp_vs_baseline": 59756,
+      "net_source_bp_vs_baseline": 147009,
+      "added_placements": 7,
+      "removed_placements": 8,
+      "shared_orientation_changes": 0,
+      "shared_slice_changes": 0
+    }
+  },
+  "mapper_calls": 0,
+  "formal_workspace_modified": false,
+  "scope": "One frozen group, same admitted evidence and scientific gates, total evaluation cap unchanged at 20000. Variant speed is not an unbiased benchmark due to reused graph caches. No whole-wheat or formal acceptance claim.",
+  "full_report_sha256": "73515133fd1935ad092f0cb179d173f7c941d8341d304abcefb7d0e8d6e51fc0",
+  "full_report_remote": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-two-funnels-20261126.0Pop2292/replay.json",
+  "admitted_reference_union_bp": 129162948,
+  "reference_chr_bp": 594102056,
+  "job_id": "43099137",
+  "interpretation": "Reference-slot priority recovers only 64914 reference bp on 1A (0.1538% of baseline). The same-cap diagnostic budget variant does not recover more. This confirms a limited effect in this group, not global root cause attribution or general irrelevance of search budgets.",
+  "scheduler": {
+    "state": "SUCCEEDED",
+    "start": "2026-11-26T20:22:14+08:00",
+    "end": "2026-11-26T20:29:11+08:00",
+    "elapsed_s": 417
+  }
+}

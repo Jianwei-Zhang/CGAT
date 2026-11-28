@@ -1,0 +1,40 @@
+{
+  "status": "selection_reuse_installed_and_one_original_parent_verified",
+  "transition_sha256": "5b7408fc2337cf00b92cec23fe0b322c349b6312f50440246c99ec506ae6aec0",
+  "source_revision": "7c7a12b770cea16c1bd72fd9ebf1b34f1597527f",
+  "checkpoint_files_unchanged": 25,
+  "protected_control_files_unchanged": true,
+  "representative_parent": {
+    "checkpoint_sha256": "37445000d0519340444c94cfd6b06a64f16219a3c3b0918ab65ee9d5407d0ebe",
+    "input_fingerprint": "a4d82425d79412b3df035878317147dc9af9e7c07fc60046c8d17c5bb98dbbd1",
+    "unit_id": "q0_chr:Un"
+  },
+  "all_25_parent_payloads_revalidated": false,
+  "formal_main_started": false,
+  "mapper_calls": 0,
+  "full_draft_job_untouched": 43084475,
+  "comparison_job_untouched": 43086929,
+  "reader_declaration_sha256": "2e4a40ceb412b12b1ac9b7b583dd7cf4494730c56ce4749e01eeea0003a344d8",
+  "installation_receipt_sha256": "8a8ae2c1c4c693e72ae0019d78b2fb65bff25a6decd1e0321c1a2b456c5330f2",
+  "schema": "wheat_q0_selection_reuse_install_closure_v1",
+  "job_id": 43098569,
+  "job_state": "SUCCEEDED",
+  "started_cst": "2026-11-26 16:50:08",
+  "ended_cst": "2026-11-26 16:54:41",
+  "owner": "/share/home/xbzhang26/cgat-reads-debug/jm19-compare-614589f-20261118/q0-selection-reuse-20261126.DjPxKFgH",
+  "engine_commit": "a294e3ef451a30a78580504a6aa65f22eb1f5d76",
+  "verified_downloads": {
+    "candidate-prepared.json": "6b6b82c8987f1bc1df5e05f4cba86c36c13e386e0d79bd8da710af9c2708aae8",
+    "transition.json": "5b7408fc2337cf00b92cec23fe0b322c349b6312f50440246c99ec506ae6aec0",
+    "entry-repair.json": "1b4e8ad8b089b0db6b0f4fd6358bc94468834c00ac8a3a69f6c44cfc18f07170",
+    "install-only.json": "a30df2139f1922bb3a3cbf9f940870ab8f990dbeb3afa2715cc07ecf69cbd96e",
+    "installed-reader.json": "2e4a40ceb412b12b1ac9b7b583dd7cf4494730c56ce4749e01eeea0003a344d8",
+    "validation-selected.json": "d4e9f5d3036f4cf2810dc9433b7344f129f20c203a904229533658d84c64183b",
+    "installation/receipt.json": "8a8ae2c1c4c693e72ae0019d78b2fb65bff25a6decd1e0321c1a2b456c5330f2",
+    "control-before.json": "9cf5194224ddffc0d11532fd551c01158f962ade12ed5b4a489b3ea79b5ae85e",
+    "kit.sha256": "84467fb6c33c4c8b1cc577ab4ca23ee2db635a9bd5896d0783c724268c3a347e",
+    "source-revision.txt": "d7e453266eaebe5fe0e405656ebb68210e985ae6b9d5abc40b2f0cb2288328b4"
+  },
+  "policy_changes_this_install": false,
+  "preparation_retry": "Initial shell redirect created the reserved empty report pathname; preparation refused before workspace writes. Empty log was renamed and existing source manifest prepared once successfully. No installation was repeated."
+}

@@ -1,0 +1,21 @@
+#!/bin/bash
+#DSUB -n jm19_q0_continuity_install
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-45
+#DSUB -R "cpu=1,mem=4096MB"
+#DSUB -o install_entry_%J.out
+set -eo pipefail
+umask 077
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 PYTHONFAULTHANDLER=1
+set -u
+sha256sum --quiet -c kit.sha256
+owner=$PWD; work="$(dirname "$owner")/gpm_server"
+python3 -Bu check_wheat_continuity_install.py before
+python3 -Bu resume_q0_science.py --transition "$owner/transition.json" --install-runtime --install-only
+cp "$work/metadata/incident_q0_routing_reader.json" installed-reader.json
+# The installer already generated and sealed the actual declaration; no second scan.
+python3 -Bu resume_q0_science.py --transition "$owner/transition.json" --validate-only --validate-unit q0_chr:Un
+python3 -Bu check_wheat_continuity_install.py after
+sha256sum entry-repair.json install-only.json installed-reader.json validation-selected.json installation/receipt.json

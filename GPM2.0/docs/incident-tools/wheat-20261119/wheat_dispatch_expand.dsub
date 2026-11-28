@@ -1,0 +1,19 @@
+#!/bin/bash
+#DSUB -n jm19_q0_scope_plan
+#DSUB -q x86
+#DSUB -nl agent-X86-46
+#DSUB -aa
+#DSUB -R "cpu=32,mem=180224MB"
+#DSUB -o plan_%J.out
+set -eo pipefail
+umask 077
+run=$(dirname "$PWD"); b=$(dirname "$run"); h="$b/q0-bound-first-demand.8xpsAJ"
+sha256sum --quiet -c kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-plan-kit.XXXXXXXX); trap 'rm -rf -- "$w"' EXIT
+mkdir "$w/helpers"; archive="$b/q0-latest-fork-20261123-1435/runtime.tar.gz"
+printf '%s  %s\n' 9d180274e7eaebb40a301a3bc886d0245a689b12dded4b52e080d805ea77dd65 "$archive" 9d0971e43033a2be9124a7956cfa41a9832c3c9d760f2768701e5090c5f7300d "$h/controls.sha256" | sha256sum -c --quiet -
+while read -r pin name; do case "$name" in *.py) cp "$h/$name" "$w/helpers/$name"; printf '%s  %s\n' "$pin" "$w/helpers/$name"|sha256sum -c --quiet -;; esac;done < "$h/controls.sha256"
+tar -xzf "$archive" -C "$w"
+export PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$w/GPM2.0/server/tools:$w/helpers"
+python3 -Bu wheat_dispatch_expand.py "$b" "$run" 24

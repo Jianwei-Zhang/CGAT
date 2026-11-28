@@ -1,0 +1,43 @@
+{
+  "candidate": {
+    "archive": "q0-formal-placement-budget.Q7M6PYWa/tools.tgz",
+    "archive_sha256": "d01fb9b2fc0b5c81a2c3a471368936d6fa4efe392d56f428fffc622f6c081b04",
+    "installed_by_this_probe": false,
+    "native_frontier_sha256": "3675a877d4df4e7020adc19ae79993546a3a70562662f3cac8d0499c600e94c3",
+    "selector": "q0-selector-bf7f797e301335e1e641552b",
+    "server_revision": "4cbd93ba18c0c0502f5049ea6968a79ffbb60cf9",
+    "target_scope": "positive_threshold"
+  },
+  "checked_at": "2026-11-26T14:59:23+0800",
+  "legacy": {
+    "accepts_supplement_scope": false,
+    "bound_scope": null,
+    "installed_builder_sha256": "7deccbe47d3c71de6bddd41112718b9f260dabb37050530e39803e29b1bf9ab9",
+    "launcher": "gpm_server/prepare_q0_evidence.sh",
+    "launcher_sha256": "172785e098202f1c5f0027eec7de2b7368e8d710074520fc7bcfaa36a37f196f",
+    "missing_candidate_components_checked": [
+      "lgz_core/q0_native_frontier.py",
+      "lgz_core/q0_retained_hits.py",
+      "lgz_core/q0_threshold_acceptance.py",
+      "lgz_core/q0_threshold_prepare.py",
+      "workspace_layout.py"
+    ],
+    "native_candidate_cache_only_default": false,
+    "native_candidate_call_sets_cache_only": false,
+    "output_markers": {
+      "grt/q/q0.fa": false,
+      "metadata/grt_q0_evidence.json": false
+    },
+    "transition": "q0-child-loader-cutover-20261122-180258/transition.json",
+    "transition_sha256": "95c2b13113ee94f7f4fb6fe17d484c5797163a0115a72a862a38e6ca7e2fe497"
+  },
+  "next_gates": [
+    "Verify sealed 22-group comparison and actual evidence-use report; review changed cuts and joins.",
+    "Bind a separately approved formal launch to the routed parent scientific checkpoints, the candidate runtime and its positive_threshold contract; do not reuse the old launcher or substitute a winning-path checkpoint for formal evidence.",
+    "Use matching warm regional tasks only; preserve real gaps and the final ordinary audit."
+  ],
+  "schema": "wheat_formal_launcher_preflight_v1",
+  "scope": "Read-only signature, call-path and marker checks on the original shared source workspace; not a scheduler authorization, data validation of all parent checkpoints, candidate installation, or final Q0 receipt.",
+  "source_workspace": "gpm_server",
+  "status": "retired_launcher_ineligible_no_formal_submission"
+}

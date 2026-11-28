@@ -1,0 +1,130 @@
+{
+  "distinct_regional_target_questions": {
+    "unproven_join": 69,
+    "weak_placement": 13
+  },
+  "distinct_trigger_target_questions": {
+    "unproven_join": 46,
+    "weak_placement": 8
+  },
+  "frame_manifest": "f2a2c95745193581ec0144a90ba77c3fd82153c7856baba59bc65c324f673b54",
+  "frame_shards": {
+    "planned-0212.json.gz": "76ba178c7928ea8ad8146389cacc6f0ab3fa93f3909f7419b8597bbc67effe13",
+    "planned-0384.json.gz": "e07ad33b2316ecbbb205f87da36cfc3558f8a1d153fba3a61887415138fd52bf"
+  },
+  "issue_sha256": "1a7d9f53498e6376ef93d800b2b8346dd3e593e04f2825cc2e2022673d3f83a5",
+  "mapper_starts": 0,
+  "native_source_scope": "14bbc01fad3743cdfdfb3ff4c6009d92caeb928c4b9291e156bac9aa827961d9",
+  "parents": [
+    {
+      "all_parent_direct_questions": 0,
+      "historical_windows": 5,
+      "query_side_may_directly_witness_frozen_join": false,
+      "source": "JM19flyeA_contig_4549",
+      "source_part": "q0-source-part-865ba1fbce846067c7ffff38",
+      "source_rank": 20089,
+      "target_only_questions": {
+        "unproven_join": 26,
+        "weak_placement": 6
+      },
+      "triggers": [
+        {
+          "end": 210434,
+          "query": "q0-query-window-91b19531b6b06fe8a1a52692",
+          "reason": "regional_target_budget",
+          "start": 90434,
+          "target_only_questions": {
+            "unproven_join": 21,
+            "weak_placement": 5
+          }
+        }
+      ],
+      "weak_placement_ids": [
+        [
+          "1B",
+          "q0-placement-9ebd8254ba33213b892015ad"
+        ],
+        [
+          "2D",
+          "q0-placement-db2a644023660bea69768fad"
+        ],
+        [
+          "3B",
+          "q0-placement-e3187ccba2ada864ae41bfd8"
+        ],
+        [
+          "4B",
+          "q0-placement-12f8904404e656a96ed1a9f1"
+        ],
+        [
+          "7A",
+          "q0-placement-074e9f5a3c919b3f18f01dc7"
+        ],
+        [
+          "Un",
+          "q0-placement-3ac1f77d4d6d1268e4cc1d7f"
+        ]
+      ]
+    },
+    {
+      "all_parent_direct_questions": 0,
+      "historical_windows": 8,
+      "query_side_may_directly_witness_frozen_join": false,
+      "source": "ptg000010l",
+      "source_part": "q0-source-part-9bf9376cf15b64235817ff09",
+      "source_rank": 23309,
+      "target_only_questions": {
+        "unproven_join": 46,
+        "weak_placement": 8
+      },
+      "triggers": [
+        {
+          "end": 74174386,
+          "query": "q0-query-window-d5061acaaeff86bed61305ae",
+          "reason": "regional_target_budget",
+          "start": 74054386,
+          "target_only_questions": {
+            "unproven_join": 28,
+            "weak_placement": 4
+          }
+        }
+      ],
+      "weak_placement_ids": [
+        [
+          "3B",
+          "q0-placement-13aaa5a9933eb4d2531ffb45"
+        ],
+        [
+          "4B",
+          "q0-placement-12f8904404e656a96ed1a9f1"
+        ],
+        [
+          "5A",
+          "q0-placement-1bab56bfb462e94a3337c902"
+        ],
+        [
+          "5A",
+          "q0-placement-9f3691c41f450fe779f8fca6"
+        ],
+        [
+          "6B",
+          "q0-placement-173d7ec955134363800ffdc3"
+        ],
+        [
+          "6B",
+          "q0-placement-5834d72a76cf40d6805bdc03"
+        ],
+        [
+          "6B",
+          "q0-placement-a601a3e71b6ade93c50cbfd1"
+        ],
+        [
+          "7B",
+          "q0-placement-40628f0cfbfda2740e3dfc4f"
+        ]
+      ]
+    }
+  ],
+  "schema": "frozen_wheat_actual_native_fallback_question_links_v1",
+  "scope": "Two former native-fallback parents. Query identity is not an endpoint of ANY frozen requested join. Their regional target intervals overlap the reported questions; the 38,267-target native fallback is broader. Neither this source-pair test nor overlap rules exclude indirect rerouting, new evidence or out-of-frame relationships. No change to production policy."
+}

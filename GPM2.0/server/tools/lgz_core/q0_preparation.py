@@ -941,7 +941,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
     reference_inputs = [row for row in inputs if row["path"] in reference_pafs]
     with (LocalReferenceCache(root, reference_inputs) if use_regional else nullcontext(None)) as cache:
         catalog = build_catalog(root, sources, lengths, assignments, min_gap=POLICY["min_gap"],
-                                regional_factory=cache.factory if cache else None)
+                                regional_factory=cache.factory if cache else None,
+                                progress=lambda msg: print(f"LGZ q0 catalog: {msg}", flush=True))
         if cache: cache.publish()
         from .q0_frontier_scope import UnsearchedWindows
         regional_frontier = None

@@ -1,0 +1,51 @@
+{
+  "full": {
+    "bytes": 9145342,
+    "paf_sha256": "6b04d86a3488c3dabc69d5909af2554af687b8a396f7811d6086c3e06e785fbb",
+    "seconds": 656.136
+  },
+  "lookup": "2e09b9ff5c849f4d4a83c177c46a4586c29d84b1407666dab8087615ad8c1c89",
+  "mapping": "b43c87a03d6f9b3e7cb33aea22293086f88e95a961d6149f47303736b5231538",
+  "panel": "15fd2e5a2ff25b04b67648285b012a1c713a120174419e8a92e3b98bc63a3c02",
+  "parts": [
+    {
+      "bases": 8017761727,
+      "bytes": 2334587,
+      "paf_sha256": "5a37493816feab92290230d9b5f2c6464c0cb2d522e0484c845cafbfcd10b3ad",
+      "pre_query_s": 118.939,
+      "query_s": 47.499,
+      "records": 8355,
+      "targets": 10584
+    },
+    {
+      "bases": 8066419788,
+      "bytes": 2202292,
+      "paf_sha256": "fdd4b61f393491a18f06dcb9cfcda5239fd9d6fb30418c93bd71aff2f263d98a",
+      "pre_query_s": 117.905,
+      "query_s": 45.631,
+      "records": 7906,
+      "targets": 9317
+    },
+    {
+      "bases": 8036598112,
+      "bytes": 2443583,
+      "paf_sha256": "c37092b4accd58e1fd7ba8c6982887cdc0dcb85b6ff2ed46e6a102af89868863",
+      "pre_query_s": 117.507,
+      "query_s": 51.853,
+      "records": 8717,
+      "targets": 9895
+    },
+    {
+      "bases": 7585342862,
+      "bytes": 2164880,
+      "paf_sha256": "5df647c00e0951df3140e22a49a5ec49e0913d05ca7ddc1f44e86a71952f1a3d",
+      "pre_query_s": 110.615,
+      "query_s": 44.234,
+      "records": 7775,
+      "targets": 8471
+    }
+  ],
+  "phases": "e7f46aad635c930845963551cd8ad8e0287ec0b1a2f9e427566408c4492c4ee3",
+  "query_fasta": "e5a8f88d92127cc582ce54e9f842460347667f20476915f32298657a3ae757c3",
+  "scope": "Observed byte boundaries of the original monolithic mapper output, not evidence that separate processes produce these bytes. No search space removed."
+}

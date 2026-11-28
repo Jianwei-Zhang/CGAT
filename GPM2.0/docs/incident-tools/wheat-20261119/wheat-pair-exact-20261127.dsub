@@ -1,0 +1,40 @@
+#!/bin/bash
+#DSUB -n jm19_q0_pair_exact
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-45
+#DSUB -R "cpu=32,mem=98304MB"
+#DSUB -o pair_exact_%J.out
+set -euo pipefail
+umask 077
+owner=$PWD
+sha256sum --quiet -c inputs.sha256
+exec 9>run.lock
+flock -n 9
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export GPM_RUN_THREADS=32 PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTHONFAULTHANDLER=1
+for i in {1..120}; do
+    [[ ! -s allocation.json ]] || break
+    sleep 3
+done
+test -s allocation.json
+export _GPM_Q0_SCHEDULER_PROOF="$owner/allocation.json"
+export _GPM_Q0_SCHEDULER_SHA256=$(sha256sum allocation.json | cut -d" " -f1)
+code=$(mktemp -d /tmp/wheat-pair-exact-code.XXXXXXXX)
+trap 'rm -rf -- "$code"' EXIT
+mkdir "$code/baseline" "$code/candidate"
+tar -xzf baseline-tools.tgz -C "$code/baseline"
+tar -xzf candidate-tools.tgz -C "$code/candidate"
+export PYTHONPATH="$code/baseline/tools:$owner"
+if [[ ! -s subset.json ]]; then
+    python3 -Bu wheat_pair_exact_qualification.py prepare "$owner"
+fi
+# Reused input remains content-bound and is rehashed by BOTH fresh replays.
+if [[ ! -s baseline.json ]]; then
+    python3 -Bu wheat_pair_exact_qualification.py baseline "$owner"
+fi
+# A retained baseline is accepted only by the exact input/output/selector checks below.
+export PYTHONPATH="$code/candidate/tools:$owner"
+python3 -Bu wheat_pair_exact_qualification.py candidate "$owner"
+python3 -Bu wheat_pair_exact_qualification.py compare "$owner"
+sha256sum qualification.json

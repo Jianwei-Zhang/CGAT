@@ -1,0 +1,141 @@
+{
+  "elapsed_s": 185.89021483808756,
+  "formal_workspace_modified": false,
+  "group": "1A",
+  "limitations": [
+    "Low anchor density is not by itself a measurement of repeat content.",
+    "Hull fallback is allowed even if support/hull remains below 20%, matching the original extent decision.",
+    "Admission comparison is not a selected-path or biological precision acceptance."
+  ],
+  "mapper_calls": 0,
+  "outputs": {
+    "drop75-placements.jsonl.gz": {
+      "bytes": 2532570,
+      "sha256": "59b4545f86c65d37e68b121715252b961d463e6ad094ce3a3066fa6a08fe2972"
+    },
+    "drop80-placements.jsonl.gz": {
+      "bytes": 2037574,
+      "sha256": "c2fd985bb61b9d819815ded24cf18664eb9ff5cf86d746f278e6f7ffd46175c0"
+    },
+    "drop90-placements.jsonl.gz": {
+      "bytes": 1752218,
+      "sha256": "094eabc8179f811e46a825b5c6d085312a3b9e1ad698786c0b7955a898026894"
+    },
+    "hull75-placements.jsonl.gz": {
+      "bytes": 2532570,
+      "sha256": "2625b90343c5c89556b8d861e6e82a66338d76261765f0c19cf0246209ccf84d"
+    },
+    "hull80-placements.jsonl.gz": {
+      "bytes": 2037574,
+      "sha256": "fe192cd146584d3738f6cf406d978bd7208ffd6cb25ea19d799ec48588d69e76"
+    },
+    "hull90-placements.jsonl.gz": {
+      "bytes": 1752218,
+      "sha256": "66b4aaaa326193bdf0f04a40d70c3ffd532014bb09f4c711e50d1d202003d5d5"
+    }
+  },
+  "processed_sources": 16826,
+  "restored_regions": [],
+  "schema": "wheat_continuity_hull_cache_replay_v1",
+  "screened_cache_sha256": "9c4fbfeef67122e8ad827b436b400cb09e47fe53830b4305a4659eafcf82b2f6",
+  "selected_mode": "drop75",
+  "selection_rule": "zero old-Q0 conflicts; maximize actual combined reference union, then fewer placements, longer maximum, higher dominance threshold",
+  "source_receipt_sha256": "638dbf33ea1ea2390bd6b432ee3b82bdefae16f2b4ecec7e6cfae130f9ec1478",
+  "strict_three_arms_reproduced": {
+    "75": true,
+    "80": true,
+    "90": true
+  },
+  "variants": {
+    "drop75": {
+      "combined_reference_bp": 362240671,
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 222272638
+      },
+      "old_q0_source_bp": {
+        "same_group_same_orientation": 246799488
+      },
+      "placements": 43,
+      "reference_bp": 354132490,
+      "source_bp_sum": 669794819,
+      "sources": 41
+    },
+    "drop80": {
+      "combined_reference_bp": 326300086,
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 222272638
+      },
+      "old_q0_source_bp": {
+        "same_group_same_orientation": 246799488
+      },
+      "placements": 37,
+      "reference_bp": 314670671,
+      "source_bp_sum": 598866396,
+      "sources": 35
+    },
+    "drop90": {
+      "combined_reference_bp": 303856199,
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 218062604
+      },
+      "old_q0_source_bp": {
+        "same_group_same_orientation": 241462960
+      },
+      "placements": 26,
+      "reference_bp": 284593535,
+      "source_bp_sum": 547281827,
+      "sources": 25
+    },
+    "hull75": {
+      "combined_reference_bp": 362240671,
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 222272638
+      },
+      "old_q0_source_bp": {
+        "same_group_same_orientation": 246799488
+      },
+      "placements": 43,
+      "reference_bp": 354132490,
+      "source_bp_sum": 669794819,
+      "sources": 41
+    },
+    "hull80": {
+      "combined_reference_bp": 326300086,
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 222272638
+      },
+      "old_q0_source_bp": {
+        "same_group_same_orientation": 246799488
+      },
+      "placements": 37,
+      "reference_bp": 314670671,
+      "source_bp_sum": 598866396,
+      "sources": 35
+    },
+    "hull90": {
+      "combined_reference_bp": 303856199,
+      "max_placement_bp": 220288873,
+      "old_q0_conflict_placements": 0,
+      "old_q0_reference_bp": {
+        "same_group_same_orientation": 218062604
+      },
+      "old_q0_source_bp": {
+        "same_group_same_orientation": 241462960
+      },
+      "placements": 26,
+      "reference_bp": 284593535,
+      "source_bp_sum": 547281827,
+      "sources": 25
+    }
+  }
+}

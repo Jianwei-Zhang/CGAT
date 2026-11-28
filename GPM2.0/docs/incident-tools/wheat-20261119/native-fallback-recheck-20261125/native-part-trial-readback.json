@@ -1,0 +1,41 @@
+{
+  "calibration": "e6e03e3850fd47d10bc6cd263a2ceb1be70a04fe3c99d721f7b7ec293f1ffbd8",
+  "index_observations_identical": true,
+  "parts": [
+    {
+      "candidate_mid_occ": 500,
+      "native_stderr": "06903a86a1054eab1ab612bb6218bbcb60b1dd65c7a75162b3b9924e7a58b8e6",
+      "observed_seed_index_identical": true,
+      "original_mid_occ": 500,
+      "paf_identical": true,
+      "part": 1
+    },
+    {
+      "candidate_mid_occ": 500,
+      "native_stderr": "c5113f7e9d5b1c146f85ecf6631a3f39050adecefcf1ef16356741999dbf692d",
+      "observed_seed_index_identical": true,
+      "original_mid_occ": 500,
+      "paf_identical": true,
+      "part": 2
+    },
+    {
+      "candidate_mid_occ": 500,
+      "native_stderr": "960cdb4b0a2a377393a47697dc2de7b8028c0dc170629f2cd4a103468279cf31",
+      "observed_seed_index_identical": true,
+      "original_mid_occ": 500,
+      "paf_identical": true,
+      "part": 3
+    },
+    {
+      "candidate_mid_occ": 500,
+      "native_stderr": "f3cee1a7f5258ea0d6795f0b930c3c4aeabd37138ab2a402d28aaa5de3572c07",
+      "observed_seed_index_identical": true,
+      "original_mid_occ": 500,
+      "paf_identical": true,
+      "part": 4
+    }
+  ],
+  "receipt": "a416aea2134accbe36f2d01a7ab638b92417c35b159bc7f18d794a4a5ca7ee19",
+  "scope": "Independent readback of the saved native outputs for these three queries; not an assertion of equivalence for long queries.",
+  "whole_paf_identical": true
+}

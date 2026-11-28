@@ -1,0 +1,16 @@
+#!/bin/bash
+#DSUB -n jm19_q0_all_flanks
+#DSUB -q x86
+#DSUB -nl agent-X86-44
+#DSUB -aa
+#DSUB -R "cpu=16,mem=65536MB"
+#DSUB -o review_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c kit.sha256
+exec 9>review.lock; flock -n 9
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+code=$(mktemp -d /tmp/wheat-review-code.XXXXXXXX); trap 'rm -rf -- "$code"' EXIT
+tar -xzf tools.tgz -C "$code"
+export PYTHONPATH="$code/GPM2.0/server/tools:$PWD" PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+python3 -Bu review_wheat_frozen_group.py all-screen 16

@@ -1,0 +1,17 @@
+#!/bin/bash
+#DSUB -n jm19_q0_regional_readback
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-46
+#DSUB -D "43081762=SUCCEEDED"
+#DSUB -R "cpu=1,mem=16384MB"
+#DSUB -o readback_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c kit.sha256
+exec 9>assess.lock; flock -n 9
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-evidence-read.XXXXXXXX);trap 'rm -rf -- "$w"' EXIT
+tar -xzf tools.tgz -C "$w"; export PYTHONPATH="$w/tools" PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+python3 -Bu assess_wheat_local_only_batches.py "$(cat mapping-owner)"
+sha256sum assessment.json

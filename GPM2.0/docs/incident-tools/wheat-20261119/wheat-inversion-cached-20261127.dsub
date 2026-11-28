@@ -1,0 +1,21 @@
+#!/bin/bash
+#DSUB -n jm19_inversion_preserving_3groups
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-34
+#DSUB -R "cpu=8,mem=81920MB"
+#DSUB -o inversion_cached_%J.out
+set -eo pipefail
+umask 077
+sha256sum --quiet -c kit.sha256
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+base=$(dirname "$PWD")
+original="$base/q0-continuity-indexed-20261126.CgydRhOS"
+phase1="$base/q0-top-chain-locus-20261127.CTotPSFG"
+cross="$base/q0-top-chain-cross-20261127.XLaIRQyk"
+code=$(mktemp -d /tmp/wheat-inversion-code.XXXXXXXX)
+tar -xzf "$original/tools.tgz" -C "$code"
+export PYTHONPATH="$PWD:$cross:$phase1:$original:$code/tools"
+python3 -Bu -m unittest -v test_wheat_inversion_preserving
+python3 -Bu wheat_inversion_cached_loop.py "$base" "$PWD" --workers 4

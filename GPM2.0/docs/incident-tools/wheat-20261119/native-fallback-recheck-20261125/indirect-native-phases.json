@@ -1,0 +1,61 @@
+{
+  "arms": {
+    "full": {
+      "native_cpu_s": 1324.671,
+      "native_real_s": 655.371,
+      "parts": [
+        {
+          "bases": 8017761727,
+          "pre_query_s": 118.939,
+          "query_s": 47.499,
+          "targets": 10584
+        },
+        {
+          "bases": 8066419788,
+          "pre_query_s": 117.905,
+          "query_s": 45.631,
+          "targets": 9317
+        },
+        {
+          "bases": 8036598112,
+          "pre_query_s": 117.507,
+          "query_s": 51.853,
+          "targets": 9895
+        },
+        {
+          "bases": 7585342862,
+          "pre_query_s": 110.615,
+          "query_s": 44.234,
+          "targets": 8471
+        }
+      ],
+      "peak_rss_gb": 34.41,
+      "pre_query_s": 464.966,
+      "query_s": 189.217,
+      "tail_s": 1.188
+    },
+    "reduced": {
+      "native_cpu_s": 135.423,
+      "native_real_s": 70.762,
+      "parts": [
+        {
+          "bases": 2302475263,
+          "pre_query_s": 35.535,
+          "query_s": 34.923,
+          "targets": 3755
+        }
+      ],
+      "peak_rss_gb": 10.902,
+      "pre_query_s": 35.535,
+      "query_s": 34.923,
+      "tail_s": 0.304
+    }
+  },
+  "mapping": "b43c87a03d6f9b3e7cb33aea22293086f88e95a961d6149f47303736b5231538",
+  "panel": "15fd2e5a2ff25b04b67648285b012a1c713a120174419e8a92e3b98bc63a3c02",
+  "scope": "Single cold build per arm; pre-query includes reading/building the index plus setup/statistics for each partition. Query time includes mapping/output through the mapped marker. These are observed phases, not a warm index benchmark.",
+  "stderr": {
+    "full": "d1a572dfdf4240cc0aafe646d168fbb84d695477b5deb16b3db9493f6caff9cc",
+    "reduced": "6d651d1eb3284894fbf078899164ba62b87b7e73f157e85f39e9ef029bf2a941"
+  }
+}

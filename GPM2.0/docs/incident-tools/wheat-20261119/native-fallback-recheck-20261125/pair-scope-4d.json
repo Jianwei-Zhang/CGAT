@@ -1,0 +1,40 @@
+{
+  "bounded_request": true,
+  "distinct_remaining_questions": 177,
+  "distinct_untested_target_bases": 99851195,
+  "distinct_untested_target_count": 179,
+  "limits": "Pair scope follows the original planner, including reciprocal coverage and its declared long-part approximate profile. It is not a proof of identical PAFs with a smaller target collection. Self exclusion is not negative sequence evidence. Non-endpoint queries can still indirectly change placement or routing.",
+  "mapper_calls": 0,
+  "mask_sha256": "b93203594aaf176cabe2b693ddd9f1f7fb579e3c5767a277d7e602da4f27ad1b",
+  "parents": {
+    "q0-source-part-865ba1fbce846067c7ffff38": {
+      "direct_join_role": {},
+      "exact_pair_scope": 0,
+      "limited_pair_scope": 0,
+      "query_has_demand": false,
+      "query_role_questions": {},
+      "untested_pair_scope": 179,
+      "untested_target_bases": 99851195,
+      "whole_targets_examined_by_axis": 179
+    },
+    "q0-source-part-9bf9376cf15b64235817ff09": {
+      "direct_join_role": {},
+      "exact_pair_scope": 0,
+      "limited_pair_scope": 0,
+      "query_has_demand": false,
+      "query_role_questions": {},
+      "untested_pair_scope": 179,
+      "untested_target_bases": 99851195,
+      "whole_targets_examined_by_axis": 179
+    }
+  },
+  "question_classes": {
+    "some_untested_relationship:unproven_join": 154,
+    "some_untested_relationship:weak_placement": 23
+  },
+  "questions_sha256": "71f3fbbddefcf097912b9d6908e953bfcb3b30fc1545df5d21f22187070361f9",
+  "remaining_source_bases": 99851195,
+  "remaining_sources": 179,
+  "whole_native_target_bases": 31706122489,
+  "whole_native_target_count": 38267
+}

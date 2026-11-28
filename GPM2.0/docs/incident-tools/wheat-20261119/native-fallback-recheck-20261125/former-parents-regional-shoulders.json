@@ -1,0 +1,29 @@
+{
+  "any_relationship": {
+    "issues_with_any_100bp_shoulder": {
+      "unproven_join": 3,
+      "weak_placement": 3
+    },
+    "joins_hit_on_both_ends_by_same_parent": 0,
+    "joins_hit_on_both_ends_in_same_query_window": 0
+  },
+  "cross_assembly_only": {
+    "issues_with_any_100bp_shoulder": {},
+    "joins_hit_on_both_ends_by_same_parent": 0,
+    "joins_hit_on_both_ends_in_same_query_window": 0
+  },
+  "distinct_query_target_strand": 476,
+  "geometric_contacts_before": 98,
+  "mapping": "ffc6e0f5cd45948e5d5ff5140c1b6a15e977e6b8bcdf5c7477c699ed34c16f8e",
+  "native_mapper_starts": 0,
+  "paf_rows_supporting_any_shoulder": {
+    "intra": 5
+  },
+  "projected_by_relation": {
+    "cross": 718,
+    "intra": 942
+  },
+  "projected_rows": 1660,
+  "questions": "9c0a2e5569e4161e7ef59f7332b232f1d2d2ea4480c4a1c8445490c61ee62d97",
+  "scope": "Fixed old question shoulders and real paired CIGAR runs; contacts are candidate evidence, not orientation-compatible bridging, gap closure, placement acceptance or the next Q0 path."
+}

@@ -1,0 +1,230 @@
+{
+  "schema": "wheat_1A_old_q0_source_placement_comparison_v1",
+  "old_metadata_sha256": "cd9069e54e64cce94ba7d4790afd2c575d85ffc227722b04eca56bf6e04ea847",
+  "old_q0_source_bp_checked": 14097044589,
+  "results": {
+    "frozen": {
+      "placements": 383,
+      "reference_overlap_with_old_q0_bp": {
+        "same_1A_same_orientation": 2724893
+      },
+      "flagged_placements": 0,
+      "flagged_examples": []
+    },
+    "dominant90": {
+      "placements": 3082,
+      "reference_overlap_with_old_q0_bp": {
+        "same_1A_same_orientation": 218137529
+      },
+      "flagged_placements": 0,
+      "flagged_examples": []
+    },
+    "regional": {
+      "placements": 24319,
+      "reference_overlap_with_old_q0_bp": {
+        "other_chromosome": 14979044,
+        "other_subgenome": 2715029,
+        "same_1A_same_orientation": 402630389,
+        "same_1A_opposite_orientation": 3386233
+      },
+      "flagged_placements": 3861,
+      "flagged_examples": [
+        {
+          "placement_id": "q0-placement-2f672d928daaa3b859d84a8f",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000006l"
+          ],
+          "interval": [
+            5710966,
+            5713789
+          ],
+          "new_orientation": "-",
+          "old_groups_orientations": [
+            "7B",
+            "7B:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-6b4b3a7a683124a4a326df6a",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000012l"
+          ],
+          "interval": [
+            2394688,
+            2401068
+          ],
+          "new_orientation": "+",
+          "old_groups_orientations": [
+            "5B",
+            "5B:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-60e2dc1972b9be4a46eeb77d",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000013l"
+          ],
+          "interval": [
+            4829233,
+            4829949
+          ],
+          "new_orientation": "-",
+          "old_groups_orientations": [
+            "5B",
+            "5B:-"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-a6f2e6b45bf64d5550125df5",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000009l"
+          ],
+          "interval": [
+            911521,
+            912221
+          ],
+          "new_orientation": "+",
+          "old_groups_orientations": [
+            "2D",
+            "2D:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-7b42ac874504636df004228e",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000009l"
+          ],
+          "interval": [
+            1200403,
+            1208390
+          ],
+          "new_orientation": "+",
+          "old_groups_orientations": [
+            "2D",
+            "2D:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-4d30b83a0f83ed4cbbb4e942",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000009l"
+          ],
+          "interval": [
+            1424474,
+            1428409
+          ],
+          "new_orientation": "+",
+          "old_groups_orientations": [
+            "2D",
+            "2D:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-e1ea42ba87d14bb7aea3f58a",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000009l"
+          ],
+          "interval": [
+            2400055,
+            2405224
+          ],
+          "new_orientation": "+",
+          "old_groups_orientations": [
+            "2D",
+            "2D:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-347e76439d3c3002c4e3454f",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000009l"
+          ],
+          "interval": [
+            924953,
+            931425
+          ],
+          "new_orientation": "-",
+          "old_groups_orientations": [
+            "2D",
+            "2D:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-71385f4c39fb89a4d8d527f2",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000009l"
+          ],
+          "interval": [
+            1156706,
+            1158771
+          ],
+          "new_orientation": "-",
+          "old_groups_orientations": [
+            "2D",
+            "2D:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-32bc05d7f5cdf41ccdff6764",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000004l"
+          ],
+          "interval": [
+            23530196,
+            23531743
+          ],
+          "new_orientation": "-",
+          "old_groups_orientations": [
+            "2A:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-5731e6636d0f25996bf615b1",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000004l"
+          ],
+          "interval": [
+            23533990,
+            23537884
+          ],
+          "new_orientation": "-",
+          "old_groups_orientations": [
+            "2A:+"
+          ]
+        },
+        {
+          "placement_id": "q0-placement-8207c22326ca5ec7771bc823",
+          "source": [
+            "JM19_hifiasm",
+            "ptg000004l"
+          ],
+          "interval": [
+            23541527,
+            23555734
+          ],
+          "new_orientation": "-",
+          "old_groups_orientations": [
+            "2A:+"
+          ]
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Compares actual source intervals and orientations against old Q0 metadata; it does not align sequences anew.",
+    "Old Q0 is a comparator, not independent biological ground truth.",
+    "Reported reference overlaps can overlap across categories and modes.",
+    "Lack of old Q0 placement is not evidence of error; the old route selected only one of redundant assemblies."
+  ]
+}

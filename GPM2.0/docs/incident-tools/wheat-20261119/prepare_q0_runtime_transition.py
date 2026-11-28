@@ -1,13 +1,16 @@
 """Prepare an isolated NEW-q0 transition, without installing or stopping jobs.
 
 The source packet binds the previous installed transition and the exact new
-files. Existing scientific policies and the native origin must stay unchanged.
+files. The native origin stays unchanged. Policy changes are rejected except
+for explicitly bound positive-threshold routing/budget deltas and the separately
+authorized, byte-pinned 2064cb4c continuous Q0 engine.
 A real read-only 25-checkpoint preflight and allocation-ready gate follow this
 metadata-only step. Never rerun it over an existing candidate/journal.
 """
 import argparse
 import ast
 import csv
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -23,7 +26,65 @@ POLICIES = {'q0_preparation.py':'POLICY', 'q0_regional_discovery.py':'REGIONAL_P
 LAUNCHER = 'prepare_q0_evidence.sh'
 DECLARATION = 'metadata/incident_q0_routing_reader.json'
 REPAIR_PROFILE = 'decision_frontier_repair'
+THRESHOLD_PROFILE = 'positive_threshold'
+# These are the already-approved local-only routing/budget changes, not a
+# permission to relax alignment scores or placement acceptance. Exact old/new
+# policy AST identities must be declared in the source packet.
+THRESHOLD_POLICY_CHANGES = {'q0_regional_discovery.py', 'q0_regional_candidates.py', 'q0_paths.py', 'q0_admission.py'}
 SELECTOR_POLICIES = {'q0_admission.py': 'AdmissionPolicy', 'q0_paths.py': 'PathPolicy'}
+
+
+# This is a separate explicit scientific authorization, NOT an expansion of the
+# generic positive-threshold budget permission. Bind the reviewed production
+# engine bytes, including the new nested ContinuousAdmissionPolicy defaults.
+CONTINUITY_CHANGE = {
+    'schema': 'q0_continuity_2064cb4c_v1',
+    'engine_revision': '2064cb4cfd51b5c886f60af19f020caf0b18950f',
+    'admission_policy_version': 2, 'path_policy_version': 3,
+    'reference_locus_padding_bp': 100000,
+}
+CONTINUITY_FILES = {'q0_admission.py': 'd5058d6669c44d027e93312c423d74a5e8a8a7a39261e0382b26e1e3a1b8d5c3',
+ 'q0_backbone.py': '22731fd25c1c7cb415a7785872572c0eb9462ba6f09562425f378505dd78aa7c',
+ 'q0_collinear.py': 'fdfb10586b3077be8584e4c9e6e8d191280918d5f08c6d5a35da92030002b52e',
+ 'q0_coverage.py': '8b3a5917b7a4418f69354fb32476fdd156bf999baa13d2aa51b190f8155eb77a',
+ 'q0_interval_index.py': 'f5c5d7d3b49e71edc637535fda0a6d66f8ac50f718dbd454ea08557efa462e18',
+ 'q0_junction_review.py': 'fd723eb0d598c11ce3a25372c7b61f771b16a96c1a115bd9f7133cc2c467e27b',
+ 'q0_paths.py': 'e2f196a09b29d9f16377a6732cb58678e994f79fddbef2b52921ab77d84120ff',
+ 'q0_reference_locus.py': '0b0444a3352cf4175af507406758560d6cb5d9f23305251392aa61f358c99aa9',
+ 'q0_threshold_questions.py': '4a098e8f5af9f64b0951a05d690a9475defdccb1dc23a89e8e5028ea36da3066'}
+
+
+def validate_continuity_change(bundle, manifest):
+    source = manifest.get('source_occupancy_change')
+    declaration = manifest.get('continuous_q0_policy_change')
+    if declaration is None:
+        if source is not None or manifest.get('exact_engineering_change') is not None:
+            raise ValueError('exact engineering requires reviewed continuity baseline')
+        return None
+    engineering = None
+    if manifest.get('exact_engineering_change') is not None:
+        from q0_exact_engineering_transition import validate
+        engineering = validate(bundle, manifest)
+    if source is not None:
+        from q0_exact_engineering_transition import SOURCE_FILES, validate_source_change
+        if source.get("schema") == "q0_local_chain_un_carriers_v1":
+            from q0_exact_engineering_transition import validate_final_change, FINAL_FILES
+            validate_final_change(bundle, manifest)
+            SOURCE_FILES = {**SOURCE_FILES, **FINAL_FILES}
+        else:
+            validate_source_change(bundle, manifest)
+    if (declaration != CONTINUITY_CHANGE or manifest.get('q0_supplement_scope') != THRESHOLD_PROFILE
+            or source is None and engineering is None and manifest.get('git_revision') != CONTINUITY_CHANGE['engine_revision']):
+        raise ValueError('invalid explicit continuous Q0 policy authorization')
+    for name, expected in CONTINUITY_FILES.items():
+        if source is not None:
+            expected = SOURCE_FILES.get(name, expected)
+        if engineering is not None and name == 'q0_admission.py':
+            from q0_exact_engineering_transition import ENGINEERING_FILES
+            expected = ENGINEERING_FILES[name]
+        if digest(child(bundle, 'runtime/' + name)) != expected:
+            raise ValueError('continuous Q0 engine differs from reviewed 2064cb4c: ' + name)
+    return declaration
 
 
 def child(root, relative):
@@ -54,6 +115,34 @@ def runtime_names(path, function='builder_identity'):
     if path.name not in names or any(not re.fullmatch(r'[A-Za-z0-9_]+\.py', n) for n in names):
         raise ValueError('candidate has an unsafe/empty runtime inventory: '+function)
     return names
+
+
+def threshold_runtime_names(root):
+    """Close the Q0-only relative imports and identity-file references."""
+    pending = ['q0_preparation.py', 'q0_admission.py', 'q0_threshold_acceptance.py', 'q0_threshold_prepare.py']
+    names = set()
+    while pending:
+        name = pending.pop()
+        if name in names:
+            continue
+        if name != 'common.py' and not re.fullmatch(r'q0_[a-z_]+\.py', name):
+            raise ValueError('threshold closure escaped Q0 modules')
+        tree = ast.parse(child(root, name).read_text())
+        names.add(name)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 1:
+                modules = [node.module.split('.')[0]] if node.module else [n.name for n in node.names]
+                pending.extend(mod+'.py' for mod in modules)
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and re.fullmatch(r'(?:q0_[a-z_]+|common)\.py', node.value)):
+                pending.append(node.value)
+    names.add('__init__.py')
+    return names
+
+
+def policy_change(before, after):
+    return {'prior_ast_sha256': hashlib.sha256(before.encode()).hexdigest(),
+            'candidate_ast_sha256': hashlib.sha256(after.encode()).hexdigest()}
 
 
 def selector_policy_ast(path, symbol):
@@ -113,9 +202,16 @@ def prepare(bundle):
     if 'regional_mapper_loader_policy' in manifest and scope != 'clear_same_dependencies_v1':
         raise ValueError('invalid regional mapper loader candidate policy')
     supplement = manifest.get('q0_supplement_scope')
-    if ('q0_supplement_scope' in manifest and supplement != REPAIR_PROFILE
+    if ('q0_supplement_scope' in manifest and supplement not in (REPAIR_PROFILE, THRESHOLD_PROFILE)
             or supplement is None and any(key in manifest for key in ('proof_repair_package', 'prior_selector_files'))):
         raise ValueError('invalid candidate q0 supplement scope')
+    declared_changes = manifest.get('positive_threshold_policy_changes', {})
+    if (not isinstance(declared_changes, dict) or not set(declared_changes) <= THRESHOLD_POLICY_CHANGES
+            or supplement != THRESHOLD_PROFILE and 'positive_threshold_policy_changes' in manifest):
+        raise ValueError('invalid positive-threshold policy change declaration')
+    continuity_change = validate_continuity_change(bundle, manifest)
+    if 'q0_admission.py' in declared_changes and continuity_change is None:
+        raise ValueError('AdmissionPolicy change requires explicit continuous Q0 policy authorization')
     previous_path = checked(manifest['previous_transition'])
     previous = json.loads(previous_path.read_text())
     work = Path(previous['workspace']).resolve(strict=True)
@@ -163,10 +259,17 @@ def prepare(bundle):
         selector = set(runtime_names(child(bundle, 'runtime/q0_admission.py'), 'selector_identity'))
         if not set(SELECTOR_POLICIES) <= selector:
             raise ValueError('candidate omits a required selector policy module')
-        repair_package, prior_selector = repair_inputs(work, manifest, selector - names, installed)
+        if supplement == THRESHOLD_PROFILE:
+            selector |= threshold_runtime_names(bundle/'runtime')
+        prior_names = selector | names if supplement == THRESHOLD_PROFILE else selector - names
+        repair_package, prior_selector = repair_inputs(work, manifest, prior_names, installed)
         installed = {**installed, **prior_selector}
         names |= selector
     required = {'runtime/'+name for name in names} | set(HELPERS.values()) | {'q0_science_handoff_gate.py', 'prepare_q0_runtime_transition.py'}
+    if supplement == THRESHOLD_PROFILE:
+        required.add('support/workspace_layout.py')
+    if any(manifest.get(key) is not None for key in ('exact_engineering_change', 'source_occupancy_change')):
+        required.add('q0_exact_engineering_transition.py')
     if set(sources) != required:
         raise ValueError('candidate source closure differs from builder/entry inventory')
     runtime = []; policy_checks = []
@@ -176,17 +279,36 @@ def prepare(bundle):
         prior = installed.get(relative)
         if prior is None and target.exists():
             raise ValueError('unexpected existing candidate runtime target: '+relative)
-        if name in POLICIES:
-            if prior is None or policy_ast(target, POLICIES[name]) != policy_ast(child(bundle, 'runtime/'+name), POLICIES[name]):
-                raise ValueError('candidate changes a scientific policy: '+name)
-            policy_checks.append({'file':name, 'symbol':POLICIES[name], 'ast_equal':True})
-        if supplement is not None and name in SELECTOR_POLICIES:
-            symbol = SELECTOR_POLICIES[name]
-            if prior is None or selector_policy_ast(target, symbol) != selector_policy_ast(child(bundle, 'runtime/'+name), symbol):
-                raise ValueError('candidate changes a selector policy: '+name)
-            policy_checks.append({'file':name, 'symbol':symbol, 'ast_equal':True})
+        symbol = POLICIES.get(name) or (SELECTOR_POLICIES.get(name) if supplement is not None else None)
+        if symbol:
+            extract = policy_ast if name in POLICIES else selector_policy_ast
+            before = extract(target, symbol) if prior is not None else None
+            after = extract(child(bundle, 'runtime/'+name), symbol)
+            equal = before == after
+            if not equal:
+                change = policy_change(before or '', after)
+                if (supplement != THRESHOLD_PROFILE or name not in THRESHOLD_POLICY_CHANGES
+                        or prior is None or declared_changes.get(name) != change):
+                    kind = 'scientific' if name in POLICIES else 'selector'
+                    raise ValueError('candidate changes a '+kind+' policy: '+name)
+            elif name in declared_changes:
+                raise ValueError('declared policy change has no matching difference: '+name)
+            policy_checks.append({'file':name, 'symbol':symbol, 'ast_equal':equal,
+                                  **({'explicit_change':change} if not equal else {})})
         runtime.append({'relative':relative, 'prior_sha256':prior, 'source':sources['runtime/'+name],
                         'new_sha256':sources['runtime/'+name]['sha256']})
+    if set(declared_changes) != {row['file'] for row in policy_checks if not row['ast_equal']}:
+        raise ValueError('positive-threshold policy changes are incomplete or unused')
+    if supplement == THRESHOLD_PROFILE:
+        relative = '.prepare_lib/tools/workspace_layout.py'
+        # This support module is new in the legacy runtime. An existing file
+        # needs a separate reviewed migration, never an assumed overwrite.
+        source = sources['support/workspace_layout.py']
+        prior = installed.get(relative)
+        if child(work, relative).exists() and (prior is None or prior != source['sha256']):
+            raise ValueError('unexpected existing workspace layout support')
+        runtime.append({'relative':relative, 'prior_sha256':prior, 'source':source,
+                        'new_sha256':source['sha256']})
     for name in ('transition.json', LAUNCHER, 'candidate-prepared.json'):
         if child(bundle, name).exists():
             raise ValueError('candidate output already exists; inspect rather than overwrite')
@@ -210,6 +332,14 @@ def prepare(bundle):
         transition['q0_supplement_scope'] = supplement
         transition['proof_repair_package'] = repair_package
         checked(repair_package)
+    if supplement == THRESHOLD_PROFILE:
+        transition['positive_threshold_policy_changes'] = declared_changes
+    if continuity_change is not None:
+        transition['continuous_q0_policy_change'] = continuity_change
+    if manifest.get('exact_engineering_change') is not None:
+        transition['exact_engineering_change'] = manifest['exact_engineering_change']
+    if manifest.get('source_occupancy_change') is not None:
+        transition['source_occupancy_change'] = manifest['source_occupancy_change']
     write_new(transition_path, transition)
     checked(manifest_before); checked(journal_before); checked(manifest['previous_transition'])
     for relative, expected in installed.items():
@@ -230,6 +360,12 @@ def prepare(bundle):
     if supplement is not None:
         checked(repair_package)
         report['q0_supplement_scope'] = supplement
+    if continuity_change is not None:
+        report['continuous_q0_policy_change'] = continuity_change
+    if manifest.get('exact_engineering_change') is not None:
+        report['exact_engineering_change'] = manifest['exact_engineering_change']
+    if manifest.get('source_occupancy_change') is not None:
+        report['source_occupancy_change'] = manifest['source_occupancy_change']
     write_new(bundle/'candidate-prepared.json', report)
     return report
 

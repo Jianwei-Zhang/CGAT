@@ -1,0 +1,20 @@
+#!/bin/bash
+#DSUB -n jm19_owner_pair_exact
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-45
+#DSUB -R "cpu=32,mem=98304MB"
+#DSUB -o owner_exact_%J.out
+set -eo pipefail
+umask 077
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+set -u
+sha256sum --quiet -c inputs.sha256
+q=../q0-pair-exact-20261127.GIqRs517
+for f in subset.json subset.pickle baseline-tools.tgz baseline-admission.json.gz; do ln -s "$q/$f" "$f"; done
+mkdir code; tar xzf candidate-tools.tgz -C code
+export PYTHONPATH="$PWD/code/tools:$PWD" GPM_RUN_THREADS=32 PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1
+for i in {1..120}; do test ! -s allocation.json || break; sleep 3; done
+test -s allocation.json; export _GPM_Q0_SCHEDULER_PROOF="$PWD/allocation.json" _GPM_Q0_SCHEDULER_SHA256=$(sha256sum allocation.json|cut -d" " -f1)
+for phase in full write read; do python3 -Bu wheat_owner_pair_qualification.py "$phase"; done
+cat qualification.json

@@ -156,6 +156,149 @@ class CandidatePreparationTests(unittest.TestCase):
             prep.prepare(self.bundle)
         self.assertFalse((self.bundle/'transition.json').exists())
 
+    def bind_threshold_candidate(self):
+        self.bind_repair_candidate()
+        self.manifest['q0_supplement_scope'] = prep.THRESHOLD_PROFILE
+        (self.bundle/'runtime/__init__.py').write_text('# Q0 compatibility bootstrap\n')
+        (self.bundle/'support').mkdir()
+        (self.bundle/'support/workspace_layout.py').write_text('# legacy support\n')
+        # Include transitive and identity-only dependencies in addition to the
+        # old builder/selector lists. They must be bound, never found by accident.
+        (self.bundle/'runtime/q0_threshold_acceptance.py').write_text(
+            "from .q0_sources import SourceKey\nRULE='q0_threshold_questions.py'\n")
+        (self.bundle/'runtime/q0_sources.py').write_text('class SourceKey: pass\n')
+        (self.bundle/'runtime/q0_threshold_questions.py').write_text('VALUE=1\n')
+        (self.bundle/'runtime/q0_threshold_prepare.py').write_text('from . import q0_preparation\n')
+        path=self.bundle/'runtime/q0_paths.py'
+        before=prep.selector_policy_ast(path, 'PathPolicy')
+        path.write_text(path.read_text().replace('20000', 'None'))
+        self.manifest['positive_threshold_policy_changes'] = {
+            'q0_paths.py':prep.policy_change(before,prep.selector_policy_ast(path,'PathPolicy'))}
+        self.save_manifest()
+        self.before=self.snapshot()
+
+    def test_threshold_explicitly_binds_policy_delta_closure_and_legacy_support(self):
+        self.bind_threshold_candidate()
+        report=prep.prepare(self.bundle)
+        self.assertEqual(report['q0_supplement_scope'],'positive_threshold')
+        transition=json.loads((self.bundle/'transition.json').read_text())
+        names={r['relative'] for r in transition['runtime']}
+        self.assertIn('.prepare_lib/tools/workspace_layout.py',names)
+        self.assertIn('.prepare_lib/tools/lgz_core/q0_threshold_questions.py',names)
+        self.assertEqual(transition['positive_threshold_policy_changes'],self.manifest['positive_threshold_policy_changes'])
+        self.assertEqual(self.snapshot(),self.before)
+
+    def test_admission_change_is_not_a_generic_budget_permission(self):
+        self.bind_threshold_candidate()
+        path = self.bundle/'runtime/q0_admission.py'
+        before = prep.selector_policy_ast(path, 'AdmissionPolicy')
+        path.write_text(path.read_text().replace('minimum_bp=100', 'minimum_bp=200'))
+        self.manifest['positive_threshold_policy_changes']['q0_admission.py'] = prep.policy_change(
+            before, prep.selector_policy_ast(path, 'AdmissionPolicy'))
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError, 'requires explicit continuous'):
+            prep.prepare(self.bundle)
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_reviewed_continuity_files_and_declaration_are_exact(self):
+        import shutil
+        core = Path(__file__).resolve().parents[3]/'server/tools/lgz_core'
+        for name in prep.CONTINUITY_FILES:
+            shutil.copyfile(core/name, self.bundle/'runtime'/name)
+        manifest = {'git_revision': prep.CONTINUITY_CHANGE['engine_revision'],
+                    'q0_supplement_scope': prep.THRESHOLD_PROFILE,
+                    'continuous_q0_policy_change': dict(prep.CONTINUITY_CHANGE)}
+        # The working tree is now an engineering successor, not the byte-pinned
+        # original. It MUST NOT pass using the old scientific declaration alone.
+        with self.assertRaisesRegex(ValueError, 'differs from reviewed'):
+            prep.validate_continuity_change(self.bundle, manifest)
+        for name, expected in prep.CONTINUITY_FILES.items():
+            if name in ('q0_admission.py', 'q0_collinear.py', 'q0_reference_locus.py'):
+                self.assertNotEqual(prep.digest(core/name), expected)  # not authorized by this historical packet
+            else:
+                self.assertEqual(prep.digest(core/name), expected)
+        manifest['continuous_q0_policy_change']['reference_locus_padding_bp'] = 1000000
+        with self.assertRaisesRegex(ValueError, 'authorization'):
+            prep.validate_continuity_change(self.bundle, manifest)
+        manifest['continuous_q0_policy_change'] = dict(prep.CONTINUITY_CHANGE)
+        path = self.bundle/'runtime/q0_collinear.py'
+        path.write_text(path.read_text() + '\n# changed nested policy source\n')
+        with self.assertRaisesRegex(ValueError, 'differs from reviewed'):
+            prep.validate_continuity_change(self.bundle, manifest)
+
+    def test_explicit_continuity_declaration_survives_preparation(self):
+        from unittest.mock import patch
+        self.bind_threshold_candidate()
+        self.manifest['git_revision'] = prep.CONTINUITY_CHANGE['engine_revision']
+        self.manifest['continuous_q0_policy_change'] = dict(prep.CONTINUITY_CHANGE)
+        path = self.bundle/'runtime/q0_admission.py'
+        before = prep.selector_policy_ast(path, 'AdmissionPolicy')
+        path.write_text(path.read_text().replace('minimum_bp=100', 'minimum_bp=200'))
+        self.manifest['positive_threshold_policy_changes']['q0_admission.py'] = prep.policy_change(
+            before, prep.selector_policy_ast(path, 'AdmissionPolicy'))
+        self.save_manifest()
+        # Synthetic fixture pins exercise full preparation; the separate test
+        # above checks every real 2064cb4c byte pin and rejects even rehashed drift.
+        pins = {p.name: prep.digest(p) for p in (self.bundle/'runtime').glob('*.py')}
+        with patch.object(prep, 'CONTINUITY_FILES', pins):
+            report = prep.prepare(self.bundle)
+        transition = json.loads((self.bundle/'transition.json').read_text())
+        self.assertEqual(report['continuous_q0_policy_change'], prep.CONTINUITY_CHANGE)
+        self.assertEqual(transition['continuous_q0_policy_change'], prep.CONTINUITY_CHANGE)
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_threshold_reuses_only_journal_bound_identical_legacy_support(self):
+        self.bind_threshold_candidate()
+        relative = '.prepare_lib/tools/workspace_layout.py'
+        target = self.work/relative
+        target.write_bytes((self.bundle/'support/workspace_layout.py').read_bytes())
+        journal = json.loads(self.journal.read_text())
+        journal['installed'].append({'relative':relative, 'sha256':prep.digest(target)})
+        self.journal.write_text(json.dumps(journal))
+        before = self.snapshot()
+        report = prep.prepare(self.bundle)
+        self.assertIn(relative, report['unchanged_runtime_files'])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_threshold_rejects_changed_support_even_if_previous_bytes_are_owned(self):
+        self.bind_threshold_candidate()
+        relative = '.prepare_lib/tools/workspace_layout.py'
+        target = self.work/relative
+        target.write_text('# previously installed different support\n')
+        journal = json.loads(self.journal.read_text())
+        journal['installed'].append({'relative':relative, 'sha256':prep.digest(target)})
+        self.journal.write_text(json.dumps(journal))
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, 'existing workspace layout'):
+            prep.prepare(self.bundle)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_threshold_rejects_undeclared_or_changed_policy_delta(self):
+        self.bind_threshold_candidate()
+        self.manifest['positive_threshold_policy_changes']={}
+        self.save_manifest()
+        with self.assertRaisesRegex(ValueError,'changes a selector policy'):
+            prep.prepare(self.bundle)
+        self.assertFalse((self.bundle/prep.LAUNCHER).exists())
+
+    def test_threshold_still_rejects_alignment_policy_change_and_existing_support(self):
+        self.bind_threshold_candidate()
+        p=self.bundle/'runtime/q0_preparation.py';before=p.read_text()
+        p.write_text(before.replace("'version':5", "'version':6"));self.save_manifest()
+        with self.assertRaisesRegex(ValueError,'changes a scientific policy'):
+            prep.prepare(self.bundle)
+        p.write_text(before);self.save_manifest()
+        (self.work/'.prepare_lib/tools/workspace_layout.py').write_text('# unexpected existing support')
+        with self.assertRaisesRegex(ValueError,'existing workspace layout'):
+            prep.prepare(self.bundle)
+
+    def test_threshold_missing_transitive_dependency_is_not_silently_omitted(self):
+        self.bind_threshold_candidate()
+        (self.bundle/'runtime/q0_threshold_questions.py').unlink();self.save_manifest()
+        with self.assertRaises(FileNotFoundError):
+            prep.prepare(self.bundle)
+        self.assertEqual(self.snapshot(),self.before)
+
     def test_existing_unowned_new_module_is_never_assumed_to_be_a_valid_prior(self):
         p=self.work/'.prepare_lib/tools/lgz_core/q0_regional_execution.py';p.write_text('unrelated file')
         with self.assertRaisesRegex(ValueError,'unexpected existing'):prep.prepare(self.bundle)

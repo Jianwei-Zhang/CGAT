@@ -96,6 +96,10 @@ class NativeFrontierTests(unittest.TestCase):
         f,_=bridge_fixture(reverse=True);f.links.clear();f.raw={k:v for k,v in f.raw.items() if '_vs_ref/' in k}
         with TemporaryDirectory() as d:
             root=f.workspace(d);(root/'metadata/package.tsv').write_text('reads_qc_enabled\nfalse\n')
+            # Reopen the parent with the fixture binary, not a workstation mapper.
+            import os
+            env = patch.dict(os.environ, {"PATH": str(Path(d)/"q0-fixture-bin") + os.pathsep + os.environ["PATH"]})
+            env.start(); self.addCleanup(env.stop)
             outer=OuterCheckpointManager(root);outer.commit(outer.prepare('q0_chr:chr1','runs/chr_chr1/q0_command.sh'))
             all_ids=sorted(self.parts); request=dict(kind='partial_source_discovery',query_ids=all_ids,target_ids=all_ids,minimum_uncovered_bp=100)
             def partial(*args,**kwargs):

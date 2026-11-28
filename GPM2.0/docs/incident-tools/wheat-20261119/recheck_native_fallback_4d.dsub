@@ -1,0 +1,23 @@
+#!/bin/bash
+#DSUB -n jm19_q0_native_recheck4d
+#DSUB -q x86
+#DSUB -aa
+#DSUB -nl agent-X86-46
+#DSUB -R "cpu=8,mem=98304MB"
+#DSUB -o replay_%J.out
+set -eo pipefail
+umask 077
+base=$(dirname "$PWD"); q="$base/q0-request-ready.44e274a7/qualification"
+sha256sum -c --quiet kit.sha256
+printf '%s  %s\n' 9fe4a884f98b500fa00c3ea1e6bfd62918a514507637c4793b0fe7b1d213703f "$q/group.py" 36b6c31cd0e5b0049b47646f96d2991081050d79d24b947c95a1aee645d6a70a "$q/fork_wheat_q0.py" 0f06edd183467d950cd99d5c11ca8ed23ff57aaeacce96a6580b7527573dac28 "$q/latest.tgz" | sha256sum -c --quiet -
+source "$HOME/cgat-reads-debug/jm19-x86-readiness-20261118/environment.sh"
+w=$(mktemp -d /tmp/wheat-native-4d.XXXXXXXX); trap 'rm -rf -- "$w"' EXIT
+mkdir "$w/input" "$w/frozen" "$w/new"; tar -xzf "$q/latest.tgz" -C "$w/frozen"; tar -xzf tools.tgz -C "$w/new"
+export PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 GPM_RUN_THREADS=8
+PYTHONPATH="$w/frozen/GPM2.0/server/tools" python3 -Bu "$q/group.py" stage "$base" "$w/input"
+for i in {1..90}; do [[ ! -s allocation.json ]] || break; sleep 2; done; [[ -s allocation.json ]]
+export _GPM_Q0_SCHEDULER_PROOF="$PWD/allocation.json"; _GPM_Q0_SCHEDULER_SHA256=$(sha256sum allocation.json | cut -d ' ' -f1); export _GPM_Q0_SCHEDULER_SHA256
+mode=${WHEAT_NATIVE_SELECTOR:-request}; [[ $mode == request || $mode == ordinary ]]
+mkdir result
+PYTHONPATH="$w/new/tools:$q:$PWD" python3 -Bu recheck_native_fallback_4d.py "$base" "$w/input" "$PWD/result" "$mode"
+sha256sum result/result.json

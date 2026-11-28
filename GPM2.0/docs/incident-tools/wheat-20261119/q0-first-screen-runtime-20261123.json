@@ -1,0 +1,39 @@
+{
+  "scope": "bounded real reference-only sample; no whole-wheat time or supplementary mapper count",
+  "sources": 32,
+  "parts": 32,
+  "access": {
+    "fasta_bytes": 52484630,
+    "paf_bytes": 2165162,
+    "records": 8643
+  },
+  "trials": [
+    {
+      "budget": 1,
+      "seconds": 8.193948909640312,
+      "screen": []
+    },
+    {
+      "budget": 8,
+      "seconds": 2.4559749141335487,
+      "screen": [
+        "reference screen: parts=32 cpu_budget=8 lanes=8",
+        "reference screen complete: parts=32 worker_parts=28"
+      ]
+    },
+    {
+      "budget": 8,
+      "seconds": 2.4181107357144356,
+      "screen": [
+        "reference screen: parts=32 cpu_budget=8 lanes=8",
+        "reference screen complete: parts=32 worker_parts=28"
+      ]
+    },
+    {
+      "budget": 1,
+      "seconds": 8.36310026794672,
+      "screen": []
+    }
+  ],
+  "all_decisions_equal": true
+}
