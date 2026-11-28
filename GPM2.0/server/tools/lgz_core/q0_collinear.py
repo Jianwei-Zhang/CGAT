@@ -25,9 +25,17 @@ class ContinuousAdmissionPolicy:
     minimum_internal_fraction: float = 0.01
     minimum_foreign_density: float = 0.50
     maximum_main_overlap_fraction: float = 0.10
+    # Comma-separated exact labels, serializable in frozen JSON policy stamps.
+    unplaced_reference_groups: str = "Un,chrUn"
+
+    def is_unplaced(self, chromosome):
+        return chromosome in self.unplaced_reference_groups.split(",")
 
     def __post_init__(self):
         import math
+        labels = self.unplaced_reference_groups
+        if not isinstance(labels,str) or (labels and any(not n or n.strip()!=n for n in labels.split(","))):
+            raise Q0EvidenceError("invalid unplaced reference labels")
         for name in ("minimum_main_chain_bp", "minimum_new_chain_bp", "foreign_cluster_gap_bp",
                      "minimum_terminal_foreign_bp", "minimum_internal_foreign_bp"):
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
@@ -123,6 +131,7 @@ def foreign_barriers(groups, high, main_key, main_chain, length, *, minimum_anch
                      policy=ContinuousAdmissionPolicy()):
     main_hull = hull(a.source for a in main_chain)
     main_index = OverlapIndex(a.source for a in main_chain)
+    high_index_main = OverlapIndex(high.get(main_key, ()))
     barriers, audit = [], []
     for key, anchors in sorted(groups.items()):
         if key[0] == main_key[0]:
@@ -147,8 +156,14 @@ def foreign_barriers(groups, high, main_key, main_chain, length, *, minimum_anch
             split = (bp >= required and high_bp >= max(required, minimum_anchor_bp)
                      and bp >= policy.minimum_foreign_density * span.length
                      and main_overlap <= policy.maximum_main_overlap_fraction * bp)
+            internal_un = (split and not policy.is_unplaced(main_key[0]) and policy.is_unplaced(key[0])
+                           and any(a.source.end <= span.start and high_index_main.overlap((a.source,)) > 0 for a in main_chain)
+                           and any(a.source.start >= span.end and high_index_main.overlap((a.source,)) > 0 for a in reversed(main_chain)))
+            if internal_un:
+                split = False
             audit.append({"group": list(key), "source_interval": [span.start, span.end],
-                          "support_bp": bp, "high_mapq_bp": high_bp, "split": split})
+                          "support_bp": bp, "high_mapq_bp": high_bp, "split": split,
+                          **({"reason": "internal_un_preserve_main_chain"} if internal_un else {})})
             if split:
                 barriers.append(span)
     return merged_intervals(barriers), audit
@@ -206,12 +221,22 @@ def continuous_candidates(part, groups, high, admission_policy, make_placement,
                     bp < admission_policy.minimum_whole_support_fraction * region.length):
                 continue
             legacy_pass = legacy and bp >= policy.minimum_main_chain_bp
+            # Interior Un evidence is not a competing chromosome assignment.
+            # Exclude only the supported interior on a genuinely two-sided
+            # primary chain; unrelated/terminal Un support still competes.
+            internal_spans = {}
+            for f in foreign:
+                if f.get("reason") == "internal_un_preserve_main_chain":
+                    internal_spans.setdefault(tuple(f["group"]), []).append(Interval(*f["source_interval"]))
             competitors = []
             if bp >= policy.minimum_new_chain_bp:
                 for other, rows in groups.items():
                     if other == key:
                         continue
                     local = clipped(rows, region, other[1])
+                    if other in internal_spans:
+                        local = tuple(a for arm in subtract_intervals(region, internal_spans[other])
+                                      for a in clipped(local, arm, other[1]))
                     competitors.append((size(a.source for a in chain(local, other[1])), size(a.source for a in local)))
             top = max((v[0] for v in competitors), default=0)
             maximum_group = max((v[1] for v in competitors), default=0)
@@ -225,13 +250,27 @@ def continuous_candidates(part, groups, high, admission_policy, make_placement,
                               "maximum_single_group_support_bp": maximum_group,
                               "legacy_dominance_passed": legacy_pass, "top_chain_passed": top_pass,
                               "foreign_barriers": foreign})
+    # Only an actually qualified primary carrier can protect an interior arm.
+    # Never emit an Un duplicate of such a carrier or let it veto both arms.
+    protected = [hull(a.source for a in anchors) for (key, _, anchors),row in zip(proposals,audit)
+                 if not policy.is_unplaced(key[0]) and any(
+                     f.get("reason") == "internal_un_preserve_main_chain" for f in row["foreign_barriers"])]
+    kept, rows = [], []
+    for (key,region,anchors),row in zip(proposals,audit):
+        if policy.is_unplaced(key[0]):
+            region = hull(a.source for a in anchors)
+            if any(span.contains(region) for span in protected):
+                row.update(status="not_emitted", reason="internal_un_on_qualified_main_chain"); continue
+            row["source_interval"] = [region.start,region.end]
+        kept.append((key,region,anchors)); rows.append(row)
+    proposals = kept
     placements = []
     if len({key[0] for key, _, _ in proposals}) <= 1:
         carriers = [region for _, region, _ in proposals]
     else:
         carriers = exclusive_carriers([(key[0], region, hull(a.source for a in anchors))
                                        for key, region, anchors in proposals])
-    for (key, region, anchors), carrier, row in zip(proposals, carriers, audit):
+    for (key, region, anchors), carrier, row in zip(proposals, carriers, rows):
         if carrier is None:
             row.update(status="unresolved", reason="overlapping_cross_chromosome_chain_hulls")
             continue

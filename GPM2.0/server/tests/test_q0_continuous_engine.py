@@ -334,3 +334,44 @@ class BackboneJoinTests(unittest.TestCase):
         self.assertEqual(result.joins[0].kind, 'input_assembly_gap')
 
 if __name__=='__main__':unittest.main()
+
+class LocalEnvelopeIncidentTests(unittest.TestCase):
+    @staticmethod
+    def sparse(name, size, events):
+        p = placement(name, 0, size)
+        anchors = tuple(anchor(*args) for args in events)
+        return replace(p, reference_blocks=anchors, reference_intervals=merged_intervals(a.reference for a in anchors),
+                       anchor_intervals=merged_intervals(a.source for a in anchors))
+
+    def test_4a_distal_114bp_does_not_merge_two_source_slices(self):
+        # Frozen three source/partner atom pairs; reduced surrounding reference anchors.
+        a = self.sparse("ptg000036l",220255611,[(0,100,0),(130000000,130000100,200000000),(175000000,175000100,245000000)])
+        b = self.sparse("ptg000015l",30000000,[(0,100,0),(25000000,25000100,25000000),(29999900,30000000,245000000)])
+        spans = [(139394745,4306115,8),(139394688,4306123,57),(166195495,23503207,49)]
+        edges = [Equivalence(a.source,Interval(x,x+n),b.source,Interval(y,y+n),True,str(i)) for i,(x,y,n) in enumerate(spans)]
+        pools = {p.source:(p.interval,) for p in (a,b)}; selected = [(p.source,p.interval) for p in (a,b)]
+        domain = ReferenceDomains([a,b]); model = CoverageModel(pools,edges,reference_domains=domain)
+        self.assertEqual(model.unique_selected_bp(selected), a.interval.length+b.interval.length)
+        with patch.object(ReferenceDomains,"local_bounds",lambda d,p,iv:d.bounds[p.placement_id]):
+            self.assertIsNone(CoverageModel(pools,edges,reference_domains=ReferenceDomains([a,b])).unique_selected_bp(selected))
+
+    def test_6a_same_locus_212bp_via_unselected_bridge_still_rejected(self):
+        a = self.sparse("JM19flyeA_contig_5353",37818089,[(0,100,0),(37799000,37799100,1000000)])
+        b = self.sparse("JM19flyeD_contig_16054",30000,[(27813,28025,1000950)])
+        c = placement("bridge",0,212)
+        c = replace(c,reference_intervals=(),reference_blocks=(),anchor_intervals=(),seed_eligible=False,localization_kind="input_adjacency")
+        edges = []
+        for x,y,z,n in [(37799926,0,27813,200),(37799914,200,28013,12)]:
+            iv=Interval(y,y+n)
+            edges.extend([Equivalence(a.source,Interval(x,x+n),c.source,iv,True,"a"),
+                          Equivalence(c.source,iv,b.source,Interval(z,z+n),False,"b")])
+        model=CoverageModel({p.source:(p.interval,) for p in (a,b,c)},edges,reference_domains=ReferenceDomains([a,b,c]))
+        self.assertIsNone(model.unique_selected_bp([(p.source,p.interval) for p in (a,b)]))
+
+    def test_un_labels_configurable_and_real_foreign_barrier_remains(self):
+        f=ContinuousAdmissionTests();part,gs,hi=f.fixture(foreign=True); k=("scaffolds","-")
+        gs[k]=gs.pop(("2","-"));hi[k]=hi.pop(("2","-")); main=("1","+")
+        args=(gs,hi,main,gs[main],part.interval.length)
+        self.assertTrue(foreign_barriers(*args,minimum_anchor_bp=100)[0])
+        cuts,audit=foreign_barriers(*args,minimum_anchor_bp=100,policy=ContinuousAdmissionPolicy(unplaced_reference_groups="scaffolds"))
+        self.assertFalse(cuts); self.assertTrue(any(r.get("reason")=="internal_un_preserve_main_chain" for r in audit))

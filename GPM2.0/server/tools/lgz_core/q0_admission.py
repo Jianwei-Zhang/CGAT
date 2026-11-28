@@ -783,6 +783,14 @@ def admit_placements(data: EvidenceInput, *, policy: AdmissionPolicy = Admission
         return _admit_placements(data, policy, path_policy, quality_pass, screen_threads, phases)
 
 
+def pair_locus_allowed(chromosome, direct_chromosomes, high_intervals, support, minimum):
+    """Inherited evidence cannot overturn another rooted locus without local anchors."""
+    if not (direct_chromosomes - {chromosome}):
+        return True
+    return _size(overlap for iv in support for hit in _overlapping_spans(iv, high_intervals)
+                 if (overlap := hit.intersection(iv))) >= minimum
+
+
 def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, phases, *, first_request=False):
     screen_progress = _quiet if phases.log is _quiet else phases.emit
     if quality_pass is not None and (set(quality_pass) != set(data.sources) or any(type(v) is not bool for v in quality_pass.values())):
@@ -798,12 +806,19 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
     else:
         screened = ((key, part, screen(data, part, policy) if key in allowed else None)
                     for key, part in ordered)
+    direct_groups, direct_high = {}, {}
     for key, part, result in screened:
         if key not in allowed:
             if not first_request:
                 records.append({"segment_id": key, "status": "rejected", "reason": "failed_reads_qc"})
             continue
         groups[key], high, mask, evidence_ids = result
+        # Small screened hits alone do not veto an inherited locus. Require
+        # substantial high-MAPQ support on this same source.
+        direct_groups[key] = {chrom for (chrom, strand), spans in high.items()
+                              if _size(spans) >= policy.continuous.minimum_terminal_foreign_bp} if policy.continuous else set()
+        if policy.continuous and direct_groups[key]:
+            direct_high[key] = high
         ambiguous[part.source].extend(mask)
         if not first_request:
             records.append({"segment_id": key, "status": "reference_screen",
@@ -815,7 +830,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
         if len(groups[key]) == 1 and high and all(_ordered(anchors, group[1]) for group, anchors in groups[key].items()):
             (chromosome, strand), anchors = next(iter(groups[key].items()))
             support = merged_intervals(a.source for a in anchors)
-            interval = part.interval if _size(support) / part.interval.length >= policy.minimum_whole_support_fraction else _hull(support)
+            interval = part.interval if (not policy.continuous or not policy.continuous.is_unplaced(chromosome)) and _size(support) / part.interval.length >= policy.minimum_whole_support_fraction else _hull(support)
             placement = _placement(part, chromosome, strand, interval, support, anchors,
                                    (a.evidence_id for a in anchors), kind="reference")
             accepted[placement.placement_id] = placement
@@ -885,6 +900,10 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
         linked_seeds = seed_neighbors.for_source(current.source)
         for anchor, links in linked_seeds:
             if anchor.chromosome == current.chromosome:
+                continue
+            if policy.continuous and current.chromosome in direct_groups[part.segment_id]:
+                # A reference seed with only one direct locus cannot be split
+                # onto another chromosome solely by an unanchored pair tail.
                 continue
             for orientation in ("+", "-"):
                 probe = _placement(part, anchor.chromosome, orientation, part.interval, (part.interval,), (),
@@ -1020,7 +1039,7 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
                 continue
             for (chromosome, strand), value in sorted(alternatives.items()):
                 support = value["intervals"]
-                partial = (len(groups.get(key, {})) > 1 or len(alternatives) > 1 or
+                partial = ((policy.continuous and policy.continuous.is_unplaced(chromosome)) or len(groups.get(key, {})) > 1 or len(alternatives) > 1 or
                            sum(i.length for i in support) / part.interval.length < policy.minimum_whole_support_fraction)
                 interval = bounds[(chromosome, strand)] if partial else part.interval
                 refs = []
@@ -1028,6 +1047,16 @@ def _admit_placements(data, policy, path_policy, quality_pass, screen_threads, p
                     overlap = a.source.intersection(interval)
                     if overlap:
                         refs.append(ReferenceAnchor(overlap, _project(a.source, a.reference, strand, overlap), a.evidence_id))
+                if policy.continuous and not pair_locus_allowed(
+                        chromosome, direct_groups[key], direct_high.get(key, {}).get((chromosome, strand), ()),
+                        support, min(policy.minimum_anchor_bp, interval.length)):
+                    if not first_request:
+                        records.append({"segment_id": key, "status": "unresolved", "chromosome": chromosome,
+                                        "reason": "pair_only_conflicts_with_direct_reference"})
+                    continue
+                if policy.continuous and policy.continuous.is_unplaced(chromosome) and refs:
+                    interval = _hull(a.source for a in refs)
+                    support = tuple(ov for iv in support if (ov := iv.intersection(interval)))
                 if not _ordered(refs, strand):
                     if not first_request:
                         records.append({"segment_id": key, "status": "unresolved", "reason": "noncollinear_reference_anchors",
