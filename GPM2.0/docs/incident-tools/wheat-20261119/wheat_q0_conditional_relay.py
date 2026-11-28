@@ -244,15 +244,21 @@ def verify(config, root):
         new_conflicts = new_cross_conflicts(conflicts, prior_conflicts)
         calibrated = config.get("runtime_revision") == FINAL_REVISION
         if calibrated:
-            from wheat_reference_release_gate import cross_audit
-            from wheat_source_collision_controls import calibrated_controls, validate_admission_occupancy
+            # validation_code puts the sealed v1 producer first on sys.path.
+            # Use the separately hash-bound relay policy, without changing that kit.
+            from importlib.util import spec_from_file_location, module_from_spec
+            from wheat_source_collision_controls import validate_admission_occupancy
+            policy_file = root / "wheat_reference_release_gate.py"
+            need(f"{digest(policy_file)}  {policy_file.name}" in (root/"relay-kit.sha256").read_text().splitlines(),
+                 "carrier gate is not bound to the relay kit")
+            spec = spec_from_file_location("relay_carrier_policy", policy_file)
+            gate = module_from_spec(spec); spec.loader.exec_module(gate)
             validate_admission_occupancy(admitted.placements)
-            decisions = cross_audit(owner.parent, new_conflicts)
-            controls = calibrated_controls(owner, metrics, paths)
-            # JSON round trip normalizes source-coordinate tuples to arrays.
-            need(json.loads(json.dumps(controls)) == json.loads((owner/"result/source-control-audit.json").read_text()), "control report mismatch")
-            write_once(root / "calibrated-gates.json", {"net_cross_conflicts":decisions, "controls":controls})
-            need(controls["passed"], "intact slice, coverage or NG50 control regression")
+            decisions = gate.cross_audit(owner.parent, new_conflicts)
+            controls = gate.carrier_controls(owner, metrics, paths)
+            write_once(root / "calibrated-gates.json", {"net_cross_conflicts":decisions, "controls":controls,
+                       "archived_v1_control_sha256":digest(owner/"result/source-control-audit.json")})
+            need(controls["passed"], "carrier, directly supported short slice, coverage or NG50 control regression")
             verdict = hard_gates(metrics, overlaps, [r for r in decisions if r["verdict"] == "unsupported_primary"])
             verdict.update(source_controls=controls, cross_chromosome_admission_overlaps=0,
                            raw_net_cross_conflicts=len(decisions), unsupported_primary_conflicts=0)

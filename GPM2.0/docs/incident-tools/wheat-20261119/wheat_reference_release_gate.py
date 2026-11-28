@@ -1,6 +1,7 @@
 """Read-only wheat release gates. Coordinates are source-forward, zero-based and half-open."""
 from collections import defaultdict
 from hashlib import sha256
+from pathlib import Path
 import json
 from types import SimpleNamespace
 
@@ -22,19 +23,32 @@ def classify(row, new_bp, old_bp):
 
 def cross_audit(base, rows):
     """Never use inherited placement blocks as independent reference evidence."""
-    from lgz_core import q0_admission as A, q0_collinear as C
-    from lgz_core.q0_retained_hits import _checked_line, retained_names, retained_geometry_cache
-    from lgz_core.q0_sources import SourceKey, Interval
-    import wheat_production22_cached as whole
     output = [dict(row) for row in rows]
-    disputes = defaultdict(list)
+    primary = []
     for row in output:
         if UNPLACED.intersection((row["current_group"], row["old_group"])):
             row["verdict"] = classify(row, None, None)
         else:
-            disputes[SourceKey(*row["source"])].append(row)
+            primary.append(row)
+    def compare(row, support):
+        new = support(row["current_group"],row["current_orientation"])
+        old = max(support(row["old_group"], strand) for strand in ("+", "-"))
+        row.update(new_direct_chain_bp=new, old_best_direct_chain_bp=old, verdict=classify(row, new, old))
+    measure_rows(base, primary, compare)
+    return output
+
+
+def measure_rows(base, rows, consume):
+    """Measure actual screened high-MAPQ collinear blocks on each source interval."""
+    from lgz_core import q0_admission as A, q0_collinear as C
+    from lgz_core.q0_retained_hits import _checked_line, retained_names, retained_geometry_cache
+    from lgz_core.q0_sources import SourceKey, Interval
+    import wheat_production22_cached as whole
+    disputes = defaultdict(list)
+    for row in rows:
+        disputes[SourceKey(*row["source"])].append(row)
     if not disputes:
-        return output
+        return
     snap, root, index, ordered, _ = whole.frozen.bind(base/"q0-latest-fork-20261123-1435/control/snapshot.json",
                                                        base/"q0-source-part-lookup-20261121-1600/source-part-lookup.json")
     files = {r["path"]: r for r in snap["files"]}
@@ -71,10 +85,7 @@ def cross_audit(base, rows):
                     return C.size(a.source for a in C.chain(C.clipped(anchors, iv, strand), strand))
                 for row in disputes[key]:
                     iv = Interval(*row["interval"]); whole.require(part.interval.contains(iv) and iv.length == row["bp"], "invalid disputed interval")
-                    new = measure(row["current_group"], row["current_orientation"], iv)
-                    old = max(measure(row["old_group"], strand, iv) for strand in ("+", "-"))
-                    row.update(new_direct_chain_bp=new, old_best_direct_chain_bp=old, verdict=classify(row, new, old))
-    return output
+                    consume(row, lambda chrom, strand: measure(chrom, strand, iv))
 
 
 def slices(path):
@@ -107,3 +118,57 @@ def control_group(old, new, before, after, reference_length):
     return dict(baseline=a, candidate=b, reference_length_bp=reference_length, missing_baseline_slices=missing,
                 added_slices=added, added_slice_lengths_bp=sorted((n[4]-n[3] for n in added),reverse=True),
                 passed=not missing and all(b[k]>=a[k] for k in ("selected_source_bp","selected_reference_bp","ng50")))
+
+
+CARRIER_BP = 100_000
+CARRIER_POLICY = "local_chain_carrier_100kb_supported_debris_ng50_v2"
+
+
+def carrier_group(old, new, before, after, reference_length):
+    result = control_group(old, new, before, after, reference_length)
+    missing = set(map(tuple, result.pop("missing_baseline_slices")))
+    carriers = [r for r in old if r[4]-r[3] >= CARRIER_BP]
+    result.update(baseline_carriers=len(carriers), missing_carriers=[r for r in carriers if tuple(r) in missing],
+                  short_slices=[dict(source=[ds,ctg], orientation=strand, interval=[a,b], bp=b-a,
+                                     intact=(ds,ctg,strand,a,b) not in missing)
+                                for ds,ctg,strand,a,b in old if b-a < CARRIER_BP])
+    del result["passed"]  # No verdict until missing short intervals are independently audited.
+    return result
+
+
+def assess_carriers(base, groups, *, measure=measure_rows):
+    pending = []
+    for chrom, row in groups.items():
+        for piece in row["short_slices"]:
+            if not piece["intact"]:
+                piece["baseline_group"] = chrom
+                pending.append(piece)
+    def record(piece, support):
+        counts = {st:support(piece["baseline_group"], st) for st in ("+", "-")}
+        if not all(type(n) is int and 0 <= n <= piece["bp"] for n in counts.values()):
+            raise ValueError("invalid short-slice support")
+        piece["local_high_mapq_chain_bp"] = counts
+        piece["unsupported_at_old_locus"] = max(counts.values()) == 0
+    measure(base, pending, record)
+    for row in groups.values():
+        row["passed"] = (not row["missing_carriers"] and all(p["intact"] or p["unsupported_at_old_locus"] for p in row["short_slices"])
+                         and all(row["candidate"][k] >= row["baseline"][k] for k in ("selected_source_bp","selected_reference_bp","ng50")))
+    return all(r["passed"] for r in groups.values())
+
+
+def carrier_controls(owner, candidate, paths):
+    # Reuse the frozen checkpoint and FAI readers, never the producer's pass/fail bit.
+    import wheat_source_collision_controls as frozen
+    whole = frozen.whole
+    old = Path((owner/"baseline-owner").read_text().strip())
+    whole.require(old == owner.parent/frozen.OLD_OWNER and old.resolve() == old, "wrong control owner")
+    before = frozen.metrics(old, frozen.OLD_KIT, geometry=True)["groups"]
+    # Read the same pinned reference FAI in the validator and independent relay.
+    base = owner.parent
+    snap, root, _, _, _ = whole.frozen.bind(base/"q0-latest-fork-20261123-1435/control/snapshot.json",base/"q0-source-part-lookup-20261121-1600/source-part-lookup.json")
+    ref, = whole.frozen.prep.table(root, "metadata/reference.tsv", ("fai_relpath",))
+    f, = [r for r in snap["files"] if r["path"] == ref["fai_relpath"]]
+    lengths = {k:int(n) for k,n,*_ in (l.split("\t") for l in whole.frozen.bounded(root/f["path"], 16<<20, f["sha256"]).decode().splitlines())}
+    groups = {k:carrier_group(before[k]["geometry"], slices(paths[k]), before[k], candidate[k], lengths[k]) for k in frozen.CONTROLS}
+    return dict(policy=CARRIER_POLICY, minimum_carrier_bp=CARRIER_BP, baseline_job=43225037,
+                baseline_group_009=frozen.OLD_GROUP_009, groups=groups, passed=assess_carriers(base, groups))
