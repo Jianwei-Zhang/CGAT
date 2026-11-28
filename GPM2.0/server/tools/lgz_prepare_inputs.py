@@ -968,7 +968,7 @@ def prepare(args: argparse.Namespace) -> None:
             print(f"LGZ prepare phase: {message}", flush=True)
 
         try:
-            construction = build_q0(server_dir, progress=progress, quality_pass=(
+            construction = build_q0(server_dir, progress=progress, screen_threads=execution_threads(args.threads), quality_pass=(
                 {SourceKey(*key): passed for key, passed in qc_pass.items()} if reads_qc_enabled else None))
         except Q0EvidenceError as exc:
             fail(f"q0 selection failed: {exc}")

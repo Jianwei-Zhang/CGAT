@@ -5,8 +5,10 @@ claims of lossless whole-source alignment. Unroutable source parts retain the
 native full-context fallback; no partial mapper output is accepted.
 """
 from __future__ import annotations
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
+from heapq import nlargest
 import itertools
 from pathlib import Path
 import shutil
@@ -17,19 +19,19 @@ from .common import sha256_file, stable_id
 from .q0_catalog import ObservedSourcePairs, partial_source_intervals
 from .q0_query_windows import WindowPolicy, TargetWindow, plan_query_windows
 from .q0_reference_index import ReferenceIndex, _signature
-from .q0_regional_mapping import MAX_TARGET_BASES, prepare_regional_mapping
+from .q0_regional_mapping import TARGET_BATCH_POLICY, target_batches, RegionalWorkLog, prepare_regional_mapping
 from .q0_frontier_scope import window_touches_frontier
 from .q0_regional_execution import ParentRequest, RegionalExecutor, completed_result
 from .q0_sources import Interval, Q0EvidenceError
 
 REGIONAL_POLICY = {
-    "version": 1, "reference_bases_at_least": 5_000_000_000, "preset": "asm10",
+    "version": 2, "reference_bases_at_least": 5_000_000_000, "preset": "asm10",
     "core_bases": 100_000, "query_context_bases": 10_000,
     "minimum_uncovered_bases": 100, "anchor_context_bases": 1_000_000,
     "reference_context_bases": 10_000, "target_context_bases": 10_000,
-    "maximum_target_bases": MAX_TARGET_BASES,
+    "target_batching": TARGET_BATCH_POLICY,
     "covered_cross_bases": "subtract_complete_identity_ge_0.95_paired_ge_100",
-    "unroutable": "native_full_source_all_anchors",
+    "unroutable": "whole_source_cache_only_keep_routable_siblings",
     "later_candidate_chr": "regional_execution_with_exact_legacy_query_selection",
     "whole_source_equivalence": False,
 }
@@ -124,18 +126,18 @@ def observe_part_hits(catalog, hits, observed):
 
 def plan_parent(catalog, index, windows):
     """Plan a parent's exact targets before selecting native fallback."""
-    planned = []
+    planned = []; reason = None
     for query in windows:
         regions = index.regions(query.segment_id, Interval(query.start,query.end),
                                 anchor_context=1_000_000, reference_context=10_000)
         rows = index.targets(regions, context=10_000, exclude=[query.segment_id])
-        bases = sum(i.length for values in rows.values() for i in values)
-        if not rows or bases > MAX_TARGET_BASES:
-            return [], "no_reference_targets" if not rows else "regional_target_budget"
+        if not rows:
+            reason = "no_reference_targets"
+            continue
         targets = [TargetWindow(key,catalog.parts[key].interval.length,i.start,i.end)
                    for key,values in rows.items() for i in values]
         planned.append((query, targets))
-    return planned, None
+    return planned, reason
 
 
 def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, preset, threads, skip_self=False, complete_tasks=(), required_target_ids=None, regional_frontier=None, unsearched=None):
@@ -170,11 +172,12 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
               "approximate_scope_task_ids":native_scopes.approximate_scope_task_ids if native_scopes else [], "residual_bases": sum(i.length for values in holes.values() for i in values),
               "mapper_threads": mapper_threads, "maximum_workers": workers,
               "address_space_bytes_per_mapper": 4*1024**3, "fallback_sources": [],
-              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0}
+              "frontier_scope": regional_frontier is not None, "frontier_omitted_windows": 0, "target_batch_splits": 0}
     def consume():
         ordinal, task = completed_result(pending)
         tasks.append((ordinal, task))
         if len(tasks)%100 == 0:
+            work.emit("progress")
             print(f"LGZ q0 regional progress: completed={len(tasks)} planned={len(windows)} fallback_sources={len(fallback)}", flush=True)
     def requests():
         for segment_id, group in itertools.groupby(windows, key=lambda w: w.segment_id):
@@ -184,14 +187,14 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                 report[field] += 1
                 continue  # Tested relationships, not an invented coverage/placement assertion.
             yield ParentRequest("partial", segment_id, tuple(group))
-    with execution, ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
+    with RegionalWorkLog("partial") as work, execution, ThreadPoolExecutor(max_workers=workers, thread_name_prefix="q0-region") as pool:
         for parent_number, request, (planned, _, reason) in execution.completed(requests()):
             segment_id = request.segment_id
             parent_order[segment_id] = parent_number
             if reason is not None:
                 fallback.add(segment_id); report["fallback_sources"].append({"segment_id":segment_id,"reason":reason})
-                continue
             for window_number, (query, targets) in enumerate(planned):
+                work.add("candidates")
                 if skip_self and any(catalog.parts[t.segment_id].source.dataset == catalog.parts[query.segment_id].source.dataset for t in targets):
                     raise Q0EvidenceError("--skip-self conflicts with required regional supplementary comparisons")
                 if regional_frontier is not None and not window_touches_frontier(query, targets, catalog.parts, regional_frontier):
@@ -199,14 +202,28 @@ def prepare_partial(root, catalog, index, observed, tool, *, reference_lengths, 
                         raise Q0EvidenceError("q0 frontier omissions require a bound scope recorder")
                     unsearched.observe(query, targets, catalog.parts)
                     report["frontier_omitted_windows"] += 1
+                    work.add("frontier_omitted")
                     continue
-                if len(pending) >= workers: consume()
-                future = pool.submit(prepare_regional_mapping, root,catalog,query,targets,tool,
-                                     reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
-                pending[future] = (parent_number, window_number)
-                if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
+                # Gate the original window, then dispatch every target of an accepted frame.
+                for batch_number, batch in enumerate(target_batches(targets)):
+                    if batch_number:
+                        report["target_batch_splits"] += 1
+                    if len(pending) >= workers: consume()
+                    future = pool.submit(work.run, prepare_regional_mapping, root,catalog,query,batch,tool,
+                                         reference_bases=sum(reference_lengths.values()),preset=preset,threads=mapper_threads)
+                    pending[future] = (parent_number, window_number, batch_number)
+                    if threads == 1: consume()  # Owner planning cannot overlap the one granted mapper CPU.
         while pending: consume()
     report.update(execution.report)
     report["completed_regional_tasks"] = len(tasks)
     report["fallback_sources"].sort(key=lambda row:parent_order[row["segment_id"]])
+    if fallback:
+        # This decision precedes the regional frontier filter; it is not a fresh mapper receipt.
+        rows = report["fallback_sources"]
+        reasons = Counter(row["reason"] for row in rows)
+        largest = nlargest(3, ((catalog.parts[r["segment_id"]].interval.length, r["segment_id"], r["reason"])
+                               for r in rows))
+        print(f"LGZ q0 partial native fallback planned: parents={len(rows)} "
+              f"regional_frontier={regional_frontier is not None} reasons={dict(sorted(reasons.items()))} "
+              f"largest_bp_id_reason={largest}", flush=True)
     return [task for _ordinal, task in sorted(tasks, key=lambda row:row[0])], sorted(fallback), report

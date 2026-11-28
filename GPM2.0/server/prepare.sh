@@ -41,7 +41,7 @@ LGZ_QC_MEMORY_GB="80"
 LGZ_KMER_SIZE="21"
 LGZ_REFILL_MAX_LENGTH="1000000"
 LGZ_EXECUTION_PROFILE="optimized"
-Q0_SUPPLEMENT_SCOPE="full"
+Q0_SUPPLEMENT_SCOPE="auto"
 LGZ_STEP2_MUMMER_SCOPE="gap-screen"
 
 usage() {
@@ -69,7 +69,7 @@ Usage:
     [--lgz-kmer-size <kmer_size>] \
     [--max-fill <bp>] \
     [--lgz-execution-profile optimized|baseline] \
-    [--q0-supplement-scope full|decision_frontier_repair|positive_threshold] \
+    [--q0-supplement-scope auto|full|decision_frontier_repair|positive_threshold] \
     [--lgz-step2-mummer-scope gap-screen|full] \
     [--ds [<dataset_name>] <dataset_fasta_path> ...]
 
@@ -108,8 +108,8 @@ Behavior:
   - LGZ defaults: optimized execution, full Step1, anchor-safe gap-screen Step2
   - --lgz-execution-profile baseline restores legacy scheduling and per-chromosome refill
   - positive_threshold uses a supported Q0 backbone without claiming exhaustive alternatives (no reads QC).
-  - --q0-supplement-scope defaults to full; decision_frontier_repair is an opt-in, potentially lossy Q0-only search with bounded repair and full fallback
-    It targets expensive regional discovery and can be slower on small workloads. This is not a resume resource option.
+  - Q0 supplement scope is selected automatically from bound workload complexity; simple workloads retain full search, while large no-reads-QC regional workloads may use bounded proof repair and full fallback
+    --q0-supplement-scope remains a diagnostic override and is not needed for normal users. This is not a resume resource option.
   - --lgz-step2-mummer-scope full restores the complete Step2 MUMmer alignment scope
   - Discovers minimap2, nucmer, delta-filter, and show-coords from PATH and records their resolved paths
   - No reads: LGZ-only; later append with bash run_all.sh --hifi reads.fq.gz [--ont reads.fq.gz]
@@ -827,8 +827,8 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --q0-supplement-scope)
-      [[ $# -ge 2 ]] || die "$1 requires full, decision_frontier_repair or positive_threshold"
-      case "$2" in full|decision_frontier_repair|positive_threshold) Q0_SUPPLEMENT_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
+      [[ $# -ge 2 ]] || die "$1 requires auto, full, decision_frontier_repair or positive_threshold"
+      case "$2" in auto|full|decision_frontier_repair|positive_threshold) Q0_SUPPLEMENT_SCOPE="$2" ;; *) die "Invalid $1 '$2'." ;; esac
       shift 2
       ;;
     --lgz-execution-profile|--grt-execution-profile)

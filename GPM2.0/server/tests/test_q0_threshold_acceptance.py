@@ -1,5 +1,6 @@
 """Positive threshold is a distinct, bound final search contract, never a bypass for old scopes."""
 import os
+import pickle
 from pathlib import Path
 import subprocess
 import sys
@@ -10,6 +11,7 @@ from unittest.mock import patch
 
 from server.tests.test_q0_admission import EvidenceFixture, bridge_fixture, dna
 from server.tools.lgz_core import q0_admission as adm, q0_preparation as prep
+from server.tools.lgz_core import q0_threshold_prepare as threshold, q0_threshold_questions as demand_rule
 from server.tools.lgz_core.common import stable_id
 from server.tools.lgz_core.q0_frontier_scope import UnsearchedQ0Context, audit_selected_scope
 from server.tools.lgz_core.q0_sources import Q0EvidenceError
@@ -45,12 +47,43 @@ class ThresholdAcceptanceTests(unittest.TestCase):
             with self.assertRaisesRegex(UnsearchedQ0Context,'overlaps an unsearched'):
                 adm.construct_q0(with_scope(data,need,[[part.segment_id,[[cut,cut+1]]]]))
             incomplete={s:spans for s,spans in need.items() if s!=source}
-            with self.assertRaisesRegex(UnsearchedQ0Context,'not requested'):
+            with self.assertRaisesRegex(UnsearchedQ0Context,'not requested') as rejected:
                 adm.construct_q0(with_scope(data,incomplete))
+            self.assertEqual(pickle.loads(pickle.dumps(rejected.exception)).demand, need)
         accepted=adm.construct_q0(with_scope(data,need))
         self.assertEqual([j.kind for j in accepted.paths['chr1'].path.joins],['reference_unknown'])
         self.assertGreater(accepted.decisions['supplement_acceptance']['decision_counts']['unproven_join'],0)
         with self.assertRaises(UnsearchedQ0Context): adm.construct_q0(with_scope(data,{},mode='base_only'))
+
+    def test_repair_dispatch_uses_audited_demand_once_then_rechecks_changed_evidence(self):
+        f, _ = bridge_fixture(); strong = f.data(); weak = replace(strong, pair_links=())
+        expected, _ = questions(weak, adm.select_q0_paths(weak), []); self.assertTrue(expected)
+        first = with_scope(weak, {}, mode='base_only'); second = with_scope(strong, expected)
+        class ReachedFinalVerification(Exception): pass
+        with (tempfile.TemporaryDirectory() as directory, patch.object(prep, '_readless_package'),
+              patch.object(threshold, 'initial_generation', return_value=('request', None, False, {})),
+              patch.object(prep, '_prepare_evidence_pass', return_value=({'outputs':[]}, None, None)) as dispatch,
+              patch.object(adm, 'load_evidence_input', side_effect=[first, second]),
+              patch.object(demand_rule, 'questions', wraps=questions) as ask,
+              patch.object(threshold._ThresholdInputs, 'verify', side_effect=ReachedFinalVerification),
+              self.assertRaises(ReachedFinalVerification)):
+            threshold.prepare(Path(directory), 1, 'unused')
+        self.assertEqual([c.kwargs['frontier_override'] for c in dispatch.call_args_list], [{},expected])
+        self.assertEqual([id(c.args[0]) for c in ask.call_args_list], [id(first), id(second)])
+
+    def test_rooted_full_fallback_is_not_an_empty_repair(self):
+        f, _ = bridge_fixture(); data = with_scope(f.data(), {}, mode='base_only')
+        class ReachedFullDispatch(Exception): pass
+        with (tempfile.TemporaryDirectory() as directory, patch.object(prep, '_readless_package'),
+              patch.object(threshold, 'initial_generation', return_value=('request', None, False, {})),
+              patch.object(prep, '_prepare_evidence_pass', side_effect=[({'outputs':[]}, None, None), ReachedFullDispatch]) as dispatch,
+              patch.object(adm, 'load_evidence_input', return_value=data),
+              patch.object(demand_rule, 'questions', return_value=(None, {'rooted_no_path_full_fallback':1})) as ask,
+              self.assertRaises(ReachedFullDispatch)):
+            threshold.prepare(Path(directory), 1, 'unused')
+        ask.assert_called_once()
+        self.assertIsNone(dispatch.call_args.kwargs['frontier_override'])
+        self.assertEqual(dispatch.call_args.kwargs['fallback_reason'], 'threshold_full_fallback')
 
     def test_regular_scope_reuses_complete_enumeration_but_not_an_omitted_weak_shoulder(self):
         f,_=bridge_fixture(); data=replace(f.data(),pair_links=()); need,_=questions(data,adm.select_q0_paths(data),[])
@@ -107,7 +140,9 @@ class ThresholdAcceptanceTests(unittest.TestCase):
             fake=Path(t)/'q0-fixture-bin'; tool=str(fake/'minimap2'); env={**os.environ,'PATH':str(fake)+os.pathsep+os.environ['PATH']}
             # An external invocation, with real outer receipts and source/reference FASTAs, not a panel adapter.
             args=[sys.executable,str(Path(prep.__file__).parents[1]/'lgz_prepare_evidence.py'),'--server-dir',str(root),'--minimap2',tool,'--supplement-scope',SCOPE]
-            subprocess.run(args,env=env,check=True,capture_output=True,text=True)
+            env.pop('GPM_RUN_THREADS', None)
+            first = subprocess.run([*args, '--threads', '4'],env=env,check=True,capture_output=True,text=True)
+            self.assertIn('cpu_budget=4 lanes=1', first.stdout)  # small input stays serial
             with patch.dict(os.environ,env):
                 r=prep.load_verified_evidence(root); cat=prep.json_file(root/r['catalog']); self.assertEqual(cat['supplement_scope']['effective'],'base_only')
                 self.assertFalse(cat['supplementary_alignments']); cached=(root/prep.MANIFEST).stat().st_mtime_ns
@@ -128,13 +163,37 @@ class ThresholdAcceptanceTests(unittest.TestCase):
         from server.tools.lgz_core.q0_publication import validate_prepared_q0
         with tempfile.TemporaryDirectory() as t:
             f, truth=bridge_fixture(reverse=True); root=complete_workspace(f,Path(t)); fake=Path(t)/'q0-fixture-bin'
-            with patch.dict(os.environ,{'PATH':str(fake)+os.pathsep+os.environ['PATH']}):
-                prep.prepare_evidence(root,minimap2=str(fake/'minimap2'),supplement_scope=SCOPE)
-                run=run_prepare(root); self.assertEqual(run.returncode,0,run.stderr)
+            with (patch.dict(os.environ,{'PATH':str(fake)+os.pathsep+os.environ['PATH'],'GPM_RUN_THREADS':'3'}),
+                  patch.object(adm,'select_q0_paths',wraps=adm.select_q0_paths) as audits):
+                prep.prepare_evidence(root,threads=4,minimap2=str(fake/'minimap2'),supplement_scope=SCOPE)
+                self.assertTrue(audits.called)
+                self.assertEqual({c.kwargs.get('screen_threads',1) for c in audits.call_args_list},{4})
+                run=run_prepare(root,threads=8); self.assertEqual(run.returncode,0,run.stderr)
+                from server.tools.run_resources import execution_threads
+                self.assertIn(f'placement thread budget={execution_threads(8)}',run.stdout)
             self.assertEqual(dict(read_fasta(root/'grt/q/q0.fa')),{'chr1':truth})
             freeze=validate_prepared_q0(root)
             self.assertEqual(next(r['available'] for r in freeze['sources'] if r['source']['contig']=='c'),
                              [{'start':0,'end':200},{'start':1000,'end':1200}])
+
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'bounded spawned workers on Linux')
+    def test_published_threshold_generation_is_identical_with_actual_screen_workers(self):
+        from server.tools.lgz_core import q0_source_screen as lanes
+        with tempfile.TemporaryDirectory() as t:
+            f,truth=bridge_fixture(reverse=True);root=f.workspace(t);(root/'metadata/package.tsv').write_text('reads_qc_enabled\nfalse\n')
+            fake=Path(t)/'q0-fixture-bin'
+            with patch.dict(os.environ,{'PATH':str(fake)+os.pathsep+os.environ['PATH']}):
+                prep.prepare_evidence(root,minimap2=str(fake/'minimap2'),supplement_scope=SCOPE)
+                serial=adm.build_q0(root);logs=[]
+                # This tiny fixture only overrides the workload-size gate; packets, spawned
+                # reads, owner order, publication audit and every evidence ID are real.
+                with (patch.object(lanes,'_lanes',return_value=3),
+                      patch.object(lanes,'_weight',side_effect=lambda data,part: bool(data.reference_hits.get(part.source)))):
+                    parallel=adm.construct_q0(adm.load_evidence_input(root),screen_threads=3,progress=logs.append)
+                self.assertEqual(parallel,serial);self.assertEqual(parallel.records,{'chr1':truth})
+                self.assertGreater(int(next(s for s in logs if s.startswith('reference screen complete:')).rsplit('=',1)[1]),0)
+                with patch.object(adm,'select_q0_paths',side_effect=AssertionError('accepted generation must not rerank')):
+                    self.assertEqual(adm.build_q0(root),serial)
 
     def test_weak_join_does_not_build_a_discarded_catalog_or_reread_the_source_fasta_for_dispatch(self):
         f,_=bridge_fixture(); f.links.clear(); f.raw={k:v for k,v in f.raw.items() if '_vs_ref/' in k}

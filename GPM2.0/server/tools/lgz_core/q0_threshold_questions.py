@@ -1,8 +1,9 @@
 """Ask for evidence of a missing Q0 decision, not evidence that competitors do not exist.
 
-Experimental draft routing; cannot authorize a placement/cut, convert an unknown join to an
-exact join, or certify search completeness. Input must be the ordinary selector's draft.
+Draft routing cannot authorize a placement/cut, convert an unknown join to an exact join,
+or certify search completeness. It consumes the shared selector's winner, not its report.
 """
+from .q0_paths import REFERENCE_ROOT_KINDS, LOCALIZED_ANCHOR_KINDS
 from collections import Counter, defaultdict
 from dataclasses import replace
 
@@ -55,6 +56,11 @@ def _supported_unknown_joins(paths, placed, links, policy):
         for left, join, right in zip(path.slices, path.joins, path.slices[1:]):
             if join.kind == 'reference_unknown':
                 lp, rp = placed[left.placement_id], placed[right.placement_id]
+                # facing_evidence requires an anchor on BOTH sides. This is an
+                # unresolved join, not a positive: keep its shoulder request,
+                # but don't keep scanning links for a witness it cannot have.
+                if not lp.anchor_intervals or not rp.anchor_intervals:
+                    continue
                 a, b = lp.source, rp.source
                 joins = lookup.get((a, b))
                 if joins is None:
@@ -82,7 +88,7 @@ def _supported_unknown_joins(paths, placed, links, policy):
     return positive
 
 
-def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
+def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy(), issue_sink=None):
     minimum = policy.minimum_anchor_bp
     if type(reach) is not int or reach < minimum:
         raise ValueError('question shoulders shorter than the required paired support')
@@ -92,7 +98,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
         # expansion and input adjacency inherit an existing chromosome; they cannot name one.
         # Lack of a selected path alone is NOT evidence that a chromosome has no reference root.
         direct = draft.admission if draft is not None else admit_placements(replace(data, pair_links=(), original_adjacencies=()))
-        if not any(p.localization_kind == 'reference' for p in direct.placements):
+        if not any(p.localization_kind in REFERENCE_ROOT_KINDS for p in direct.placements):
             return {}, {'no_reference_seed_no_backbone': 1}
         return None, {'rooted_no_path_full_fallback': 1}
     placed = {p.placement_id: p for p in draft.admission.placements}
@@ -104,7 +110,7 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
             raise Q0EvidenceError('assignment source not in blind draft input')
         if c in data.reference_lengths:
             required[c].add(s)
-    roots = {p.chromosome for p in placed.values() if p.localization_kind == 'reference'}
+    roots = {p.chromosome for p in placed.values() if p.localization_kind in REFERENCE_ROOT_KINDS}
     # A tail split retains its original reference seed; the new tail inherits another
     # existing seed. Seeing any placements off this lineage would invalidate the bound.
     if not {p.chromosome for p in placed.values()} <= roots:
@@ -123,10 +129,13 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
             if p.source != s.source or p.orientation != s.orientation or not p.interval.contains(s.interval):
                 raise Q0EvidenceError('slice differs from admitted placement')
             sides = ends(s.interval, minimum)
-            anchors = merged_intervals(p.anchor_intervals) if p.localization_kind in ('reference', 'pairwise') else ()
+            anchors = merged_intervals(p.anchor_intervals) if p.localization_kind in LOCALIZED_ANCHOR_KINDS else ()
             weak = [v for v in sides if not supported(v, anchors, minimum)] if sides else [s.interval]
             if weak:
                 needed[s.source].extend(weak); stats['weak_placement'] += 1
+                if issue_sink is not None:
+                    issue_sink(dict(kind='weak_placement',groups=[path.chromosome],id=s.placement_id,
+                                    spans=[[s.source.dataset,s.source.contig,v.start,v.end] for v in weak]))
             else:
                 stats['positive_placement_stop'] += 1
                 if s.source in missing:
@@ -145,17 +154,26 @@ def questions(data, draft, assignments, *, reach=2000, policy=PathPolicy()):
                 stats['observed_facing_match_leave_gap'] += 1
                 continue
             stats['unproven_join'] += 1
+            endpoints = [] if issue_sink is not None else None
             for p, local in ((lp, j.left_end), (rp, j.right_start)):
                 lo, hi = max(0, local-reach), min(p.interval.length, local+reach)
-                needed[p.source].append(p.source_interval(Interval(lo, hi)))
+                span = p.source_interval(Interval(lo, hi)); needed[p.source].append(span)
+                if endpoints is not None: endpoints.append([p.source.dataset,p.source.contig,span.start,span.end])
+            if issue_sink is not None:
+                issue_sink(dict(kind='unproven_join',groups=[path.chromosome],id=j.join_id,
+                                placement_ids=[j.left_id,j.right_id],spans=endpoints))
     # A secondary assignment to an unbuilt chromosome is a possible rival, not an
     # independent reason to redo an already supported placement. Do not exempt the
     # rest of its contig or erase an independent weak-junction request on this axis.
-    fixed = {s: merged_intervals(v) for s, v in strong_on_missing.items()}
-    for part in data.parts.values():
-        if part.source in missing:
-            remaining = subtract_intervals(part.interval, fixed.get(part.source, ()))
-            stats['missing_chromosome_parts'] += 1
-            stats['secondary_assignment_supported_bp_not_requested'] += part.interval.length - sum(i.length for i in remaining)
-            needed[part.source].extend(remaining)
+    if missing:
+        fixed = {s: merged_intervals(v) for s, v in strong_on_missing.items()}
+        for part in data.parts.values():
+            if part.source in missing:
+                remaining = subtract_intervals(part.interval, fixed.get(part.source, ()))
+                stats['missing_chromosome_parts'] += 1
+                stats['secondary_assignment_supported_bp_not_requested'] += part.interval.length - sum(i.length for i in remaining)
+                needed[part.source].extend(remaining)
+                if remaining and issue_sink is not None:
+                    issue_sink(dict(kind='missing_chromosome_part',groups=sorted(c for c in absent & roots if part.source in required[c]),
+                                    id=part.segment_id,spans=[[part.source.dataset,part.source.contig,v.start,v.end] for v in remaining]))
     return {s: merged_intervals(v) for s, v in needed.items() if v}, dict(stats)

@@ -19,8 +19,11 @@ class _ReferenceBlockCandidates:
         self.blocks = sorted(blocks, key=lambda b: b.query.start)
         self.starts = []
         self.prefix_end = []
+        self.has_overlap = False
         farthest = 0
         for b in self.blocks:
+            if b.query.start < farthest:  # Equal endpoints share no query base.
+                self.has_overlap = True
             farthest = max(farthest, b.query.end)
             self.starts.append(b.query.start)
             self.prefix_end.append(farthest)
@@ -122,6 +125,10 @@ def reference_masks(blocks, margin):
     if len(keys) < 2:
         return [(b.query,) for b in blocks], ()
     candidates = _ReferenceBlockCandidates(blocks)
+    if not candidates.has_overlap:
+        # Distinct placements cannot mask one another on disjoint query bases.
+        # Return in the original block order, not the index order.
+        return [(b.query,) for b in blocks], ()
     # A sparse matrix is cheaper to scan directly. Count candidate visits, not
     # just rows: one long nested interval can widen the scan over disjoint hits.
     if len(blocks) >= 32:

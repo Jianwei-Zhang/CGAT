@@ -10,7 +10,7 @@ from .q0_frontier_scope import UnsearchedQ0Context, _unsearched_axes
 from .q0_sources import Interval, Q0EvidenceError, SourceKey, merged_intervals, subtract_intervals
 
 SCOPE = 'positive_threshold'
-SEMANTICS = 'supported_backbone_not_exhaustive_alternatives_v1'
+SEMANTICS = 'supported_backbone_not_exhaustive_alternatives_v2'
 MAX_REPAIRS = 1
 
 
@@ -19,8 +19,11 @@ def contract():
     return {'semantics': SEMANTICS, 'minimum_anchor_bp': 100, 'join_reach_bp': 2000,
             'maximum_repairs': MAX_REPAIRS, 'readless_only': True,
             'rule_sha256': sha256_file(here.with_name('q0_threshold_questions.py')),
+            'junction_review_sha256': sha256_file(here.with_name('q0_junction_review.py')),
+            'paf_chunks_sha256': sha256_file(here.with_name('q0_paf_chunks.py')),
             'retained_hit_sha256': sha256_file(here.with_name('q0_retained_hits.py')),
             'native_candidate_sha256': sha256_file(here.with_name('q0_threshold_candidates.py')),
+            'native_frontier_sha256': sha256_file(here.with_name('q0_native_frontier.py')),
             'acceptance_sha256': sha256_file(here), 'preparer_sha256': sha256_file(here.with_name('q0_threshold_prepare.py'))}
 
 
@@ -58,6 +61,17 @@ class VerifiedScope:
     report_identity: str
 
 
+class ThresholdRepairRequired(UnsearchedQ0Context):
+    """Private handoff of this selection's exact demand (None means full search)."""
+    def __init__(self, reason, demand, native_ids=()):
+        super().__init__(reason)
+        self.demand = demand
+        self.native_ids = tuple(native_ids)
+
+    def __reduce__(self):
+        return type(self), (self.args[0], self.demand, self.native_ids)
+
+
 def complete_window_accounting(catalog):
     """Both planners finished. Each skipped *whole* context recorded both axes before dispatch.
 
@@ -74,15 +88,18 @@ def complete_window_accounting(catalog):
         if type(done) is not int or done < 0 or type(skipped) is not int or skipped < 0:
             raise Q0EvidenceError('invalid threshold regional phase counts')
         n += done
-    if n != sum(t['kind'] == 'regional_discovery' for t in catalog['supplementary_alignments']):
+    from .q0_junction_review import extra_count
+    if n + extra_count(catalog) != sum(t['kind'] == 'regional_discovery' for t in catalog['supplementary_alignments']):
         raise Q0EvidenceError('threshold regional phase completion differs from tasks')
     return True
 
 
 def audit(data, selection, *, admission_policy=None, path_policy=None, quality_pass=None):
-    from .q0_admission import AdmissionPolicy
+    from .q0_admission import AdmissionPolicy, FirstRequestSelection
     from .q0_paths import PathPolicy
     from .q0_threshold_questions import questions
+    if isinstance(selection, FirstRequestSelection):
+        raise Q0EvidenceError('a planning-only Q0 selection cannot certify a prepared generation')
     binding = data.threshold_scope
     if not isinstance(binding, VerifiedScope) or not binding.ready_identity or binding.ready_identity!=data.ready_manifest_identity:
         raise Q0EvidenceError('threshold acceptance needs a verified scope and assignment inventory')
@@ -96,6 +113,8 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
         raise Q0EvidenceError('threshold acceptance contract differs from catalog')
     frontier=decode(report['threshold_request'],{s:len(seq) for s,seq in data.sources.items()})
     axes=_unsearched_axes(report,data.parts)
+    from .q0_native_frontier import CACHE_ONLY, omitted, touches
+    pending = omitted(report,data.parts)
     if mode=='full':
         if axes or frontier is not None: raise Q0EvidenceError('full threshold fallback contains omissions or a scoped request')
         return {'full_discovery': True}
@@ -103,22 +122,39 @@ def audit(data, selection, *, admission_policy=None, path_policy=None, quality_p
             or (mode in ('base_only','supported_after_discovery') and (frontier or axes))):
         raise Q0EvidenceError('invalid threshold search mode')
     assignments=({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in binding.assignments)
-    need,counts=questions(data,selection,assignments)
-    if need is None: raise UnsearchedQ0Context('threshold selector needs full supplemental evidence')
+    # Only unresolved gaps/weak placements may abstain from a global search. A
+    # missing required chromosome never becomes accepted through this rule.
+    bounded_cold = bool(pending) and report.get('native_fallback_policy') == CACHE_ONLY
+    issues = [] if bounded_cold else None
+    need,counts=questions(data,selection,assignments,issue_sink=issues.append if bounded_cold else None)
+    if need is None: raise ThresholdRepairRequired('threshold selector needs full supplemental evidence', need)
     if report.get('candidate_threshold_request') == [] and need:
-        raise UnsearchedQ0Context('candidate search stopped but final decisions still need evidence')
-    enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog)
+        raise ThresholdRepairRequired('candidate search stopped but final decisions still need evidence', need)
+    affected = [row['id'] for row in pending if touches(row,data.parts,need)]
+    if affected:
+        if not bounded_cold:
+            raise Q0EvidenceError('unbound deferred native fallback policy; cannot certify the selected path')
+        missing = {}
+        for issue in issues:
+            if issue['kind'] not in ('weak_placement','unproven_join'):
+                for d,s,a,b in issue['spans']:
+                    missing.setdefault(SourceKey(d,s),[]).append(Interval(a,b))
+        if any(touches(row,data.parts,missing) for row in pending):
+            raise Q0EvidenceError('required Q0 chromosome remains unproven; automatic whole-source fallback is disabled')
+        counts['unsearched_whole_source_matrices'] = len(affected)
+
+    enumerated = mode=='decision_frontier' and complete_window_accounting(data.catalog) and (not pending or bounded_cold)
     covered_without_repair = 0
     for s,spans in need.items():
         for span in spans:
             if subtract_intervals(span,frontier.get(s,())):
                 if not enumerated:
-                    raise UnsearchedQ0Context('threshold decision was not requested on this source interval')
+                    raise ThresholdRepairRequired('threshold decision was not requested on this source interval', need)
                 covered_without_repair += 1
             if s in axes:
                 starts,omitted=axes[s]; j=bisect_right(starts,span.end-1)-1
                 if j>=0 and omitted[j].end>span.start:
-                    raise UnsearchedQ0Context('threshold decision overlaps an unsearched source interval')
+                    raise ThresholdRepairRequired('threshold decision overlaps an unsearched source interval', need)
     if covered_without_repair:
         counts['expanded_intervals_already_covered_by_planner'] = covered_without_repair
     return counts
@@ -146,6 +182,15 @@ def validate_catalog(root, manifest, catalog):
                 or (not remaining and ('regional_candidate_discovery' in catalog or
                                        any(t['kind']=='candidate_chr' for t in catalog['supplementary_alignments'])))):
             raise Q0EvidenceError('invalid sparse candidate threshold inventory')
+    from .q0_native_frontier import validate_inventory
+    from .q0_junction_review import extra_count
+    extra_count(catalog)
+    from .q0_native_frontier import CACHE_ONLY
+    if scope.get('deferred_native_matrices') and scope.get('native_fallback_policy') != CACHE_ONLY:
+        raise Q0EvidenceError('unbound deferred native fallback policy')
+    if 'native_fallback_policy' in scope and (scope['native_fallback_policy'] != CACHE_ONLY or mode != 'decision_frontier'):
+        raise Q0EvidenceError('unknown or misplaced native fallback policy')
+    validate_inventory(catalog)
     if mode=='base_only':
         if q!={} or scope['unsearched_part_intervals'] or catalog['supplementary_alignments'] or any(k in catalog for k in ('regional_partial_discovery','regional_candidate_discovery')):
             raise Q0EvidenceError('base-only threshold evidence claims supplemental discovery')

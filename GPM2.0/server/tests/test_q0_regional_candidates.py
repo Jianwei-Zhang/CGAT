@@ -49,6 +49,40 @@ class RegionalCandidatesTests(unittest.TestCase):
         query,targets=windows[0];self.assertEqual(query.cores,((0,1000),))
         self.assertEqual({t.segment_id for t in targets},{self.ids['b']})
 
+    def test_target_total_above_100mb_is_not_a_native_candidate_matrix(self):
+        from server.tools.lgz_core.q0_regional_execution import plan_request
+        from server.tools.lgz_core.q0_regional_mapping import target_batches
+        index=mock.Mock(); index.regions.return_value={'chr':(Interval(0,1000),)}
+        index.parts = {k:SimpleNamespace(interval=Interval(0,100_000_001)) for k in ('t1','t2')}
+        index.targets.return_value={'t1':(Interval(0,60_000_001),),'t2':(Interval(0,40_000_000),)}
+        q=QueryWindow('q',3000,0,1000,((0,1000),))
+        (row,), native, reason=plan_request(ParentRequest('candidate','q',(q,),('chr',),3,0,3),index)
+        self.assertEqual((native,reason),(0,None)); batches=list(target_batches(row[1]))
+        self.assertEqual(len(batches),2); self.assertEqual({t.segment_id for b in batches for t in b},{'t1','t2'})
+
+    def test_one_unanchored_candidate_window_does_not_discard_local_siblings(self):
+        from server.tools.lgz_core.q0_regional_execution import plan_request
+        index=mock.Mock(); index.parts={'t':SimpleNamespace(interval=Interval(0,3000))}
+        index.regions.side_effect=[{'chr':(Interval(0,1000),)}, {}, {'chr':(Interval(2000,3000),)}]
+        index.targets.return_value={'t':(Interval(0,1000),)}
+        windows=tuple(QueryWindow('q',3000,i,i+1000,((i,i+1000),)) for i in (0,1000,2000))
+        rows,native,reason=plan_request(ParentRequest('candidate','q',windows,('chr',),1,0,1),index)
+        self.assertEqual(([q.start for q,_ in rows],native,reason),([0,2000],1,'query_window_without_qualified_reference'))
+
+    def test_cold_optional_seed_does_not_block_routable_candidate_targets(self):
+        from server.tools.lgz_core.q0_native_frontier import RegionalFallbackCache,PHASES
+        a,b,c=(self.ids[k] for k in 'abc');self.catalog.reference_routable_parts=frozenset((a,b))
+        planner=self.plan();self.assertIsNotNone(planner.next_unroutable_seed())
+        def local(root,catalog,q,targets,tool,**kw):
+            self.assertEqual(q.segment_id,a);self.assertEqual({t.segment_id for t in targets},{b});return {'paf':'actual-local'}
+        with mock.patch.object(candidates,'prepare_regional_mapping',side_effect=local):
+            tasks,missing,report=prepare_candidates(self.root,self.catalog,self.index,self.requests,(),[],{},
+                 reference_lengths=self.refs,preset='asm10',threads=1,planner=planner)
+        self.assertEqual(tasks,[{'paf':'actual-local'}]);self.assertEqual(report['completed_regional_tasks'],1)
+        self.assertEqual([(r['query_ids'],r['target_ids']) for r in missing],[([a],[c])])
+        gate=RegionalFallbackCache(bounded=True);self.assertEqual(gate.dispatch(PHASES[1],missing,lambda _:None),[])
+        self.assertEqual(gate.omissions[0]['target_ids'],[c]);self.assertNotEqual(planner.remaining_targets(c,planner.mask([a])),0)
+
     def test_known_sources_are_excluded_before_paf_decode_and_no_local_targets_is_not_failure(self):
         known={(SourceKey('ds','a'),SourceKey('ds','b'))};plan=self.plan(known)
         _,eligible=plan.eligible(self.ids['a']);original=self.index._hit

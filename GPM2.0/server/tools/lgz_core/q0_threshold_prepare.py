@@ -3,14 +3,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
+from time import monotonic
 
 from . import q0_preparation as prep
 from .common import stable_id
 from .q0_alignments import read_paf_observations as _native_observations
 from .q0_retained_hits import read_retained_paf, retained_geometry_cache, retained_names
+from .q0_frontier_scope import UnsearchedQ0Context
 from .q0_paths import PairLink
-from .q0_sources import Interval, Q0EvidenceError, merged_intervals, split_source
-from .q0_threshold_acceptance import MAX_REPAIRS, SCOPE, SEMANTICS, audit
+from .q0_sources import Interval, OriginalAdjacency, Q0EvidenceError, SourceKey, merged_intervals, split_source
+from .q0_threshold_acceptance import MAX_REPAIRS, SCOPE, SEMANTICS, ThresholdRepairRequired, audit
 
 
 class _CoverageRow:
@@ -50,8 +52,9 @@ class _PartitionNames(dict):
 
 class _DraftMatrices:
     """One preparation call, one verified generation. Never a persistent success or cache."""
-    def __init__(self, root):
+    def __init__(self, root, threads=1):
         self.root = root
+        self.threads = threads
         self.rows = {}
         self.canonical = defaultdict(dict)
         self.short_geometry = retained_geometry_cache()
@@ -62,7 +65,8 @@ class _DraftMatrices:
         before = prep.file_signature(path)
         hits = []
         for hit in read_retained_paf(path, artifact=artifact, query_names=_PartitionNames(query_lengths,self.canonical[query_dataset]),
-                                     target_names=_PartitionNames(target_lengths,self.canonical[target_dataset]), short_geometry=self.short_geometry):
+                                     target_names=_PartitionNames(target_lengths,self.canonical[target_dataset]),
+                                     short_geometry=self.short_geometry, threads=self.threads):
             hits.append(hit)
             yield _CoverageRow(hit)
         if prep.file_signature(path) != before:
@@ -112,6 +116,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
     native_decisions = None
     regional_observations = None
     sparse_decisions = None
+    threads = 1
 
     def _read_initial(self):
         # An existing ready generation may be reusable: don't retain millions of hits for a cache check.
@@ -119,7 +124,7 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         if (prep.workspace_artifact_path(self.root, prep.MANIFEST).exists() or prep._initial_inputs is not prep._native_initial_inputs
                 or prep.read_paf_observations is not _native_observations):
             return super()._read_initial()
-        self.matrices = _DraftMatrices(self.root)
+        self.matrices = _DraftMatrices(self.root, self.threads)
         return prep._initial_inputs(self.root, matrix_reader=self.matrices.observe)
 
     def read(self):
@@ -130,27 +135,67 @@ class _ThresholdInputs(prep._ProofRepairInputs):
         return first
 
 
-def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, retain_native=None):
+def _supplement_links(root, parts, tasks, short_geometry, threads):
+    """Exactly the final loader's task partition, artifact IDs and both source-part offsets."""
+    seen = set()
+    for task in tasks:
+        rel = task['paf']
+        if rel in seen: continue
+        seen.add(rel)
+        names = lambda ids: {k:(k, parts[k].interval.length) for k in ids}
+        path = prep.artifact_path(root, rel); signature = prep.file_signature(path)
+        for hit in read_retained_paf(path, artifact=rel, query_names=names(task['query_ids']),
+                                     target_names=names(task['target_ids']), short_geometry=short_geometry,threads=threads):
+            q,t = parts[hit.query_name],parts[hit.target_name]
+            yield PairLink(hit,q.source,t.source,q.interval.start,t.interval.start)
+        if prep.file_signature(path) != signature: raise Q0EvidenceError('completed fallback-draft PAF changed while reading')
+
+
+def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=None, threads=1, retain_native=None, selection_checkpoint=None,
+                      existing_catalog=None, supplementary=(), on_updated_questions=None, junction_dispatch=None):
     """Only decision input, not a private ready/catalog. Keep self and cross hits and original CIGAR."""
-    from .q0_admission import EvidenceInput, select_q0_paths
+    from .q0_admission import EvidenceInput, select_request_paths
     from .q0_threshold_questions import questions
+
+    def log(msg):
+        print(("LGZ q0 first draft: " if existing_catalog is None else "LGZ q0 updated fallback draft: ") + msg, flush=True)
+
+    if supplementary and selection_checkpoint is not None:
+        raise Q0EvidenceError('updated fallback evidence cannot use a base-only selection checkpoint')
     keys = {(s.dataset, s.contig): s for s in seqs}
     parts, edges, refs, links, by_dataset = {}, [], defaultdict(list), [], defaultdict(dict)
-    for key, seq in seqs.items():
+    if existing_catalog is not None:
+        if existing_catalog.sequences is not seqs or matrices is not None or selection_checkpoint is not None:
+            raise Q0EvidenceError('updated fallback draft cannot reuse a foreign source or a base-only selection checkpoint')
+        parts = existing_catalog.parts
+        edges = [OriginalAdjacency(**{**v, 'source':SourceKey(**v['source']), 'gap_interval':Interval(**v['gap_interval'])})
+                 for v in existing_catalog.payload['original_connections']]
+    started = monotonic()
+    total = len(seqs)
+    log(f"source indexing before reference PAF: starting {total} sequences")
+    next_report = started + 60
+    for completed, (key, seq) in enumerate(seqs.items()):
+        now = monotonic()
+        if now >= next_report:
+            log(f"source indexing: processed={completed}/{total} elapsed_s={now-started:.1f}")
+            next_report = now + 60
         by_dataset[key.dataset][key.contig] = len(seq)
+        if existing_catalog is not None: continue  # This pass already split these original FASTAs.
         try:
             info = split_source(key, seq, min_gap=prep.POLICY['min_gap'])
         except Q0EvidenceError:
             continue  # Same invalid-source verdict as ordinary catalog/admission.
         parts.update((p.segment_id,p) for p in info.segments)
         edges.extend(info.adjacencies)
+    log(f"source indexing complete: processed={total}/{total} segments={len(parts)} "
+        f"adjacencies={len(edges)} elapsed_s={monotonic()-started:.1f}")
     names = {ds: retained_names(lens) for ds, lens in by_dataset.items()}
     ref_names = retained_names(lengths)
     short_geometry = retained_geometry_cache()
     for dataset, qnames in names.items():
         rel = f'runs/{dataset}_vs_ref/result.paf'
         for hit in read_retained_paf(prep.artifact_path(root,rel), query_names=qnames, target_names=ref_names,
-                                     artifact=rel, short_geometry=short_geometry):
+                                     artifact=rel, short_geometry=short_geometry, threads=threads):
             source = keys[dataset, hit.query_name]
             refs[source].append(hit)
     if matrices is not None:
@@ -159,25 +204,52 @@ def initial_questions(root, seqs, lengths, assignments, alignments, *, matrices=
         q, t, rel = row['query_dataset'], row['target_dataset'], row['paf']
         hits = (matrices.take(row) if matrices is not None else
                 read_retained_paf(prep.artifact_path(root,rel), query_names=names[q], target_names=names[t],
-                                  artifact=rel, short_geometry=short_geometry))
+                                  artifact=rel, short_geometry=short_geometry, threads=threads))
         for hit in hits:
             left, right = keys[q, hit.query_name], keys[t, hit.target_name]
             links.append(PairLink(hit, left, right))
         del hits
+    links.extend(_supplement_links(root, parts, supplementary, short_geometry, threads))
     data = EvidenceInput(seqs,parts,lengths,dict(refs),tuple(links),tuple(edges),{},'threshold-plan-not-published')
     del links, edges  # the immutable selection input now owns these references
-    selected = select_q0_paths(data)
-    need, _ = questions(data, selected, assignments)
-    have_path = any(r.path is not None for r in selected.paths.values())
+    from .q0_junction_review import Review
+    review = Review() if junction_dispatch is not None else None
+    selected = select_request_paths(data, screen_threads=threads, progress=log,
+                                    **({"review": review} if review is not None else {}),
+                                    **({"checkpoint": selection_checkpoint} if selection_checkpoint is not None else {}))
+    if review is not None:
+        extra = junction_dispatch(review,selected)
+        if extra:
+            fresh = tuple(_supplement_links(root,parts,extra,short_geometry,threads))
+            if fresh:
+                # The original base, source offsets and evidence IDs stay in memory. One
+                # re-selection, never one per competitor; empty local hits change no path.
+                data.pair_links += fresh
+                del fresh,selected
+                selected = select_request_paths(data, screen_threads=threads, progress=log)
+    log("paths selected; calculating first supplement request")
+    issues = [] if on_updated_questions is not None else None
+    need, counts = questions(data, selected, assignments, **({'issue_sink':issues.append} if issues is not None else {}))
+    have_path = any(row.path is not None for row in selected.paths.values())
+    if on_updated_questions is not None:
+        on_updated_questions(need, have_path, counts, issues)
+    if have_path:
+        log(f"placements: sufficient={counts.get('positive_placement_stop', 0)} weak={counts.get('weak_placement', 0)}; "
+            f"unknown joins: sufficient_to_keep_gap={counts.get('observed_facing_match_leave_gap', 0)} "
+            f"need_evidence={counts.get('unproven_join', 0)}")
+    log("first supplement decision: full fallback" if need is None else
+        f"first supplement decision: sources={len(need)} intervals={sum(map(len, need.values()))}")
     if retain_native is not None and need and have_path:
         from .q0_threshold_candidates import DecisionState
         retain_native.native_decisions = DecisionState(data, need, assignments)
     return need, have_path
 
 
-def initial_generation(root, snapshot, mapper):
+def initial_generation(root, snapshot, mapper, *, threads=1):
+    snapshot.threads = threads
     initial = snapshot.read()
     seqs,lengths,assignments,options,_,alignments,_,inputs = initial
+    snapshot.junction_preset = options.get('minimap_preset','asm10')
     if 'q0_supplement_scope' in options:
         raise Q0EvidenceError('set threshold scope on the evidence command')
     tool = prep.executable_identity(mapper); policy = prep.supplement_policy(SCOPE); builder = prep.builder_identity()
@@ -189,7 +261,7 @@ def initial_generation(root, snapshot, mapper):
             old = prep.load_verified_evidence(root); snapshot.verify()
             return request, old, True, None
     native = not prep.regional_enabled(lengths, options.get("minimap_preset", "asm10"))
-    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices,
+    need, have_path = initial_questions(root, seqs, lengths, assignments, alignments, matrices=snapshot.matrices, threads=threads,
                                         retain_native=snapshot if native else None)
     snapshot.matrices = None
     # Fixed-size ordinary/selective regimes are distinct: promote only a sparse positive
@@ -227,26 +299,67 @@ def initial_generation(root, snapshot, mapper):
 
 def prepare(root, threads, mapper):
     from .q0_admission import load_evidence_input, select_q0_paths
-    from .q0_frontier_scope import UnsearchedQ0Context
-    from .q0_threshold_questions import questions
     if threads < 1:
         raise Q0EvidenceError('q0 evidence threads must be positive')
     root = root.resolve(); prep._readless_package(root)
     snapshot = _ThresholdInputs(root)
-    request, receipt, cached, wanted = initial_generation(root, snapshot, mapper)
+    request, receipt, cached, wanted = initial_generation(root, snapshot, mapper, threads=threads)
     full = wanted is None and receipt is None
+    from .q0_junction_review import Review, dispatch, extend_draft, extra_count
+    def select_for_audit(data, review=None):
+        return select_q0_paths(data, screen_threads=threads, review=review,
+                               progress=lambda msg: print(f"LGZ q0 threshold audit: {msg}", flush=True))
+
+    prior_local = []
     for n in range(MAX_REPAIRS+3):
         if receipt is None:
             receipt,_,_ = prep._prepare_evidence_pass(root,threads=threads,minimap2=mapper,supplement_scope=SCOPE,
                 draft=True,frontier_override=None if full else wanted,fallback_reason='threshold_full_fallback' if full else None,
                 expected_input=request,repair_inputs=snapshot)
+        if prior_local:
+            base = prep.json_file(prep.artifact_path(root,receipt['catalog']))
+            receipt = extend_draft(root,receipt,base,prior_local)
         output_paths = [prep.workspace_artifact_path(root, row['path']) for row in receipt['outputs']]
         before = [prep.file_signature(p) for p in output_paths]
-        data = load_evidence_input(root,_draft=receipt); selection = select_q0_paths(data)
+        data = load_evidence_input(root,_draft=receipt)
+        scoped = data.catalog['supplement_scope']['effective']=='decision_frontier'
+        review = Review() if scoped and not cached else None
+        from .q0_selection_cache import load as load_selection, store as store_selection
+        accepted = load_selection(root,receipt,data) if cached else None
+        selection = accepted.selection if accepted is not None else select_for_audit(data,review)
+        if accepted is not None:
+            print('LGZ q0 threshold: reusing accepted same-generation selection', flush=True)
+        if review is not None and review.proposals:
+            from .q0_catalog import CandidateCatalog
+            extra = dispatch(review,selection,root,CandidateCatalog({},data.sources,data.parts),
+                             data.catalog['supplementary_alignments'],receipt['tool'],snapshot.junction_preset,
+                             threads,sum(data.reference_lengths.values()))
+            if extra:
+                snapshot.verify()
+                if before != [prep.file_signature(p) for p in output_paths]:
+                    raise Q0EvidenceError('threshold output changed during junction review')
+                receipt = extend_draft(root,receipt,data.catalog,extra)
+                # Do not keep two full source and PAF heaps alive. The ordinary loader
+                # verifies the new closure and final selection still enforces every gate.
+                nonempty = any(prep.artifact_path(root,t['paf']).stat().st_size for t in extra)
+                del data
+                data = load_evidence_input(root,_draft=receipt)
+                if nonempty:
+                    del selection
+                    selection = select_for_audit(data)
+                output_paths = [prep.workspace_artifact_path(root,row['path']) for row in receipt['outputs']]
+                before = [prep.file_signature(p) for p in output_paths]
+        count = extra_count(data.catalog)
+        prior_local = data.catalog['supplementary_alignments'][-count:] if count else []
         try:
             audit(data,selection)
-        except UnsearchedQ0Context:
+        except ThresholdRepairRequired as stopped:
             if full: raise
+            need = stopped.demand
+        except UnsearchedQ0Context:
+            # No bound repair demand: use the full pass, never infer covered intervals.
+            if full: raise
+            need = None
         else:
             if not any(r.path is not None for r in selection.paths.values()):
                 raise Q0EvidenceError('no chromosome has a trustworthy q0 path')
@@ -257,11 +370,13 @@ def prepare(root, threads, mapper):
             if before != [prep.file_signature(p) for p in output_paths]:
                 raise Q0EvidenceError('threshold output changed during admission')
             snapshot.verify()
-            if not cached:
+            if accepted is None:
+                receipt = store_selection(root,receipt,data,selection)
+                snapshot.verify()
+                prep.load_verified_evidence(root,_draft=receipt)
                 prep.atomic_write_json(prep.workspace_artifact_path(root, prep.MANIFEST), receipt)
+                print('LGZ q0 threshold: accepted selection published for downstream reuse', flush=True)
             return receipt
-        assignments = ({'dataset_name':d,'seq_name':s,'assigned_chr_name':c} for d,s,c in data.threshold_scope.assignments)
-        need,_ = questions(data,selection,assignments)
         del data,selection
         if need is None or n >= MAX_REPAIRS or wanted is None:
             full = True

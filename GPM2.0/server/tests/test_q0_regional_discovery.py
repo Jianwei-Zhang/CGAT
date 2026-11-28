@@ -45,15 +45,37 @@ class RegionalDiscoveryTests(unittest.TestCase):
         self.assertEqual(tuple(self.observed.cross_coverage[SourceKey('a','q')]),(Interval(100,300),))
         self.assertEqual(tuple(self.observed.cross_coverage[SourceKey('b','t')]),(Interval(200,400),))
 
-    def test_native_fallback_subsumes_parent_without_launching_earlier_window(self):
-        index=mock.Mock();index.parts=self.parts;index.regions.return_value={'chr':(Interval(0,100),)}
-        index.targets.side_effect=[{self.ids['t']:(Interval(0,1000),)},{}]
+    def test_over_budget_keeps_siblings_and_batches_after_the_frontier_gate(self):
+        from server.tools.lgz_core import q0_regional_mapping as mapping
+        index = mock.Mock(); index.parts = self.parts
+        index.regions.return_value = {'chr': (Interval(0, 1000),)}
+        tid = self.ids['t']
+        index.targets.side_effect = [{tid: (Interval(0, 100),)},
+                                     {tid: (Interval(0, 100), Interval(200, 300))}]
+        holes = {self.ids['q']: (Interval(0, 200000),)}
+        target_source = self.parts[tid].source
+        observed = []
+        def mapper(root, catalog, query, targets, tool, **kwargs):
+            observed.append((query.window_id, [t.start for t in targets])); return query.window_id
+        with (mock.patch.object(regional, 'partial_source_intervals', return_value=holes),
+              mock.patch.object(mapping, 'TARGET_BATCH_BASES', 120),
+              mock.patch.object(regional, 'prepare_regional_mapping', side_effect=mapper)):
+            tasks, fallback, report = regional.prepare_partial(
+                self.root, self.catalog, index, self.observed, {}, reference_lengths={'chr': 5_000_000_000},
+                preset='asm10', threads=1, regional_frontier={target_source:(Interval(0, 1),)})
+        self.assertEqual(fallback, [])
+        self.assertEqual(len(tasks), 3); self.assertEqual(tasks[1], tasks[2]); self.assertNotEqual(tasks[0], tasks[1])
+        self.assertEqual(observed[0][1], [0]); self.assertEqual(sorted(x[1][0] for x in observed[1:]), [0, 200])
+        self.assertEqual((report['target_batch_splits'], report['frontier_omitted_windows']), (1, 0))
+
+    def test_missing_target_window_preserves_routable_siblings(self):
+        index=mock.Mock(); index.parts=self.parts; index.regions.return_value={'chr':(Interval(0,100),)}
+        index.targets.side_effect=[{self.ids['t']:(Interval(0,1000),)}, {}, {self.ids['t']:(Interval(1000,2000),)}]
         holes={self.ids['q']:(Interval(0,300000),)}
         with mock.patch.object(regional,'partial_source_intervals',return_value=holes), \
-             mock.patch.object(regional,'prepare_regional_mapping',side_effect=AssertionError('parent fallback must not map windows')):
-            tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},reference_lengths={'chr':5_000_000_000},preset='asm10',threads=8)
-        self.assertEqual(tasks,[]);self.assertEqual(fallback,[self.ids['q']])
-        self.assertEqual(report['fallback_sources'][0]['reason'],'no_reference_targets')
+             mock.patch.object(regional,'prepare_regional_mapping',side_effect=lambda r,c,q,t,*args,**kwargs:q.cores[0][0]):
+            tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},reference_lengths={'chr':5_000_000_000},preset='asm10',threads=1)
+        self.assertEqual(tasks,[0,200000]);self.assertEqual(fallback,[self.ids['q']]);self.assertEqual(report['fallback_sources'][0]['reason'],'no_reference_targets')
         index.verify_inputs.assert_called_once()
 
     def test_pool_never_multiplies_run_thread_budget_and_keeps_order(self):
@@ -78,6 +100,9 @@ class RegionalDiscoveryTests(unittest.TestCase):
         from server.tools.lgz_core.q0_frontier_scope import UnsearchedWindows
         index=mock.Mock();index.parts=self.parts;index.regions.return_value={'chr':(Interval(0,100),)}
         index.targets.return_value={self.ids['t']:(Interval(0,1000),)}
+        from contextlib import redirect_stdout
+        from io import StringIO
+        log = StringIO()
         omissions=UnsearchedWindows()
         query=self.parts[self.ids['q']]
         frontier={query.source:(Interval(0,1),)}
@@ -85,11 +110,13 @@ class RegionalDiscoveryTests(unittest.TestCase):
             self.assertEqual([t.segment_id for t in targets],[self.ids['t']])
             return {'core':query.cores[0][0]}
         with mock.patch.object(regional,'partial_source_intervals',return_value={self.ids['q']:(Interval(0,300000),)}), \
-             mock.patch.object(regional,'prepare_regional_mapping',side_effect=mapper):
+             mock.patch.object(regional,'prepare_regional_mapping',side_effect=mapper), redirect_stdout(log):
             tasks,fallback,report=regional.prepare_partial(self.root,self.catalog,index,self.observed,{},
                 reference_lengths={'chr':5_000_000_000},preset='asm10',threads=2,
                 regional_frontier=frontier,unsearched=omissions)
         self.assertEqual(tasks,[{'core':0}]);self.assertEqual(fallback,[])
+        self.assertIn("phase=partial state=complete candidates=3 frontier_omitted=2 dispatched=1 chain_started=0 raw_started=0", log.getvalue())
+        self.assertNotIn("raw_started",report)
         self.assertEqual(report['frontier_omitted_windows'],2)
         self.assertEqual(dict(omissions.record()),{self.ids['q']:[[90000,300000]],self.ids['t']:[[0,1000]]})
 
@@ -175,7 +202,7 @@ class RegionalDiscoveryTests(unittest.TestCase):
         package=self.root/'package';(package/'lgz_core').mkdir(parents=True)
         tools=Path(prep.__file__).parent
         names=['common','q0_sources','q0_alignments','q0_catalog','q0_preparation','q0_candidate_schedule','q0_reference_index',
-               'q0_query_windows','q0_cigar_policy','q0_regional_mapping','q0_mapper_guard','q0_regional_discovery','q0_neighbor_requests','q0_regional_candidates','q0_regional_execution','q0_frontier_scope']
+               'q0_query_windows','q0_cigar_policy','q0_regional_mapping','q0_mapper_guard','q0_regional_discovery','q0_neighbor_requests','q0_regional_candidates','q0_regional_execution','q0_frontier_scope','q0_scope_policy']
         (package/'lgz_core/__init__.py').write_text('')
         for name in names:shutil.copyfile(tools/f'{name}.py',package/f'lgz_core/{name}.py')
         for name in ('run_orchestration.py', 'workspace_layout.py'):

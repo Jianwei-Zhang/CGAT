@@ -267,6 +267,26 @@ class EvidencePreparationTests(unittest.TestCase):
             writer.writerows(rows)
         seed_q0_evidence(self.server)
 
+    def test_automatic_scope_decision_is_bound_to_ready_manifest(self):
+        manifest = prepare_evidence(self.server, minimap2=str(self.minimap), supplement_scope="auto")
+        report = self.catalog()["supplement_scope"]
+        self.assertEqual(report["requested"], "auto")
+        self.assertEqual(report["effective"], "full")
+        self.assertEqual(report["decision"]["schema"], "lgz_q0_scope_decision_v1")
+        self.assertEqual(report["decision"]["effective_scope"], "full")
+        self.assertEqual(load_verified_evidence(self.server), manifest)
+
+    def test_cached_full_and_auto_report_the_actual_request(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            explicit = prepare_evidence(self.server, minimap2=str(self.minimap), supplement_scope="full")
+            automatic = prepare_evidence(self.server, minimap2=str(self.minimap), supplement_scope="auto")
+            self.assertEqual(self.catalog()["supplement_scope"]["requested"], "auto")
+            self.assertNotEqual(automatic["input_fingerprint"], explicit["input_fingerprint"])
+            self.assertEqual(automatic, prepare_evidence(self.server, minimap2=str(self.minimap), supplement_scope="auto"))
+            self.assertEqual(explicit, prepare_evidence(self.server, minimap2=str(self.minimap), supplement_scope="full"))
+            self.assertNotIn("supplement_scope", self.catalog())
+            self.assertEqual(explicit, prepare_evidence(self.server, minimap2=str(self.minimap)))
+
     def test_large_route_reaches_real_regional_receipts_and_ready_manifest(self):
         from server.tools.lgz_core import q0_preparation as prep
         mapper, _ = self.mapper()  # different identity from the seeded native mapper

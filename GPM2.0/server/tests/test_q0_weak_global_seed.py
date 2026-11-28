@@ -112,20 +112,54 @@ class WeakSeedTests(unittest.TestCase):
         with patch.object(prep,'_supplement',side_effect=[None,{'task_id':'fast'}]) as run:
             prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000)
         self.assertTrue(run.call_args.kwargs['weak_seed_fast'])
+        self.assertTrue(all(c.kwargs['cache_only'] for c in run.call_args_list))
         request['query_ids']=['short']
         with patch.object(prep,'_supplement',side_effect=[None,{'task_id':'native'}]) as run:
             prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000)
         self.assertFalse(run.call_args.kwargs['weak_seed_fast'])
 
 
-    def test_short_side_native_completion_caps_threads_independently_of_run_all_budget(self):
+    def test_short_side_cold_completion_never_relanches_native_search(self):
         request={'kind':'candidate_unroutable_seed','query_ids':['tiny_target'],'target_ids':['long'],
                  'native_short_targets_as_queries':True}
-        with patch.object(prep,'_supplement',side_effect=[None,{'task_id':'native'}]) as run:
-            prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000)
-        self.assertEqual(run.call_args.args[5],8)
-        self.assertFalse(run.call_args.kwargs['weak_seed_fast'])
+        with patch.object(prep,'_supplement',return_value=None) as run:
+            self.assertIsNone(prep._unroutable_seed(self.root,self.catalog,request,{},'asm10',32,reference_bases=5_000_000_000))
+        self.assertEqual(run.call_count,1);self.assertTrue(run.call_args.kwargs['cache_only'])
 
+    def test_cold_first_cohort_does_not_hide_a_later_verified_hit(self):
+        first=self.task(['long'],['tiny_target'])
+        warm=self.task(['long'],['big_target','long','short'])
+        tasks=[first];calls=[]
+        def probe(root,catalog,request,tool,preset,threads,**kwargs):
+            pair=(tuple(request['query_ids']),tuple(request['target_ids']));calls.append(pair)
+            if pair==(tuple(warm['query_ids']),tuple(warm['target_ids'])):return warm
+            return None
+        with patch.object(prep,'_unroutable_seed',side_effect=probe),patch.object(prep,'add_pairwise_candidates',return_value=set()):
+            scopes=prep._complete_unroutable_seeds(self.root,self.catalog,self.index,self.queries,self.targets,
+                tasks,set(),{},'asm10',32,reference_bases=5_000_000_000,skip_self=False)
+        self.assertEqual(calls[0],(('short',),tuple(self.targets)))  # The highest priority cohort is cold.
+        self.assertEqual(tasks,[first,warm]);self.assertEqual(len(calls),len(set(calls)))
+        self.assertEqual(calls[1:],[(tuple(warm['query_ids']),tuple(warm['target_ids']))])  # No probe for absent shapes.
+        self.assertEqual(scopes.keys(scopes.remaining_targets('short',scopes.mask(self.targets))),['big_target','tiny_target'])
+
+    def test_all_cold_does_not_expand_every_absent_matrix_or_replan(self):
+        first=self.task(['long'],['tiny_target']);scopes=self.planner([first]); before=list(scopes.scopes)
+        with patch.object(scopes,'_seed_groups',wraps=scopes._seed_groups) as groups, \
+             patch.object(scopes,'_cached_seed_shapes',wraps=scopes._cached_seed_shapes) as inventory, \
+             patch.object(scopes,'_seed_request',wraps=scopes._seed_request) as expanded:
+            rows=list(scopes.missing_seed_requests(self.queries,self.targets))
+        self.assertEqual((groups.call_count,inventory.call_count,expanded.call_count),(1,1,1))
+        self.assertEqual(len(rows),1);self.assertEqual(scopes.scopes,before)
+
+    def test_cache_inventory_keeps_short_side_direction_and_skips_invalid_receipts(self):
+        scopes=self.planner(); warm=self.task(['tiny_target'],['long']); target=scopes.mask(['tiny_target'])
+        bad=self.root/'grt/evidence/q0_prepare/tasks'/('q0-map-'+'0'*24)
+        bad.mkdir();(bad/'success.json').write_text('not JSON')
+        with patch.object(scopes,'_seed_groups',return_value=[(('short',),target),(('long',),target)]):
+            rows=list(scopes.missing_seed_requests(self.queries,self.targets))
+        self.assertEqual(len(rows),2);self.assertTrue(rows[1]['native_short_targets_as_queries'])
+        self.assertEqual((rows[1]['query_ids'],rows[1]['target_ids']),(warm['query_ids'],warm['target_ids']))
+        self.assertFalse(scopes.scopes)  # A receipt shape alone has never admitted a matrix.
 
     def complete_cohort(self):
         tasks=[]

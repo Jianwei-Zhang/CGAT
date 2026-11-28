@@ -7,8 +7,10 @@ No diagnostic wall-clock cutoff is installed in production.
 """
 from __future__ import annotations
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 import json
+from hashlib import sha256
 import os
 from pathlib import Path
 
@@ -23,7 +25,7 @@ import sys
 import threading
 import uuid
 
-from .common import canonical_json, sha256_bytes, sha256_file, stable_id, write_fasta
+from .common import canonical_json, sha256_bytes, sha256_file, stable_id, write_wrapped_sequence
 from .q0_alignments import read_paf
 from .q0_cigar_policy import ChainWork, CigarWorkPolicy, select_cigar_profile
 from .q0_query_windows import QueryWindow, TargetWindow, project_regional_paf
@@ -38,8 +40,54 @@ BASE_FLAGS = ["-D", "-P", "--dual=yes", "--no-long-join"]
 CONTEXT_SCHEMA = "lgz_q0_regional_context_v1"
 PROJECTION_SCHEMA = "lgz_q0_regional_projection_v1"
 MAX_QUERY_BASES = 120_000
-MAX_TARGET_BASES = 100_000_000
+TARGET_BATCH_BASES = 100_000_000  # Scheduling preference, not a scientific scope limit.
+MAX_TARGET_BASES = TARGET_BATCH_BASES  # Old incident replay tools measure the historical cutoff.
+TARGET_BATCH_POLICY = {"version": 1, "preferred_bases": TARGET_BATCH_BASES,
+                       "order": "target_window_id", "indivisible_target": "intact_guarded_singleton",
+                       "scope": "all_selected_regional_targets_in_independently_bound_batches"}
 _LOCKS = {}; _LOCK_GUARD = threading.Lock()
+
+
+# Telemetry stays process-local: cold/warm execution must produce identical receipts.
+_CURRENT_WORK = ContextVar("q0_regional_work", default=None)
+
+
+class RegionalWorkLog:
+    def __init__(self, phase):
+        self.phase = phase
+        self._lock = threading.Lock()
+        self.counts = dict.fromkeys(("candidates", "frontier_omitted", "dispatched", "chain_started",
+                                     "raw_started", "chain_reused", "raw_reused", "projection_reused",
+                                     "projection_built", "projection_only"), 0)
+
+    def add(self, key):
+        with self._lock:
+            self.counts[key] += 1
+
+    def run(self, mapping, *args, **kwargs):
+        token = _CURRENT_WORK.set(self)
+        try:
+            self.add("dispatched")
+            return mapping(*args, **kwargs)
+        finally:
+            _CURRENT_WORK.reset(token)
+
+    def emit(self, state):
+        with self._lock:
+            fields = " ".join(f"{key}={value}" for key, value in self.counts.items())
+        print(f"LGZ q0 regional work: phase={self.phase} state={state} {fields}", flush=True)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, *_):
+        self.emit("complete" if exc_type is None else "failed")
+
+
+def _work_event(key):
+    log = _CURRENT_WORK.get()
+    if log is not None:
+        log.add(key)
 
 
 class RegionalFallbackRequired(Q0EvidenceError):
@@ -64,15 +112,41 @@ def _source(catalog, segment_id):
     if cache is None:cache=catalog._regional_verified_parts={}
     previous=cache.get(segment_id)
     if previous is None or previous[0] is not sequence or previous[1:]!=(part.interval,part.sequence_sha256):
-        if sha256_bytes(sequence[part.interval.start:part.interval.end].upper().encode("ascii"))!=part.sequence_sha256:
+        content = sha256()
+        for i in range(part.interval.start, part.interval.end, 1 << 20):
+            content.update(sequence[i:min(i + (1 << 20), part.interval.end)].upper().encode("ascii"))
+        if content.hexdigest()!=part.sequence_sha256:
             raise Q0EvidenceError("regional source sequence differs from its catalog identity")
         cache[segment_id]=(sequence,part.interval,part.sequence_sha256)
     return sequence,part
 
 
-def _sequence(catalog, window):
-    sequence,part=_source(catalog,window.segment_id)
-    return sequence[part.interval.start+window.start:part.interval.start+window.end].upper()
+def _write_windows(path, catalog, windows):
+    with path.open("w", encoding="utf-8", newline="") as f:
+        for window in windows:
+            sequence, part = _source(catalog, window.segment_id)
+            f.write(f">{window.window_id}\n")
+            write_wrapped_sequence(f, sequence, part.interval.start + window.start,
+                                   part.interval.start + window.end, uppercase=True)
+
+
+def target_batches(targets):
+    """Keep every target interval intact; unchanged single-batch contexts retain their original identities."""
+    if len(targets) < 2 or sum(t.length for t in targets) <= TARGET_BATCH_BASES:
+        yield targets
+        return
+    ordered = sorted(targets, key=lambda t: t.window_id)
+    # Otherwise duplicate inputs on different sides of a batch boundary could evade _context().
+    if any(a.window_id == b.window_id for a,b in zip(ordered, ordered[1:])):
+        raise Q0EvidenceError("duplicate target window before batching")
+    batch = []; bases = 0
+    for target in ordered:
+        if batch and bases + target.length > TARGET_BATCH_BASES:
+            yield batch
+            batch = []; bases = 0
+        batch.append(target); bases += target.length
+    if batch:
+        yield batch
 
 
 def _lock(path):
@@ -165,8 +239,8 @@ def _context(root, catalog, query, targets, tool, preset):
         return relative,stored
     if directory.exists():directory=_fresh_directory(root,relative)
     else:directory.mkdir(parents=True)
-    write_fasta(directory/"query.fa",[(query.window_id,_sequence(catalog,query))])
-    write_fasta(directory/"target.fa",((w.window_id,_sequence(catalog,w)) for w in sorted(targets,key=lambda w:w.window_id)))
+    _write_windows(directory/"query.fa", catalog, [query])
+    _write_windows(directory/"target.fa", catalog, sorted(targets,key=lambda w:w.window_id))
     record={"spec":spec,"inputs":_outputs(root,[relative+"/query.fa",relative+"/target.fa"]),
             "input_fastas_reconstructible_from_bound_windows":True}
     _ops().atomic_write_json(path,record)
@@ -183,7 +257,7 @@ def _ensure_fastas(root,relative,context,catalog,query,targets):
             if _ops().identity(root,expected["path"]) != expected:
                 raise Q0EvidenceError("existing regional input changed; preserve it for diagnosis")
         else:
-            write_fasta(path,((w.window_id,_sequence(catalog,w)) for w in windows))
+            _write_windows(path, catalog, windows)
             if _ops().identity(root,expected["path"]) != expected:
                 raise Q0EvidenceError("regenerated window FASTA differs from bound input")
 
@@ -315,7 +389,9 @@ def _execute(root,directory,context,relative,catalog,query,targets,argv,tool,add
     # cancellation reaches every mapper. The guard execs, it has no child tree.
     with (directory/"result.paf.tmp").open("wb") as output,(directory/"stderr.log").open("wb") as log:
         process=subprocess.Popen(command,cwd=directory,stdout=output,stderr=log,**options)
-        try: code=process.wait()
+        try:
+            _work_event("raw_started" if argv[1] == "-c" else "chain_started")
+            code=process.wait()
         except BaseException:
             if process.poll() is None:
                 process.terminate()
@@ -365,7 +441,7 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
                              address_space_bytes=4*1024**3, policy=CigarWorkPolicy()):
     root=Path(root).resolve(strict=True)
     if threads<1 or query.length>MAX_QUERY_BASES: raise Q0EvidenceError("uncalibrated regional query/resource budget")
-    if not targets or sum(w.length for w in targets)>MAX_TARGET_BASES:
+    if not targets:
         raise RegionalFallbackRequired("regional target inventory needs declared full fallback")
     # The raw context key excludes cores; complete raw mapping can survive a
     # projection/coverage-selection repair without a new alignment.
@@ -376,6 +452,7 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
         toolargv=[tool["resolved"],"-x",preset,*BASE_FLAGS,"-t",str(threads),str(_ops().workspace_artifact_path(root, relative)/"target.fa"),str(_ops().workspace_artifact_path(root, relative)/"query.fa")]
         target_lengths={w.window_id:w.length for w in targets}
         closure={context_path}
+        new_chain = False
         if preset=="asm10" and reference_bases>=policy.minimum_reference_bases and query.length>=policy.minimum_query_bases:
             pre_spec={"schema":"lgz_q0_regional_chaining_v1","context":context_identity,"flags":BASE_FLAGS}
             pre_rel=relative+"/chaining";pre_receipt=pre_rel+"/success.json"
@@ -383,10 +460,12 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
             if _reuse(root,pre_receipt,pre_spec,required) is None:
                 directory=_fresh_directory(root,pre_rel)
                 _execute(root,directory,context,relative,catalog,query,targets,toolargv,tool,address_space_bytes)
+                new_chain = True
                 work=chain_work(directory/"result.paf.tmp",query,target_lengths,policy)
                 (directory/"result.paf.tmp").replace(directory/"result.paf")
                 _ops().atomic_write_json(_ops().workspace_artifact_path(root, pre_receipt),{"status":"success","spec":pre_spec,"outputs":_outputs(root,required)})
             else:
+                _work_event("chain_reused")
                 work=chain_work(_ops().workspace_artifact_path(root, pre_rel)/"result.paf",query,target_lengths,policy)
             decision=select_cigar_profile(reference_bases,query.length,work,complete=True,preset=preset,policy=policy)
             decision["chaining_receipt"]=_ops().identity(root,pre_receipt)
@@ -402,13 +481,16 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
         raw_spec={"schema":"lgz_q0_regional_raw_v1","context":context_identity,"flags":["-c",*BASE_FLAGS,*decision["additional_flags"]]}
         raw_id=stable_id("q0-regional-raw",raw_spec);raw_rel=relative+"/"+raw_id;raw_receipt=raw_rel+"/success.json"
         required={raw_rel+"/"+name for name in ("result.paf","command.json","guard.py")}
-        if _reuse(root,raw_receipt,raw_spec,required) is None:
+        raw_missing = _reuse(root,raw_receipt,raw_spec,required) is None
+        if raw_missing:
             directory=_fresh_directory(root,raw_rel)
             argv=[tool["resolved"],"-c","-x",preset,*BASE_FLAGS,*decision["additional_flags"],"-t",str(threads),str(_ops().workspace_artifact_path(root, relative)/"target.fa"),str(_ops().workspace_artifact_path(root, relative)/"query.fa")]
             _execute(root,directory,context,relative,catalog,query,targets,argv,tool,address_space_bytes)
             for _ in read_paf(directory/"result.paf.tmp",query_lengths={query.window_id:query.length},target_lengths=target_lengths):pass
             (directory/"result.paf.tmp").replace(directory/"result.paf")
             _ops().atomic_write_json(_ops().workspace_artifact_path(root, raw_receipt),{"status":"success","spec":raw_spec,"outputs":_outputs(root,required)})
+        else:
+            _work_event("raw_reused")
         # A fresh raw result was validated before publication above. Both a
         # fresh projection and the final verify_regional_task replay validate
         # every raw record's CIGAR and window identity, including on a cache
@@ -433,6 +515,11 @@ def prepare_regional_mapping(root, catalog, query: QueryWindow, targets: list[Ta
             (directory/"result.paf.tmp").replace(_ops().workspace_artifact_path(root, paf))
             _ops().atomic_write_json(_ops().workspace_artifact_path(root, receipt),{"status":"success","spec":projection_spec,"outputs":_outputs(root,required)})
             verify_regional_task(root,task,members=catalog.parts)
+            _work_event("projection_built")
+            if not raw_missing and not new_chain:
+                _work_event("projection_only")
+        else:
+            _work_event("projection_reused")
         # Only owned generated inputs are removed, after success. Original
         # genomes, native task FASTAs, failed inputs and complete PAFs are kept.
         for name in ("query.fa","target.fa"):(_ops().workspace_artifact_path(root, relative)/name).unlink(missing_ok=True)

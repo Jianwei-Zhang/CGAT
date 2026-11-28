@@ -61,6 +61,8 @@ class ServerRunTests(unittest.TestCase):
                 self.assertEqual(preparation.call_count, 1)
                 launch = json.loads(layout.path(".run_all/launch.json").read_text())
                 self.assertEqual(launch["options"]["--threads"], [["10"]])
+                self.assertEqual(launch["options"]["--q0-supplement-scope"], [["auto"]])
+                self.assertIn("--q0-supplement-scope", launch["argv"])
                 self.assertEqual((output / "run-count.txt").read_text(), "run\n")
                 self.assertEqual(layout.path("metadata/prepare_options.tsv").read_bytes(), original_metadata)
                 self.assertIn("[SKIP_VALID] [ref:ds]", layout.path("logs/run_all.log").read_text())
@@ -152,6 +154,25 @@ class ServerRunTests(unittest.TestCase):
         self.assertEqual(options["--self-n"], [["75"]])
         self.assertNotIn("-sm", options)
         self.assertNotIn("-sn", options)
+
+    def test_interrupted_legacy_preparation_keeps_full_search(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ref = root / "ref.fa"
+            ref.write_text(">a\nACGT\n")
+            output = root / "workspace"
+            argv = ["-o", str(output), "--ref", str(ref), "--ds", "A", str(ref)]
+            with patch.object(server_run, "prepare_workspace", return_value=7) as prepare:
+                self.assertEqual(server_run.execute(argv, root), 7)
+                manifest = WorkspaceLayout.detect(output).path(".run_all/launch.json")
+                legacy = json.loads(manifest.read_text())
+                self.assertEqual(legacy["options"].pop("--q0-supplement-scope"), [["auto"]])
+                offset = legacy["argv"].index("--q0-supplement-scope")
+                del legacy["argv"][offset:offset + 2]
+                manifest.write_text(json.dumps(legacy))
+                self.assertEqual(server_run.execute(["-o", str(output)], root), 7)
+                self.assertEqual(prepare.call_args.args[1], [*legacy["argv"], "--q0-supplement-scope", "full"])
+                self.assertEqual(json.loads(manifest.read_text()), legacy)
 
     def test_q0_supplement_scope_is_explicit_and_not_a_resume_resource(self):
         key = "--q0-supplement-scope"

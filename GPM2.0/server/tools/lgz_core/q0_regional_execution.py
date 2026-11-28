@@ -209,13 +209,16 @@ def plan_request(request, index):
         raise Q0EvidenceError("unknown regional planning request")
     from .q0_regional_candidates import candidate_window_targets
     selection = index.target_selection(request.regional_mask)
-    plans = []
+    plans = []; unroutable = None
     for query in request.windows:
         targets, reason = candidate_window_targets(index, request.segment_id, query, request.chromosomes, selection)
         if reason is not None:
-            return [], request.eligible_mask, reason
+            unroutable = reason
+            continue
         if targets:
             plans.append((query, targets))
+    if unroutable:
+        return plans, request.eligible_mask, unroutable
     return plans, request.native_mask, "target_without_qualified_reference" if request.native_mask else None
 
 

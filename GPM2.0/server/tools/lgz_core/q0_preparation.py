@@ -14,10 +14,12 @@ except ModuleNotFoundError:
 from collections import defaultdict
 from contextlib import nullcontext, closing
 import csv
+import inspect
 import json
 from pathlib import Path
 import subprocess
 import shutil
+import stat
 import uuid
 from typing import Iterable
 
@@ -30,6 +32,8 @@ from .q0_regional_discovery import REGIONAL_POLICY, LocalReferenceCache, enabled
 from .q0_regional_candidates import CANDIDATE_POLICY, CandidatePlan, CompletedNativeScopes, prepare_candidates
 from .q0_cigar_policy import WEAK_GLOBAL_SEED_POLICY, weak_global_seed_scope
 from .q0_sources import Q0EvidenceError, SourceKey
+from .q0_scope_policy import (AUTO_SCOPE, FULL_SCOPE, PROOF_REPAIR_SCOPE, AutoScopePolicy, ScopeDecision,
+                              ScopeWorkload, decide_scope)
 try:
     from run_orchestration import atomic_write_json, sha256_file as _partition_sha256
     from run_orchestration import file_identity as _file_identity, file_signature, OrchestrationContractError
@@ -52,7 +56,6 @@ OuterCheckpointManager = _default_checkpoint_manager
 
 SCHEMA = "lgz_q0_evidence_v1"
 MANIFEST = "metadata/grt_q0_evidence.json"
-PROOF_REPAIR_SCOPE = "decision_frontier_repair"
 MAX_PROOF_REPAIRS = 2
 MAPPING_OUTPUT_FILES = ("query.fa", "target.fa", "result.paf", "command.json")
 POLICY = {"version": 5, "weak_global_seed": WEAK_GLOBAL_SEED_POLICY, "regional_partial_discovery": REGIONAL_POLICY, "regional_candidate_discovery": CANDIDATE_POLICY, "min_gap": 100, "discovery": "unplaced_to_new_anchors_until_fixed_point",
@@ -86,10 +89,23 @@ def artifact_path(root: Path, relative: str) -> Path:
     return resolved
 
 
+_IDENTITY_HAS_WITHIN = 'within' in inspect.signature(_file_identity).parameters
+
+
 def identity(root: Path, relative: str) -> dict:
     path = workspace_artifact_path(root, relative)
     try:
-        bound = _file_identity(path, within=root)
+        if _IDENTITY_HAS_WITHIN:
+            bound = _file_identity(path, within=root)
+        else:
+            # Preserve the frozen outer runtime while providing the same
+            # containment + stable-target guarantee required by new Q0.
+            before = file_signature(path)
+            if not Path(before[0]).is_relative_to(root.resolve(strict=True)):
+                raise OrchestrationContractError(f"file escapes workspace: {path}")
+            bound = _file_identity(path)
+            if file_signature(path) != before:
+                raise OrchestrationContractError(f"file changed while binding Q0 identity: {path}")
     except OrchestrationContractError as exc:
         raise Q0EvidenceError(f"cannot bind q0 artifact {relative}: {exc}") from exc
     # Receipt paths are logical workspace names, not resolved target paths.
@@ -122,9 +138,10 @@ def builder_identity() -> str:
     root = Path(__file__).parent
     return stable_id("q0-evidence-builder", [
         [name, sha256_file(root / name)] for name in (
-            "q0_preparation.py", "q0_candidate_schedule.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "common.py",
+            "q0_preparation.py", "q0_candidate_schedule.py", "q0_catalog.py", "q0_sources.py", "q0_alignments.py", "q0_paf_io.py", "q0_selection_cache.py", "common.py",
             "q0_query_windows.py", "q0_reference_index.py", "q0_regional_mapping.py",
-            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_frontier_scope.py", "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
+            "q0_cigar_policy.py", "q0_mapper_guard.py", "q0_native_frontier.py", "q0_frontier_scope.py", "q0_scope_policy.py",
+            "q0_regional_discovery.py", "q0_neighbor_requests.py", "q0_regional_candidates.py", "q0_regional_execution.py")])
 
 
 def supplement_policy(scope: str) -> dict:
@@ -144,6 +161,13 @@ def supplement_policy(scope: str) -> dict:
         from .q0_threshold_acceptance import contract
         frontier["threshold"] = contract()
     return {**POLICY, "decision_frontier": frontier}
+
+
+def _request_identity(inputs, tool, policy, builder, scope_decision=None):
+    payload = {"inputs": inputs, "tool": tool, "policy": policy, "builder": builder}
+    if scope_decision is not None:
+        payload["automatic_scope_decision"] = scope_decision
+    return stable_id("q0-evidence-input", payload)
 
 
 def load_verified_evidence(root: Path, *, _draft=None) -> dict:
@@ -173,10 +197,6 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
             if row["path"] in paths or identity(root, row["path"]) != row:
                 raise Q0EvidenceError(f"q0 evidence changed or duplicated: {row['path']}")
             paths.add(row["path"])
-    expected_input = stable_id("q0-evidence-input", {"inputs": manifest["inputs"],
-                               "tool": manifest.get("tool"), "policy": policy, "builder": manifest["builder"]})
-    if manifest.get("input_fingerprint") != expected_input:
-        raise Q0EvidenceError("q0 evidence input fingerprint is inconsistent")
     outputs = {row["path"]: row for row in manifest["outputs"]}
     if manifest.get("catalog") not in outputs:
         raise Q0EvidenceError("q0 candidate catalog is not bound to its manifest")
@@ -185,10 +205,17 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
         raise Q0EvidenceError("unsupported q0 candidate catalog")
     report = catalog.get("supplement_scope")
     if scoped:
-        if (not isinstance(report, dict) or report.get("requested") != scope
+        allowed_requests = (scope, AUTO_SCOPE) if scope == PROOF_REPAIR_SCOPE else (scope,)
+        if (not isinstance(report, dict) or report.get("requested") not in allowed_requests
                 or report.get("effective") not in (("full", "decision_frontier", "base_only", "supported_after_discovery") if scope == threshold_scope else ("full", "decision_frontier"))
                 or not isinstance(report.get("unsearched_part_intervals"), list)):
             raise Q0EvidenceError("q0 supplemental catalog lacks its bound scope")
+        if report.get("requested") == AUTO_SCOPE:
+            decision = report.get("decision")
+            if (not isinstance(decision, dict)
+                    or decision.get("schema") != "lgz_q0_scope_decision_v1"
+                    or decision.get("effective_scope") != PROOF_REPAIR_SCOPE):
+                raise Q0EvidenceError("automatic Q0 scope decision is not bound to proof repair")
         skipped = 0
         for phase in ("regional_partial_discovery", "regional_candidate_discovery"):
             if phase not in catalog:
@@ -205,7 +232,19 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
                 or (report["effective"] == "full" and skipped)):
             raise Q0EvidenceError("q0 scope and its omitted intervals disagree")
     elif report is not None:
-        raise Q0EvidenceError("full q0 manifest cannot attest scoped supplemental work")
+        if (not isinstance(report, dict) or report.get("requested") != AUTO_SCOPE
+                or report.get("effective") != FULL_SCOPE
+                or report.get("unsearched_part_intervals") != []):
+            raise Q0EvidenceError("full q0 manifest cannot attest scoped supplemental work")
+        decision = report.get("decision")
+        if (not isinstance(decision, dict)
+                or decision.get("schema") != "lgz_q0_scope_decision_v1"
+                or decision.get("effective_scope") != FULL_SCOPE):
+            raise Q0EvidenceError("automatic full-scope decision is not bound")
+    decision_record = report["decision"] if report and report.get("requested") == AUTO_SCOPE else None
+    if manifest.get("input_fingerprint") != _request_identity(
+            manifest["inputs"], manifest.get("tool"), policy, manifest["builder"], decision_record):
+        raise Q0EvidenceError("q0 evidence input fingerprint is inconsistent")
     if scope == PROOF_REPAIR_SCOPE:
         _readless_package(root)
         required = [row for row in manifest["inputs"] if row["path"] == "metadata/package.tsv"]
@@ -217,12 +256,17 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
         from .q0_threshold_acceptance import validate_catalog
         validate_catalog(root, manifest, catalog)
     expected_outputs = {manifest["catalog"]}
+    from .q0_selection_cache import output_path as accepted_selection_output
+    selection_output = accepted_selection_output(manifest)
+    if selection_output is not None:
+        expected_outputs.add(selection_output)
     inputs = {row["path"] for row in manifest["inputs"]}
     try:
         for row in catalog["base_alignments"]:
             if not {row["query_fasta"], row["target_fasta"], row["paf"]} <= inputs:
                 raise Q0EvidenceError("q0 base alignment is not bound to its inputs")
         regional_members = None
+        junction_ids = set(report.get('junction_review_task_ids', ())) if scope == threshold_scope else set()
         for task in catalog["supplementary_alignments"]:
             if task.get("kind") == "regional_discovery":
                 from .q0_regional_mapping import verify_regional_task
@@ -230,6 +274,9 @@ def load_verified_evidence(root: Path, *, _draft=None) -> dict:
                     regional_members = {row["segment_id"]: (row["interval"]["end"]-row["interval"]["start"], row["sequence_sha256"])
                                         for row in catalog["segments"]}
                 receipt = verify_regional_task(root, task, members=regional_members)
+                if task['task_id'] in junction_ids:
+                    from .q0_junction_review import verify_windows
+                    verify_windows(receipt['spec'])
                 if (task["receipt"] not in outputs or any(outputs.get(row["path"]) != row for row in receipt["outputs"])):
                     raise Q0EvidenceError("regional evidence dependencies are not bound to the ready manifest")
                 expected_outputs.update({task["receipt"]} | {row["path"] for row in receipt["outputs"]})
@@ -272,6 +319,11 @@ def _dataset_sequences(root, datasets):
                 raise Q0EvidenceError(f"duplicate q0 source: {key}")
             sources[key] = sequence
     return sources
+
+
+def _matrix_paf(chromosome: str, left: str, right: str) -> str:
+    stem = f"{left}_vs_self" if left == right else f"{left}_vs_{right}"
+    return f"runs/chr_{chromosome}/{stem}/result.paf"
 
 
 def _initial_inputs(root: Path, *, matrix_reader=None):
@@ -343,8 +395,7 @@ def _initial_inputs(root: Path, *, matrix_reader=None):
             if pair not in expected or pair in actual:
                 raise Q0EvidenceError(f"unexpected or duplicate q0 pair: {chromosome}:{pair}")
             actual.add(pair)
-            stem = f"{left}_vs_self" if left == right else f"{left}_vs_{right}"
-            expected_paf = layout.relative(f"runs/chr_{chromosome}/{stem}/result.paf")
+            expected_paf = layout.relative(_matrix_paf(chromosome, left, right))
             # Old descriptors use logical paths; current producers record
             # numbered paths. Require the same exact owned pair/direction.
             if layout.relative(row["paf"]) != expected_paf:
@@ -619,28 +670,23 @@ def _supplement(root: Path, catalog: CandidateCatalog, request: dict, tool: dict
 
 
 
-def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference_bases, skip_self=False, prepared_target=None, on_cache_hit=None):
-    task=_supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,cache_only=True,on_cache_hit=on_cache_hit)
-    if task is not None:return task
+def _unroutable_seed(root, catalog, request, tool, preset, threads, *, reference_bases, skip_self=False, on_cache_hit=None):
+    """Look up both historical profiles; a cold seed is never a native mapper invocation."""
+    def probe(fast):
+        return _supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,cache_only=True,
+                           weak_seed_fast=fast,reference_bases=reference_bases,on_cache_hit=on_cache_hit)
+    task=probe(False)
+    if task is not None: return task
     queries,targets=weak_global_seed_scope(catalog.parts,catalog.reference_routable_parts,
         request['query_ids'],request['target_ids'],reference_bases=reference_bases,preset=preset)
-    fast=bool(queries and targets)
-    # Dense native repeats can exhaust memory even with a tiny target. The
-    # short-side completion uses a separate bounded worker budget, not 32 by default.
-    if request.get('native_short_targets_as_queries'):threads=min(threads,8)
-    return _supplement(root,catalog,request,tool,preset,threads,skip_self=skip_self,
-                       prepared_target=prepared_target,weak_seed_fast=fast,reference_bases=reference_bases,on_cache_hit=on_cache_hit)
+    return probe(True) if queries and targets else None
 
 
 def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,known_pairs,tool,preset,threads,*,reference_bases,skip_self):
     scopes=CompletedNativeScopes(root,catalog,index,tasks,tool,preset)
     seen={task['task_id'] for task in tasks}
-    while True:
-        request=scopes.next_missing_seed(query_ids,target_ids)
-        if request is None:break
-        template_task=next((task for task in tasks if task['kind']!='regional_discovery'
-                            and task['target_ids']==request['target_ids']),None)
-        template=({'root':str(root),'receipt':identity(root,template_task['receipt'])} if template_task else None)
+    cache_misses=0
+    for request in scopes.missing_seed_requests(query_ids,target_ids):
         consumed = False
         def consume_seed(seed,hits):
             nonlocal consumed
@@ -650,13 +696,18 @@ def _complete_unroutable_seeds(root,catalog,index,query_ids,target_ids,tasks,kno
                                     include_placed=True,known_pairs=known_pairs)
             consumed = True
         seed=_unroutable_seed(root,catalog,request,tool,preset,threads,reference_bases=reference_bases,
-                             skip_self=skip_self,prepared_target=template,on_cache_hit=consume_seed)
+                             skip_self=skip_self,on_cache_hit=consume_seed)
+        if seed is None:
+            cache_misses+=1
+            continue  # Other cohorts may have verified evidence; this one remains unsearched.
         if not consumed:
             hits=read_paf(artifact_path(root, seed['paf']),query_lengths={key:catalog.parts[key].interval.length for key in seed['query_ids']},
                           target_lengths={key:catalog.parts[key].interval.length for key in seed['target_ids']},artifact=seed['paf'])
             consume_seed(seed,hits)
         print(f"LGZ q0 weak seed: completed={seed['task_id']} approximate={seed['task_id'] in scopes.approximate_scope_task_ids} "
               f"queries={len(seed['query_ids'])} targets={len(seed['target_ids'])}",flush=True)
+    if cache_misses:
+        print(f"LGZ q0 unroutable seed: direct_cache_misses={cache_misses}; missing relationships remain unsearched",flush=True)
     return scopes
 
 def _readless_package(root):
@@ -710,23 +761,147 @@ class _ProofRepairInputs:
         return sources, lengths, assignments, options, self.paths, alignments, observations, self.identities
 
 
+
+def _scope_file(layout: WorkspaceLayout, relative: str):
+    path = layout.path(relative)
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError(f"not a regular Q0 scope input: {relative}")
+    return path, info.st_size
+
+
+def _scope_index(layout: WorkspaceLayout, relative: str):
+    path, _ = _scope_file(layout, relative)
+    with path.open(encoding="utf-8") as stream:
+        for line in stream:
+            fields = line.split("\t", 2)
+            if len(fields) < 2 or not fields[0] or any(c.isspace() for c in fields[0]):
+                raise ValueError("invalid Q0 FASTA index record")
+            length = int(fields[1])
+            if length < 1:
+                raise ValueError("invalid Q0 FASTA index length")
+            yield fields[0], length
+
+
+def _scope_paf_inventory(layout, chromosomes, datasets):
+    """Count only declared base evidence; no workspace walk or PAF content reads."""
+    if any(not isinstance(n, str) or not n or "/" in n or "\\" in n or n in {".", ".."}
+           for n in (*chromosomes, *datasets)):
+        raise ValueError("invalid Q0 inventory name")
+    paf_bytes = sum(_scope_file(layout, f"runs/{name}_vs_ref/result.paf")[1] for name in datasets)
+    matrix_count = 0
+    for chromosome in chromosomes:
+        path, _ = _scope_file(layout, f"runs/chr_{chromosome}/q0_alignment_inputs.json")
+        descriptor = json_file(path)
+        rows = descriptor.get("alignments")
+        if (descriptor.get("version") != 1 or descriptor.get("chromosome") != chromosome
+                or not isinstance(rows, list)):
+            raise ValueError("invalid Q0 scope descriptor")
+        seen = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ValueError("invalid Q0 scope pair")
+            left, right = row.get("target_dataset"), row.get("query_dataset")
+            if not isinstance(left, str) or not isinstance(right, str) or left not in datasets or right not in datasets:
+                raise ValueError("unknown Q0 scope dataset")
+            expected = _matrix_paf(chromosome, left, right)
+            if expected in seen or layout.relative(row["paf"]) != layout.relative(expected):
+                raise ValueError("duplicate or misdirected Q0 scope PAF")
+            seen.add(expected)
+            paf_bytes += _scope_file(layout, expected)[1]
+        matrix_count += len(seen)
+    return paf_bytes, matrix_count
+
+
+def _automatic_scope_decision(root: Path) -> ScopeDecision:
+    """Decide before the expensive initial PAF scan; unknown metadata is full."""
+    try:
+        reference_rows = table(root, "metadata/reference.tsv", ("fasta_relpath", "fai_relpath"))
+        dataset_rows = table(root, "metadata/datasets.tsv", ("dataset_name", "fasta_relpath", "fai_relpath"))
+        package_rows = table(root, "metadata/package.tsv", ("reads_qc_enabled",))
+        option_rows = table(root, "metadata/prepare_options.tsv", ("key", "value"))
+        if len(reference_rows) != 1 or len(package_rows) != 1:
+            raise ValueError("automatic Q0 scope metadata is incomplete")
+        layout = WorkspaceLayout.detect(root)
+        refs = {}
+        for name, length in _scope_index(layout, reference_rows[0]["fai_relpath"]):
+            if name in refs:
+                raise ValueError("duplicate Q0 reference record")
+            refs[name] = length
+        datasets = {row["dataset_name"] for row in dataset_rows}
+        if not refs or not datasets or len(datasets) != len(dataset_rows):
+            raise ValueError("incomplete Q0 source inventory")
+        source_count = source_bp = longest_source_bp = 0
+        for row in dataset_rows:
+            before = source_count
+            for _, length in _scope_index(layout, row["fai_relpath"]):
+                source_count += 1
+                source_bp += length
+                longest_source_bp = max(longest_source_bp, length)
+            if source_count == before:
+                raise ValueError("empty Q0 source index")
+        reference_bp = sum(refs.values())
+        options = {row["key"]: row["value"] for row in option_rows}
+        preset = options.get("minimap_preset", "asm10")
+        reads_value = package_rows[0]["reads_qc_enabled"]
+        reads_qc_enabled = {"true": True, "false": False}.get(reads_value)
+        paf_bytes, base_alignment_count = _scope_paf_inventory(layout, refs, datasets)
+        workload = ScopeWorkload(
+            regional_enabled=(preset == REGIONAL_POLICY["preset"]
+                              and reference_bp >= REGIONAL_POLICY["reference_bases_at_least"]),
+            reads_qc_enabled=reads_qc_enabled,
+            reference_bp=reference_bp,
+            source_bp=source_bp,
+            longest_source_bp=longest_source_bp,
+            source_count=source_count,
+            paf_bytes=paf_bytes,
+            base_alignment_count=base_alignment_count,
+        )
+    except (OSError, UnicodeError, ValueError, Q0EvidenceError, KeyError):
+        workload = ScopeWorkload(False, None, 0, 0, 0, 0, 0, 0)
+        return ScopeDecision(AUTO_SCOPE, FULL_SCOPE, "automatic_metadata_unavailable", (),
+                             workload, AutoScopePolicy())
+    return decide_scope(workload)
+
+
 def prepare_evidence(root: Path, *, threads: int = 1, minimap2: str = "minimap2",
-                     supplement_scope: str = "full") -> dict:
+                     supplement_scope: str = FULL_SCOPE) -> dict:
+    root = root.resolve()
+    if supplement_scope == AUTO_SCOPE:
+        decision = _automatic_scope_decision(root)
+        if decision.effective_scope == PROOF_REPAIR_SCOPE:
+            return _prepare_with_proof_repair(root, threads=threads, minimap2=minimap2,
+                                              requested_scope=AUTO_SCOPE, scope_decision=decision)
+        supplement_scope = decision.effective_scope
+        requested_scope = AUTO_SCOPE
+        scope_decision = decision
+    else:
+        requested_scope = supplement_scope
+        scope_decision = None
     if supplement_scope == "positive_threshold":
         from .q0_threshold_prepare import prepare
         return prepare(root, threads, minimap2)
     if supplement_scope == PROOF_REPAIR_SCOPE:
-        return _prepare_with_proof_repair(root.resolve(), threads=threads, minimap2=minimap2)
-    manifest, _, _ = _prepare_evidence_pass(root, threads=threads, minimap2=minimap2, supplement_scope=supplement_scope)
+        return _prepare_with_proof_repair(root, threads=threads, minimap2=minimap2,
+                                          requested_scope=requested_scope, scope_decision=scope_decision)
+    manifest, _, _ = _prepare_evidence_pass(root, threads=threads, minimap2=minimap2,
+                                            supplement_scope=supplement_scope,
+                                            requested_scope=requested_scope,
+                                            scope_decision=scope_decision)
     return manifest
 
 
 def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
+                           requested_scope=None, scope_decision=None,
                            draft=False, frontier_override=None, repair_round=0, fallback_reason=None,
                            expected_input=None, repair_inputs=None):
     root = root.resolve()
     if threads < 1:
         raise Q0EvidenceError("q0 evidence threads must be positive")
+    requested_scope = supplement_scope if requested_scope is None else requested_scope
+    # Reject explicit developer/test overrides before touching workspace inputs.
+    if supplement_scope == AUTO_SCOPE:
+        raise Q0EvidenceError("automatic Q0 scope must be resolved before the evidence pass")
     run_policy = supplement_policy(supplement_scope)
     builder = builder_identity()
     if repair_inputs is None:
@@ -739,8 +914,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
     if supplement_scope == PROOF_REPAIR_SCOPE:
         _readless_package(root)
     tool = executable_identity(minimap2)
-    request_identity = stable_id("q0-evidence-input", {"inputs": inputs, "tool": tool,
-                                "policy": run_policy, "builder": builder})
+    request_identity = _request_identity(inputs, tool, run_policy, builder,
+                                         scope_decision.record() if scope_decision else None)
     if expected_input is not None and expected_input != request_identity:
         raise Q0EvidenceError("q0 proof repair input identity changed between passes")
     if expected_input is None and workspace_artifact_path(root, MANIFEST).is_file():
@@ -770,11 +945,21 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
         if cache: cache.publish()
         from .q0_frontier_scope import UnsearchedWindows
         regional_frontier = None
-        unsearched = UnsearchedWindows() if supplement_scope != "full" else None
-        scope_report = {"requested": supplement_scope, "effective": "full"}
+        unsearched = UnsearchedWindows() if supplement_scope != FULL_SCOPE else None
+        scope_report = None
+        if requested_scope == AUTO_SCOPE:
+            if scope_decision is None:
+                raise Q0EvidenceError("automatic Q0 scope lacks its decision record")
+            scope_report = {"requested": AUTO_SCOPE, "effective": FULL_SCOPE,
+                            "decision": scope_decision.record(),
+                            "unsearched_part_intervals": []}
+        elif supplement_scope != FULL_SCOPE:
+            scope_report = {"requested": supplement_scope, "effective": FULL_SCOPE}
         if sparse is not None:
             scope_report["routing"] = sparse
         if supplement_scope == PROOF_REPAIR_SCOPE:
+            if scope_report is None:
+                scope_report = {"requested": supplement_scope, "effective": FULL_SCOPE}
             scope_report["proof_repair_rounds"] = repair_round
         if unsearched is not None:
             if fallback_reason is not None:
@@ -785,6 +970,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 regional_frontier = (frontier_override if frontier_override is not None else
                                      _provisional_frontier(root, sources, lengths, catalog, base_alignments))
                 if regional_frontier is not None:
+                    if scope_report is None:
+                        scope_report = {"requested": supplement_scope, "effective": FULL_SCOPE}
                     scope_report["effective"] = "decision_frontier"
                     scope_report["frontier_sources"] = len(regional_frontier)
                     scope_report["frontier_bp"] = sum(i.length for rows in regional_frontier.values() for i in rows)
@@ -794,8 +981,19 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             if not draft or repair_inputs is None: raise Q0EvidenceError("threshold generation requires a bound private pass")
             from .q0_threshold_acceptance import SEMANTICS, record
             scope_report.update(acceptance=SEMANTICS, threshold_request=record(regional_frontier))
-        if supplement_scope != "full":
+        if scope_report is not None:
             catalog.payload["supplement_scope"] = scope_report
+        from .q0_native_frontier import CACHE_ONLY, RegionalFallbackCache, prefer_cached_whole
+        bounded_native = supplement_scope == 'positive_threshold' and bool(regional_frontier)
+        native_gate = RegionalFallbackCache(bounded=bounded_native)
+        if bounded_native:
+            scope_report['native_fallback_policy'] = CACHE_ONLY
+
+        def native_fallbacks(phase, requests):
+            def probe(request):
+                return _supplement(root,catalog,request,tool,options.get('minimap_preset','asm10'),threads,
+                                   skip_self=options.get('skip_self')=='true',cache_only=True)
+            return native_gate.dispatch(phase,requests,probe)
         tasks = []
         state = (getattr(repair_inputs, "native_decisions", None)
                  if supplement_scope == "positive_threshold" and cache is None and frontier_override and not fallback_reason else None)
@@ -874,8 +1072,8 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 catalog.payload["regional_partial_discovery"] = report
                 if fallback_ids:
                     fallback_request = {**request, "query_ids": fallback_ids}
-                    partial_tasks.append(_supplement(root, catalog, fallback_request, tool, preset, threads,
-                                                    skip_self=options.get("skip_self") == "true"))
+                    whole = native_fallbacks('regional_partial_discovery',[fallback_request])
+                    partial_tasks = prefer_cached_whole(partial_tasks,whole,report)
             if not partial_consumed:tasks.extend(partial_tasks)
             # One discovery round, not one full catalog rebuild per window.
             # Keep each PAF's own declared geometry/artifact while accumulating
@@ -936,21 +1134,31 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
                 preset = options.get("minimap_preset", "asm10")
                 planner = CandidatePlan(root,catalog,index,pending_candidates,known_pairs,tasks,tool,preset,
                                         **({"native_for_weak": True} if sparse is not None else {}))
-                seed_ids = []
-                while (seed_request := planner.next_unroutable_seed()) is not None:
+                seed_ids = []; seed_misses = 0
+                for seed_request in planner.unroutable_seed_requests():
                     seed = _unroutable_seed(root,catalog,seed_request,tool,preset,threads,
                         reference_bases=sum(lengths.values()),skip_self=options.get("skip_self") == "true")
+                    if seed is None:
+                        seed_misses += 1
+                        continue
                     tasks.append(seed);seed_ids.append(seed["task_id"]);planner.add_complete_tasks([seed])
                 regional_tasks, native_requests, report = prepare_candidates(
                     root,catalog,index,pending_candidates,known_pairs,tasks,tool,reference_lengths=lengths,
                     preset=preset,threads=threads,skip_self=options.get("skip_self") == "true",planner=planner,
                     regional_frontier=candidate_frontier, unsearched=unsearched)
                 report["unroutable_seed_task_ids"] = seed_ids
-            tasks.extend(regional_tasks)
+                if seed_misses:
+                    print(f"LGZ q0 candidate seed: direct_cache_misses={seed_misses}; missing relationships remain unsearched",flush=True)
             catalog.payload["regional_candidate_discovery"] = report
-            for request in native_requests:
-                tasks.append(_supplement(root,catalog,request,tool,options.get("minimap_preset", "asm10"),threads,
-                                         skip_self=options.get("skip_self") == "true"))
+            if native_requests:
+                whole = native_fallbacks('regional_candidate_discovery',native_requests)
+                regional_tasks = prefer_cached_whole(regional_tasks,whole,report)
+            tasks.extend(regional_tasks)
+        if bounded_native:
+            if native_gate.omissions:
+                scope_report['deferred_native_matrices'] = native_gate.omissions
+            for phase, matrix_ids in native_gate.planned.items():
+                catalog.payload[phase]['native_fallback_matrix_ids'] = matrix_ids
         if _partition_sha256(Path(tool["resolved"])) != tool["sha256"]:
             raise Q0EvidenceError("q0 supplementary aligner changed during preparation")
         if repair_inputs is not None:
@@ -961,8 +1169,11 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
             raise Q0EvidenceError("q0 evidence builder changed during preparation; no manifest published")
         if supplement_policy(supplement_scope) != run_policy:
             raise Q0EvidenceError("q0 supplement scope changed during preparation; no manifest published")
-        if unsearched is not None and "native_candidate_stops" not in scope_report:
-            scope_report["unsearched_part_intervals"] = unsearched.record()
+        if unsearched is not None:
+            if scope_report is None:
+                raise Q0EvidenceError("q0 scoped preparation lacks a scope report")
+            if "native_candidate_stops" not in scope_report:
+                scope_report["unsearched_part_intervals"] = unsearched.record()
         payload = catalog.finish()
         payload["base_alignments"] = base_alignments
         payload["supplementary_alignments"] = tasks
@@ -991,7 +1202,7 @@ def _prepare_evidence_pass(root: Path, *, threads, minimap2, supplement_scope,
         return manifest, regional_frontier, False
 
 
-def _prepare_with_proof_repair(root, *, threads, minimap2):
+def _prepare_with_proof_repair(root, *, threads, minimap2, requested_scope=PROOF_REPAIR_SCOPE, scope_decision=None):
     from .q0_admission import load_evidence_input, select_q0_paths
     from .q0_frontier_scope import UnsearchedQ0Context, audit_selected_scope, selected_proof_frontier
     from .q0_sources import merged_intervals
@@ -1003,6 +1214,7 @@ def _prepare_with_proof_repair(root, *, threads, minimap2):
     for iteration in range(MAX_PROOF_REPAIRS + 2):
         manifest, planned, cached = _prepare_evidence_pass(
             root, threads=threads, minimap2=minimap2, supplement_scope=PROOF_REPAIR_SCOPE,
+            requested_scope=requested_scope, scope_decision=scope_decision,
             draft=True, expected_input=expected_input, frontier_override=frontier,
             repair_round=min(iteration, MAX_PROOF_REPAIRS), fallback_reason=fallback_reason, repair_inputs=repair_inputs)
         if cached:

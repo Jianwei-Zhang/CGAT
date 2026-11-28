@@ -15,6 +15,7 @@ from server.tools.lgz_core.q0_catalog import build_catalog
 from server.tools.lgz_core.q0_frontier_scope import (UnsearchedQ0Context, UnsearchedWindows, decision_frontier,
                                                       selected_proof_frontier, window_touches_frontier)
 from server.tools.lgz_core.q0_sources import Interval, Q0EvidenceError, SourceKey
+from server.tools.lgz_core.q0_scope_policy import ScopeWorkload, decide_scope
 
 
 class FrontierScopeTests(unittest.TestCase):
@@ -184,6 +185,27 @@ class FrontierScopeTests(unittest.TestCase):
                                                             side_effect=AssertionError("ready was not reused"))):
                 self.assertEqual(ready, q0_preparation.prepare_evidence(root, minimap2=mapper,
                                                                        supplement_scope=q0_preparation.PROOF_REPAIR_SCOPE))
+
+    def test_automatic_scope_dispatches_repair_without_reading_inputs_twice(self):
+        decision = decide_scope(ScopeWorkload(
+            regional_enabled=True, reads_qc_enabled=False, reference_bp=5_000_000_000,
+            source_bp=2_000_000_000, longest_source_bp=30_000_000, source_count=200,
+            paf_bytes=3 * 1024**3, base_alignment_count=20))
+        fixture, truth = bridge_fixture()
+        with tempfile.TemporaryDirectory() as tmp, redirect_stdout(StringIO()):
+            root = fixture.workspace(tmp)
+            (root / "metadata/package.tsv").write_text("reads_qc_enabled\nfalse\n")
+            mapper = str(Path(tmp) / "q0-fixture-bin/minimap2")
+            env = {"PATH": str(Path(mapper).parent) + os.pathsep + os.environ.get("PATH", "")}
+            with (patch.dict(os.environ, env), patch.object(q0_preparation, "regional_enabled", return_value=True),
+                  patch.object(q0_preparation, "_automatic_scope_decision", return_value=decision),
+                  patch.object(q0_preparation, "_initial_inputs", wraps=q0_preparation._initial_inputs) as initial):
+                ready = q0_preparation.prepare_evidence(root, minimap2=mapper, supplement_scope="auto")
+            self.assertEqual(initial.call_count, 1)
+            self.assertEqual(ready, q0_preparation.load_verified_evidence(root))
+            report = q0_preparation.json_file(root / ready["catalog"])["supplement_scope"]
+            self.assertEqual((report["requested"], report["decision"]), ("auto", decision.record()))
+            self.assertEqual(q0_admission.build_q0(root).records["chr1"], truth)
 
     def test_proof_repair_does_not_publish_after_draft_input_drift(self):
         from server.tools.lgz_core import q0_frontier_scope as scope

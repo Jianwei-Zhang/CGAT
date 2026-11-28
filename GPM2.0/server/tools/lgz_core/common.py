@@ -262,17 +262,23 @@ _FASTA_WRAP_LINES = re.compile(r".{1,80}", re.DOTALL)
 _FASTA_BLOCK_BASES = 80 * 1024  # A bounded block of whole lines, not a whole contig.
 
 
+def write_wrapped_sequence(handle, sequence: str, start: int, end: int, *, uppercase=False):
+    """Write an interval with 80-character lines, without copying the whole source interval."""
+    for i in range(start, end, _FASTA_BLOCK_BASES):
+        j = min(i + _FASTA_BLOCK_BASES, end)
+        if uppercase:
+            lines = _FASTA_WRAP_LINES.findall(sequence[i:j].upper())
+        else:
+            lines = _FASTA_WRAP_LINES.findall(sequence, i, j)
+        handle.write("\n".join(lines) + "\n")
+
+
 def write_fasta(path: Path, records: Iterable[tuple[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
         for name, sequence in records:
             handle.write(f">{name}\n")
-            length = len(sequence)
-            # Preserve UTF-8, LF and the original 80-character wrapping while
-            # avoiding a Python write/encoding call for every 80-base line.
-            for start in range(0, length, _FASTA_BLOCK_BASES):
-                end = min(start + _FASTA_BLOCK_BASES, length)
-                handle.write("\n".join(_FASTA_WRAP_LINES.findall(sequence, start, end)) + "\n")
+            write_wrapped_sequence(handle, sequence, 0, len(sequence))
 
 def write_tsv(path: Path, fields: list[str], rows: Iterable[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -358,12 +358,16 @@ class GrtPrepareInputsTests(unittest.TestCase):
             completed = self.run_tool(server)
             self.assertEqual(completed.returncode, 0, completed.stderr)
             lines = [line for line in completed.stdout.splitlines() if line.startswith("LGZ prepare phase: ")]
-            self.assertEqual([line.split(" ·")[0] for line in lines], [
+            milestones = [
                 "LGZ prepare phase: loading Q0 alignment evidence", "LGZ prepare phase: placing candidate segments",
                 "LGZ prepare phase: building chromosome paths", "LGZ prepare phase: chromosome path 1/1: chr1",
                 "LGZ prepare phase: reconstructing Q0 sequences and recording decisions",
                 "LGZ prepare phase: writing Q0 and freezing ordinary and telomere donors",
-            ])
+            ]
+            # Per-source and per-pair progress can appear between the stable milestones.
+            messages = [line.split(" ·")[0].split(" started_at=")[0] for line in lines]
+            self.assertEqual([msg for msg in messages if msg in milestones], milestones)
+            self.assertIn("LGZ prepare phase: Q0 placement thread budget=1", messages)
             from server.tools.lgz_core.common import read_fasta
             self.assertEqual(dict(read_fasta(server / "grt/q/q0.fa")), {"chr1": truth})
             frozen = validate_prepared_q0(server)
