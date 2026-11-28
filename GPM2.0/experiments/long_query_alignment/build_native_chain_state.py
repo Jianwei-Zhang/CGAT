@@ -107,6 +107,16 @@ def portable_options(args):
     return flags,cppflags,libraries,dependencies
 
 
+def elf_platform(binary):
+    # EI_CLASS=ELF64, EI_DATA=little endian, e_machine at offset 18.
+    with Path(binary).open("rb") as src:
+        header = src.read(20)
+    arch = {62: "linux-x86_64", 183: "linux-aarch64"}.get(int.from_bytes(header[18:20], "little"))
+    if header[:6] != b"\x7fELF\x02\x01" or not arch:
+        raise wa.ExperimentError("unsupported native companion ELF architecture")
+    return arch
+
+
 def inspect_elf(binary,*,legacy=False):
     reader = shutil.which("readelf")
     if not reader:
@@ -118,8 +128,12 @@ def inspect_elf(binary,*,legacy=False):
                              if not re.fullmatch(r"GLIBC_[0-9]+(?:\.[0-9]+)+",name)})
     paths = re.findall(r"\((?:RPATH|RUNPATH)\).*?\[([^\]]*)\]",dynamic)
     needed = re.findall(r"\(NEEDED\).*?\[([^\]]*)\]",dynamic)
+    allowed = {"libm.so.6","libpthread.so.0","libc.so.6","librt.so.1","libdl.so.2"}
+    # AArch64 glibc exports TLS symbols from its standard dynamic loader.
+    if elf_platform(binary) == "linux-aarch64":
+        allowed.add("ld-linux-aarch64.so.1")
     if legacy and (not versions or versions[-1]>(2,17) or any(paths) or other_versions
-                   or set(needed)-{"libm.so.6","libpthread.so.0","libc.so.6","librt.so.1","libdl.so.2"}):
+                   or set(needed)-allowed):
         raise wa.ExperimentError("legacy companion must require at most glibc 2.17 and have no embedded RPATH")
     return {"maximum_glibc":".".join(map(str,versions[-1])) if versions else None,
             "needed_libraries":needed,"runtime_paths":paths,"other_glibc_requirements":other_versions,"legacy_2_17_checked":legacy}

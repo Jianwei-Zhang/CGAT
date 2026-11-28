@@ -398,7 +398,7 @@ needed. The installed minimap2 executable is never patched or replaced.
 Long-query handling requires minimap2 `2.31-r1302`. Eligible large references use
 bounded native-window projection, with whole-record checks and limited risk review;
 this route supports Linux ARM64 without the x86 companion. The legacy confidence
-reconstruction route still requires the bundled Linux x86_64 companion (glibc 2.17).
+reconstruction route still requires the bundled companion for the host architecture (Linux x86_64 or ARM64, glibc 2.17).
 Ordinary mapping does not require that companion. Unsupported recovery fails explicitly
 without publishing partial output or inventing MAPQ. Resume reuses only verified
 completed groups and explicitly reviewed runtime migrations.

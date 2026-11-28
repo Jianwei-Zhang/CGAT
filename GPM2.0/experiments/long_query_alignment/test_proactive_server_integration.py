@@ -43,18 +43,23 @@ class ProactiveServerIntegrationTests(unittest.TestCase):
         if not cls.mm or not cls.bundle:
             raise unittest.SkipTest("explicit pinned mapper and portable companion required")
 
-    def run_case(self,mode):
+    def run_case(self,mode, *, packaged=False):
         with tempfile.TemporaryDirectory(prefix="cgat-proactive-adapter-") as tmp:
-            root=Path(tmp); runtime=root/"runtime"; runtime.mkdir()
-            for name in sa.RUNTIME_FILES:
-                shutil.copyfile(Path(sa.__file__).with_name(name),runtime/name)
-            checked=sa.nst.validate_bundle(self.bundle)
-            bundle=runtime/"native"/checked["platform"]
-            shutil.copytree(Path(self.bundle),bundle)
-            wa.write_json(runtime/sa.MANIFEST,dict(schema=1,status="source_checked_recovery_runtime",
-                scope="initial_reference_asm10_only",recovered_output_admission=sa.pub.POLICY,
-                native_companion_sha256=checked["sha256"],native_companion_platform=checked["platform"],
-                files_sha256=sa.runtime_files(runtime)))
+            root=Path(tmp)
+            if packaged:
+                runtime = Path(__file__).resolve().parents[2]/"server/tools/long_cigar_recovery"
+                self.assertIn("native_companion_binding", sa.validate_runtime(runtime))
+            else:
+                runtime=root/"runtime"; runtime.mkdir()
+                for name in sa.RUNTIME_FILES:
+                    shutil.copyfile(Path(sa.__file__).with_name(name),runtime/name)
+                checked=sa.nst.validate_bundle(self.bundle)
+                bundle=runtime/"native"/checked["platform"]
+                shutil.copytree(Path(self.bundle),bundle)
+                wa.write_json(runtime/sa.MANIFEST,dict(schema=1,status="source_checked_recovery_runtime",
+                    scope="initial_reference_asm10_only",recovered_output_admission=sa.pub.POLICY,
+                    native_companion_sha256=checked["sha256"],native_companion_platform=checked["platform"],
+                    files_sha256=sa.runtime_files(runtime)))
             ws=root/"workspace"; (ws/".prepare_lib").mkdir(parents=True); (ws/"metadata").mkdir()
             run=ws/"runs/query_vs_ref"; run.mkdir(parents=True)
             rng=random.Random(2311302); sequence=bytes(rng.choices(b"ACGT",k=120000))
@@ -113,6 +118,7 @@ class ProactiveServerIntegrationTests(unittest.TestCase):
                 if "-c" in execution["command"] and mode!="native":
                     self.assertNotEqual(execution["command"][-1],str(query))
 
+    def test_packaged_host_companion_publishes_mixed_control(self): self.run_case("mixed", packaged=True)
     def test_native_prepared_workspace_publishes_identical_bytes(self): self.run_case("native")
     def test_mixed_prepared_workspace_admits_then_publishes(self): self.run_case("mixed")
     def test_unmapped_long_query_publishes_checked_empty_output(self): self.run_case("unmapped")

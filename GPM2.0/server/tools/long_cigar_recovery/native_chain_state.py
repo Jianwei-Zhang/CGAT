@@ -31,7 +31,9 @@ FIELDS = ("order","id","parent","anchor_offset","anchor_count","chain_score","or
 FLAGS = ("reverse","inv","sam_primary","seg_split","split_inv","is_alt","strand_retained","is_spliced")
 
 
-def validate_bundle(directory=None):
+def validate_bundle(directory=None, *, package_platform=None):
+    # Cross-architecture inspection is used only by the offline package builder.
+    expected_platform = build.host_platform() if package_platform is None else package_platform
     directory = Path(directory) if directory is not None else build.default_bundle()
     manifest = directory/build.MANIFEST
     if not manifest.is_file():
@@ -46,7 +48,7 @@ def validate_bundle(directory=None):
         raise wa.ExperimentError("invalid native-state companion build receipt") from exc
     required = {"schema":1,"status":"built_unvalidated","protocol":1,"version":build.VERSION,
                 "preset":"asm10","upstream_commit":build.UPSTREAM_COMMIT,"binary":build.BINARY,
-                "platform":build.host_platform()}
+                "platform":expected_platform}
     if type(info) is not dict or any(info.get(k) != v for k,v in required.items()):
         raise wa.ExperimentError("native-state companion version/source/platform receipt mismatch")
     sources = info.get("source_files_sha256",{})

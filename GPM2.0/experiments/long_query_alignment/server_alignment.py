@@ -82,18 +82,30 @@ def validate_runtime(root):
                 ("unvalidated_branch_runtime","closed_pending_final_acceptance"),
                 ("source_checked_recovery_runtime",pub.POLICY))
             or value.get("scope")!="initial_reference_asm10_only"
-            or value.get("recovered_output_admission")==pub.POLICY and (
-                type(value.get("native_companion_sha256")) is not str
-                or not HASH.fullmatch(value["native_companion_sha256"])
-                or value.get("native_companion_platform") not in ("linux-x86_64","linux-aarch64"))
             or value.get("files_sha256")!=runtime_files(root)):
         raise wa.ExperimentError("branch runtime source/contract mismatch")
+    binding = None
+    platform, digest = value.get("native_companion_platform"), value.get("native_companion_sha256")
+    if "native_companions" in value:
+        matrix = value["native_companions"]
+        if (not isinstance(matrix, dict) or set(matrix) != {"linux-x86_64", "linux-aarch64"}
+                or any(not isinstance(x, dict) or set(x) != {"sha256", "manifest_sha256"}
+                       or any(not isinstance(v, str) or not HASH.fullmatch(v) for v in x.values())
+                       for x in matrix.values())):
+            raise wa.ExperimentError("invalid native companion platform bindings")
+        platform = nst.build.host_platform()
+        binding = matrix[platform]
+        digest = binding["sha256"]
+    if value.get("recovered_output_admission") == pub.POLICY and (
+            not isinstance(digest, str) or not HASH.fullmatch(digest)
+            or platform not in ("linux-x86_64", "linux-aarch64")):
+        raise wa.ExperimentError("branch runtime native companion binding mismatch")
     return {"path":str(path),"sha256":hashlib.sha256(raw).hexdigest(),"files_sha256":value["files_sha256"],
             "recovered_output_admission":value["recovered_output_admission"],
             "approximate_output_admission":value.get("approximate_output_admission"),
             "ordinary_output_admission":value.get("ordinary_output_admission"),
-            "native_companion_sha256":value.get("native_companion_sha256"),
-            "native_companion_platform":value.get("native_companion_platform"),
+            "native_companion_sha256":digest, "native_companion_platform":platform,
+            **({"native_companion_binding":binding} if binding else {}),
             "handoff_base_sha256":value.get("handoff_base_sha256"),
             "native_resume_source_profiles":value.get("native_resume_source_profiles",[]),
             "completed_reference_resume_source_profiles":value.get("completed_reference_resume_source_profiles",[]),
@@ -134,6 +146,14 @@ def cancellation_scope():
             signal.signal(number,handler)
 
 
+def publication_bundle(runtime_root, runtime):
+    bundle = nst.validate_bundle(Path(runtime_root)/"native"/nst.build.host_platform())
+    binding = runtime.get("native_companion_binding")
+    if binding is not None and any(bundle[k] != binding[k] for k in ("sha256", "manifest_sha256")):
+        raise wa.ExperimentError("native companion does not match the package binding")
+    return bundle
+
+
 def publication_source(report,attempt,*,runtime=None,runtime_root=None,ordinary_catalog=None):
     if (report.get("status")!="proactive_candidate_complete"
             or report.get("original_inputs_unchanged") is not True
@@ -147,7 +167,7 @@ def publication_source(report,attempt,*,runtime=None,runtime_root=None,ordinary_
             raise wa.ExperimentError("approximate initial-reference publication is not enabled by this package")
         bundle = None
         if report.get("helper") is not None:
-            bundle = nst.validate_bundle(Path(runtime_root)/"native"/nst.build.host_platform())
+            bundle = publication_bundle(runtime_root, runtime)
             if bundle["sha256"] != runtime.get("native_companion_sha256"):
                 raise wa.ExperimentError("legacy recovered confidence companion differs")
         admitted = pub.admit(report, attempt/"selective", bundle=bundle,
@@ -159,7 +179,7 @@ def publication_source(report,attempt,*,runtime=None,runtime_root=None,ordinary_
     if report.get("routing_mode")!="native_complete_unchanged":
         if not runtime or runtime.get("recovered_output_admission")!=pub.POLICY:
             raise wa.ExperimentError("recovery candidate retained, but formal output admission is CLOSED pending final acceptance; no result.paf or success may be emitted")
-        bundle = nst.validate_bundle(Path(runtime_root)/"native"/nst.build.host_platform())
+        bundle = publication_bundle(runtime_root, runtime)
         if (bundle["sha256"]!=runtime.get("native_companion_sha256")
                 or bundle["platform"]!=runtime.get("native_companion_platform")
                 or (bundle.get("runtime_abi") or {}).get("legacy_2_17_checked") is not True):
@@ -341,6 +361,7 @@ def run_reference(args,*,runtime_root=None):
                 ordinary_resource_context=report["ordinary_resource_context"],
                 approximate_initial_reference=runtime.get("approximate_output_admission") == ap.POLICY,
                 adaptive_ordinary=runtime.get("ordinary_output_admission") == oc.POLICY,
+                native_companion_binding=runtime.get("native_companion_binding"),
                 native_state_bundle=runtime_root/"native"/nst.build.host_platform(), **mapping_options)
             result = pa.experiment(options,prepared_workspace=workspace,admit_output=False,resume_identity=resume_identity)
             if result.get("assignment_coverage", 0.60) != args.assignment_coverage:

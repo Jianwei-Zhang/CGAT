@@ -1,4 +1,5 @@
 """Generated production tree stays byte-bound to the tested canonical runtime."""
+import json
 from pathlib import Path
 import shutil
 import tempfile
@@ -26,6 +27,26 @@ class ServerRuntimeSyncTests(unittest.TestCase):
     def test_checked_in_production_copy_matches_canonical_runtime(self):
         official = Path(__file__).resolve().parents[2] / "server"
         self.assertEqual(sync.synchronize(official)["changed"], [])
+
+    def test_both_platforms_select_the_companion_and_receipt_without_cross_execution(self):
+        sync.synchronize(self.server, native_bundle=self.bundle, write=True)
+        for platform in ("linux-x86_64", "linux-aarch64"):
+            with self.subTest(platform=platform), patch.object(sa.nst.build, "host_platform", return_value=platform):
+                binding = sa.validate_runtime(self.runtime)
+                actual = sa.publication_bundle(self.runtime, binding)
+                self.assertEqual(platform, binding["native_companion_platform"])
+                self.assertEqual(actual["sha256"], binding["native_companion_sha256"])
+                self.assertEqual(actual["manifest_sha256"], binding["native_companion_binding"]["manifest_sha256"])
+                # Even a well-formed but substituted build receipt must not publish.
+                binding["native_companion_binding"]["manifest_sha256"] = "0" * 64
+                with self.assertRaisesRegex(wa.ExperimentError, "package binding"):
+                    sa.publication_bundle(self.runtime, binding)
+        path = self.runtime / sa.MANIFEST
+        data = json.loads(path.read_bytes())
+        del data["native_companions"]["linux-aarch64"]
+        path.write_text(json.dumps(data))
+        with self.assertRaisesRegex(wa.ExperimentError, "platform bindings"):
+            sa.validate_runtime(self.runtime)
 
     def test_write_then_read_only_verification_and_stale_code_refusal(self):
         sync.synchronize(self.server, native_bundle=self.bundle, write=True)

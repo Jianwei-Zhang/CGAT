@@ -186,6 +186,9 @@ def experiment(args, *, prepared_workspace=None, admit_output=True, resume_ident
             nonlocal bundle
             if bundle is None:
                 bundle = nst.validate_bundle(getattr(args, "native_state_bundle", None))
+                pinned = getattr(args, "native_companion_binding", None)
+                if pinned is not None and any(bundle[k] != pinned[k] for k in ("sha256", "manifest_sha256")):
+                    raise wa.ExperimentError("native companion does not match the package binding")
                 report["helper"] = bundle
                 cache.bind("helper", {k: bundle[k] for k in ("sha256", "manifest_sha256", "platform")})
             return bundle

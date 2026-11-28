@@ -58,19 +58,24 @@ def expected_files(server, canonical, bundle):
                            ("tools/server_run.py", package.RUN_OVERLAY)):
         if (server / name).read_text().count(fragment) != 1:
             raise wa.ExperimentError("production alignment hook is absent or has drifted: " + name)
-    native = nst.validate_bundle(bundle)
-    if (native.get("runtime_abi") or {}).get("legacy_2_17_checked") is not True:
-        raise wa.ExperimentError("Server requires the audited portable companion, never a host-only build")
     hashes = adapter.runtime_files(canonical)
     files = {name: ((canonical / name).read_bytes(), 0o644) for name in hashes}
-    native_root = Path(native["manifest_path"]).parent
-    native_names = {build.BINARY: native["sha256"], build.MANIFEST: native["manifest_sha256"],
-                    **native.get("third_party_licenses_sha256", {})}
-    for name, digest in native_names.items():
-        path = native_root / name
-        if path.is_symlink() or wa.sha256(path) != digest:
-            raise wa.ExperimentError("portable companion changed during synchronization")
-        files["native/" + native["platform"] + "/" + name] = (path.read_bytes(), 0o755 if name == build.BINARY else 0o644)
+    companions = {}
+    for platform in ("linux-x86_64", "linux-aarch64"):
+        directory = Path(bundle).parent / platform
+        native = nst.validate_bundle(directory, package_platform=platform)
+        if (native.get("runtime_abi") or {}).get("legacy_2_17_checked") is not True:
+            raise wa.ExperimentError("Server requires the audited portable companion, never a host-only build")
+        if build.elf_platform(directory / build.BINARY) != platform:
+            raise wa.ExperimentError("portable companion ELF does not match package platform")
+        companions[platform] = {k: native[k] for k in ("sha256", "manifest_sha256")}
+        native_names = {build.BINARY: native["sha256"], build.MANIFEST: native["manifest_sha256"],
+                        **native.get("third_party_licenses_sha256", {})}
+        for name, digest in native_names.items():
+            path = directory / name
+            if path.is_symlink() or wa.sha256(path) != digest:
+                raise wa.ExperimentError("portable companion changed during synchronization")
+            files["native/" + platform + "/" + name] = (path.read_bytes(), 0o755 if name == build.BINARY else 0o644)
     base_tools = {p.relative_to(server).as_posix(): wa.sha256(p)
                   for p in sorted((server / "tools").rglob("*.py"))
                   if "__pycache__" not in p.parts and "long_cigar_recovery" not in p.relative_to(server).parts}
@@ -81,7 +86,7 @@ def expected_files(server, canonical, bundle):
     files[resume.BASE] = (encoded(base), 0o644)
     manifest = {"schema": 1, "status": "source_checked_recovery_runtime", "scope": "initial_reference_asm10_only",
                 "files_sha256": hashes, "recovered_output_admission": adapter.pub.POLICY,
-                "native_companion_platform": native["platform"], "native_companion_sha256": native["sha256"],
+                "native_companions": companions,
                 "handoff_base_sha256": hashlib.sha256(files[resume.BASE][0]).hexdigest(),
                 "production_ready": False, "customer_configuration_required": False,
                 "approximate_output_admission": adapter.ap.POLICY,
