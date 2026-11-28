@@ -683,13 +683,13 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11.5px;background:var(
 JS = r"""
 const rootEl=document.documentElement;
 const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v);}catch(_){return null;}};
-const setLang=(lang)=>{lang=(lang==='en')?'en':'zh';rootEl.dataset.lang=lang;rootEl.lang=(lang==='en')?'en':'zh-CN';document.querySelectorAll('[data-lang-btn]').forEach(b=>b.classList.toggle('is-active',b.dataset.langBtn===lang));store('cgat_report_lang',lang);};
+const setLang=(lang)=>{lang=(lang==='zh')?'zh':'en';rootEl.dataset.lang=lang;rootEl.lang=(lang==='en')?'en':'zh-CN';document.querySelectorAll('[data-lang-btn]').forEach(b=>b.classList.toggle('is-active',b.dataset.langBtn===lang));store('cgat_report_lang',lang);};
 const setTheme=(t)=>{if(t==='dark'||t==='light'){rootEl.dataset.theme=t;store('cgat_report_theme',t);}};
 const sL=store('cgat_report_lang');if(sL==='zh'||sL==='en')setLang(sL);
 const sT=store('cgat_report_theme');if(sT==='dark'||sT==='light')setTheme(sT);
 document.addEventListener('click',(ev)=>{
   const lb=ev.target.closest('[data-lang-btn]');if(lb){setLang(lb.dataset.langBtn);return;}
-  const tb=ev.target.closest('[data-theme-toggle]');if(tb){const dk=rootEl.dataset.theme==='dark'||(!rootEl.dataset.theme&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);setTheme(dk?'light':'dark');return;}
+  const tb=ev.target.closest('[data-theme-toggle]');if(tb){const dk=rootEl.dataset.theme==='dark';setTheme(dk?'light':'dark');return;}
 });
 if('IntersectionObserver' in window){
   const tocLinks=[...document.querySelectorAll('.wb-toc a[href^="#"]')];
@@ -899,8 +899,8 @@ def render(root: Path) -> Path:
         f'<p>Run <code>{esc(manifest["run_id"])}</code> · {completed_stages}/{len(records)} 阶段 · 缓存 {cached_stages}'
         + (f' · {esc(manifest.get("ended_at"))}' if manifest.get("ended_at") else "") + '</p></div>'
         '<div class="wb-controls">'
-        '<button type="button" class="ctrl-btn is-active" data-lang-btn="zh">中文</button>'
-        '<button type="button" class="ctrl-btn" data-lang-btn="en">EN</button>'
+        '<button type="button" class="ctrl-btn" data-lang-btn="zh">中文</button>'
+        '<button type="button" class="ctrl-btn is-active" data-lang-btn="en">EN</button>'
         '<button type="button" class="ctrl-btn" data-theme-toggle="1">' + bi("深/浅", "Theme") + '</button>'
         '</div></div></div></header>'
     )
@@ -1001,7 +1001,7 @@ def render(root: Path) -> Path:
         .replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     )
     document = (
-        '<!doctype html><html lang="zh-CN" data-lang="zh"><head><meta charset="utf-8">'
+        '<!doctype html><html lang="en" data-lang="en" data-theme="light"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; connect-src \'none\'; base-uri \'none\'">'
         f'<title>{esc(manifest["workspace_name"])} · LGZ 基线</title><style>' + CSS + "</style></head><body>"

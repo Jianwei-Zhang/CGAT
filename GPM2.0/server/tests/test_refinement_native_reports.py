@@ -30,7 +30,7 @@ class Documents(HTMLParser):
         values = dict(attrs)
         for name in ("href", "src"):
             if values.get(name):
-                self.links.append(values[name])
+                self.links.append((tag, name, values[name]))
         if tag == "iframe":
             self.frames.append(values)
         if tag == "meta" and values.get("http-equiv", "").lower() == "content-security-policy":
@@ -41,7 +41,9 @@ def closed_site(test, site):
     for path in site.rglob("*.html"):
         doc = Documents()
         doc.feed(path.read_text())
-        for name in doc.links:
+        for tag, attr, name in doc.links:
+            if tag == "img" and attr == "src" and name.startswith(("data:image/png;", "data:image/jpeg;")):
+                continue
             url = urlsplit(name)
             test.assertFalse(url.scheme or url.netloc or url.path.startswith("/"), name)
             target = (path.parent / unquote(url.path)).resolve() if url.path else path.resolve()
@@ -220,9 +222,9 @@ handlers.click(click);assert(click.prevented);assert.equal(frame.src,`pages/${na
             self.assertLess(reports.embedded_size(assets), sum(row["size_bytes"] for row in assets if "report_path" in row))
             prepare = visual.prepare
             def limited(*args, **kwargs):
-                # The real overview is smaller than either real child report.
-                # Leave room for it and a placeholder, not all child JS bodies.
-                kwargs["remaining_budget"] = 100000
+                # Leave room for the overview and placeholders, not all child JS bodies.
+                overview_size = (native(root, result["run_id"]) / "05.visualization/Global.report.html").stat().st_size
+                kwargs["remaining_budget"] = overview_size + 16384
                 return prepare(*args, **kwargs)
             with patch.object(visual, "prepare", side_effect=limited):
                 built = reports.build_tool_report(root, result)

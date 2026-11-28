@@ -9,14 +9,17 @@ import math
 from urllib.parse import quote, urlsplit
 
 try:
-    from ReportStyle import badge_html, esc, status_tone
+    from ReportStyle import badge_bi, badge_html, bi, esc, status_tone
 except ImportError:
     try:
-        from .ReportStyle import badge_html, esc, status_tone
+        from .ReportStyle import badge_bi, badge_html, bi, esc, status_tone
     except ImportError:
         def esc(value) -> str:
             """Escape dynamic text or HTML attribute values."""
             return _html_escape(str(value), quote=True)
+
+        def bi(en: str, zh: str) -> str:
+            return f'<span class="t-en">{esc(en)}</span><span class="t-zh">{esc(zh)}</span>'
 
         def status_tone(status: str) -> str:
             """Map a machine status string to a restrained semantic tone."""
@@ -32,9 +35,12 @@ except ImportError:
             return "info"
 
         def badge_html(label: str, tone: str = "muted") -> str:
-            """Render a semantic status pill with escaped text."""
             safe_tone = tone if tone in ("ok", "warn", "err", "info", "muted") else "muted"
             return f'<span class="badge badge-{safe_tone}">{esc(label)}</span>'
+
+        def badge_bi(en: str, zh: str, tone: str = "muted") -> str:
+            safe_tone = tone if tone in ("ok", "warn", "err", "info", "muted") else "muted"
+            return f'<span class="badge badge-{safe_tone}">{bi(en, zh)}</span>'
 
 
 _TRUNCATE_LIMIT = 24
@@ -45,437 +51,94 @@ _OVERVIEW_REPAIR_LIMIT = 8
 _JUNCTION_CSS = """
 .jr-root {
     --jr-bg: var(--surface, #ffffff);
-    --jr-subtle: var(--surface-subtle, #f1f5f9);
+    --jr-subtle: var(--surface-subtle, #f8fafc);
     --jr-ink: var(--ink, #0f172a);
     --jr-ink-2: var(--ink-secondary, #334155);
     --jr-muted: var(--ink-muted, #64748b);
     --jr-border: var(--border, #e2e8f0);
     --jr-border-strong: var(--border-strong, #cbd5e1);
-    --jr-accent: var(--accent, #0b6b7c);
-    --jr-accent-soft: var(--accent-soft, #eef7f9);
-    --jr-accent-border: var(--accent-border, #b8dde4);
+    --jr-accent: var(--accent, #2563eb);
+    --jr-accent-soft: var(--accent-soft, #eff6ff);
+    --jr-accent-border: var(--accent-border, #bfdbfe);
     --jr-ok-ink: var(--ok-ink, #166534);
-    --jr-ok-bg: var(--ok-bg, #f0fdf4);
-    --jr-ok-border: var(--ok-border, #bbf7d0);
+    --jr-ok-bg: var(--ok-bg, #ecfdf5);
+    --jr-ok-border: var(--ok-border, #86efac);
     --jr-warn-ink: var(--warn-ink, #92400e);
     --jr-warn-bg: var(--warn-bg, #fffbeb);
-    --jr-warn-border: var(--warn-border, #fde68a);
+    --jr-warn-border: var(--warn-border, #fcd34d);
     --jr-err-ink: var(--err-ink, #991b1b);
     --jr-err-bg: var(--err-bg, #fef2f2);
-    --jr-err-border: var(--err-border, #fecaca);
+    --jr-err-border: var(--err-border, #fca5a5);
     --jr-muted-ink: var(--muted-ink, #475569);
     --jr-muted-bg: var(--muted-bg, #f1f5f9);
     --jr-muted-border: var(--muted-border, #cbd5e1);
     --jr-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
-    font-family: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif);
+    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
     color: var(--jr-ink);
     background: var(--jr-bg);
-    border: 1px solid var(--jr-border);
-    border-radius: var(--radius-md, 8px);
-    box-shadow: var(--shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.05));
-    margin-bottom: 20px;
-    overflow: hidden;
 }
-.jr-root .section-header {
-    background: var(--jr-subtle);
-    border-bottom: 1px solid var(--jr-border);
-    padding: 12px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-.jr-root .section-header h2 {
-    margin: 0;
-    font-size: 0.98rem;
-    font-weight: 600;
-    color: var(--jr-ink);
-}
-.jr-root .section-body {
-    padding: 16px 20px;
-}
-.jr-root .bilingual-zh {
-    color: var(--jr-muted);
-    font-weight: 400;
-}
-.jr-root .mono {
-    font-family: var(--jr-mono);
-    font-size: 0.84em;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-}
-.jr-root .num {
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-.jr-root .muted {
-    color: var(--jr-muted);
-}
-.jr-root .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.77rem;
-    font-weight: 600;
-    line-height: 1.4;
-    border: 1px solid transparent;
-    white-space: nowrap;
-}
-.jr-root .badge::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    flex-shrink: 0;
-}
+html[data-lang="en"] .jr-root .t-zh { display: none !important; }
+html[data-lang="zh"] .jr-root .t-en { display: none !important; }
+html:not([data-lang]) .jr-root .t-zh::before { content: " / "; color: var(--jr-muted); }
+html:not([data-lang]) .jr-root .t-zh { color: var(--jr-muted); font-weight: 400; }
+.jr-root .mono { font-family: var(--jr-mono); font-size: 0.84em; overflow-wrap: anywhere; word-break: break-word; }
+.jr-root .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jr-root .muted { color: var(--jr-muted); }
+.jr-root .badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 3px; font-size: 0.75rem; font-weight: 500; line-height: 1.35; border: 1px solid transparent; white-space: nowrap; }
 .jr-root .badge-ok { background: var(--jr-ok-bg); color: var(--jr-ok-ink); border-color: var(--jr-ok-border); }
 .jr-root .badge-warn { background: var(--jr-warn-bg); color: var(--jr-warn-ink); border-color: var(--jr-warn-border); }
 .jr-root .badge-err { background: var(--jr-err-bg); color: var(--jr-err-ink); border-color: var(--jr-err-border); }
 .jr-root .badge-info { background: var(--jr-accent-soft); color: var(--jr-accent); border-color: var(--jr-accent-border); }
 .jr-root .badge-muted { background: var(--jr-muted-bg); color: var(--jr-muted-ink); border-color: var(--jr-muted-border); }
-.jr-root .artifact-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-.jr-root .artifact-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 11px;
-    background: var(--jr-subtle);
-    border: 1px solid var(--jr-border);
-    border-radius: var(--radius-sm, 6px);
-    color: var(--jr-accent);
-    font-size: 0.82rem;
-    font-weight: 500;
-    text-decoration: none;
-}
-.jr-root .artifact-link:hover {
-    background: var(--jr-accent-soft);
-    border-color: var(--jr-accent-border);
-}
-.jr-root .jr-block {
-    margin-top: 16px;
-}
-.jr-root .jr-block:first-child {
-    margin-top: 0;
-}
-.jr-root .jr-subhead {
-    margin: 0 0 10px 0;
-    font-size: 0.92rem;
-    font-weight: 600;
-    color: var(--jr-ink);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-.jr-root .jr-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
-}
-.jr-root .jr-metric {
-    background: var(--jr-bg);
-    border: 1px solid var(--jr-border);
-    border-radius: var(--radius-sm, 6px);
-    padding: 11px 14px;
-    min-width: 0;
-}
-.jr-root .jr-metric-label {
-    font-size: 0.76rem;
-    font-weight: 600;
-    color: var(--jr-muted);
-    margin: 0 0 4px 0;
-    line-height: 1.35;
-}
-.jr-root .jr-metric-value {
-    font-size: 1.15rem;
-    font-weight: 650;
-    color: var(--jr-ink);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.3;
-    overflow-wrap: anywhere;
-}
-.jr-root .jr-metric-value.accent { color: var(--jr-accent); }
-.jr-root .jr-metric-value.ok { color: var(--jr-ok-ink); }
-.jr-root .jr-metric-value.warn { color: var(--jr-warn-ink); }
-.jr-root .jr-metric-value.err { color: var(--jr-err-ink); }
-.jr-root .jr-metric-note {
-    margin-top: 4px;
-    font-size: 0.75rem;
-    color: var(--jr-muted);
-    line-height: 1.35;
-    overflow-wrap: anywhere;
-}
-.jr-root .jr-notice {
-    background: var(--jr-subtle);
-    border: 1px solid var(--jr-border);
-    border-left: 3px solid var(--jr-border-strong);
-    border-radius: var(--radius-sm, 6px);
-    padding: 10px 14px;
-    margin: 0 0 12px 0;
-    font-size: 0.84rem;
-    color: var(--jr-ink-2);
-    line-height: 1.5;
-}
-.jr-root .jr-notice-warn {
-    background: var(--jr-warn-bg);
-    border-color: var(--jr-warn-border);
-    border-left-color: var(--jr-warn-ink);
-    color: var(--jr-warn-ink);
-}
-.jr-root .jr-notice-info {
-    background: var(--jr-accent-soft);
-    border-color: var(--jr-accent-border);
-    border-left-color: var(--jr-accent);
-    color: var(--jr-ink-2);
-}
-.jr-root .jr-notice p, .jr-root .jr-notice ul {
-    margin: 0;
-}
-.jr-root .jr-notice p + p {
-    margin-top: 4px;
-}
-.jr-root .jr-notice ul {
-    padding-left: 18px;
-    margin-top: 4px;
-}
-.jr-root .jr-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 8px 0 12px 0;
-}
-.jr-root .jr-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 9px;
-    border-radius: 999px;
-    border: 1px solid var(--jr-border-strong);
-    background: var(--jr-subtle);
-    color: var(--jr-ink-2);
-    font-size: 0.77rem;
-    line-height: 1.35;
-}
-.jr-root .jr-chip-warn {
-    background: var(--jr-warn-bg);
-    border-color: var(--jr-warn-border);
-    color: var(--jr-warn-ink);
-}
-.jr-root .jr-details {
-    border: 1px solid var(--jr-border);
-    border-radius: var(--radius-sm, 6px);
-    background: var(--jr-bg);
-    margin-top: 12px;
-}
-.jr-root .jr-details > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 10px 14px;
-    background: var(--jr-subtle);
-    color: var(--jr-ink);
-    font-size: 0.86rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-    border-radius: var(--radius-sm, 6px);
-    user-select: none;
-}
-.jr-root .jr-details > summary::-webkit-details-marker {
-    display: none;
-}
-.jr-root .jr-details > summary::before {
-    content: "\\25B8";
-    display: inline-block;
-    margin-right: 6px;
-    color: var(--jr-accent);
-    transition: transform 0.12s ease;
-}
-.jr-root .jr-details[open] > summary {
-    border-bottom: 1px solid var(--jr-border);
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-}
-.jr-root .jr-details[open] > summary::before {
-    content: "\\25BE";
-}
-.jr-root .jr-details > summary:hover {
-    background: var(--jr-accent-soft);
-}
-.jr-root .jr-details > summary:focus-visible,
-.jr-root .jr-table-wrap:focus-visible,
-.jr-root a:focus-visible {
-    outline: 2px solid var(--jr-accent);
-    outline-offset: 2px;
-}
-.jr-root .jr-details-summary-main {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    flex: 1 1 auto;
-}
-.jr-root .jr-details-body {
-    padding: 12px 14px;
-}
-.jr-root .jr-table-wrap {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border: 1px solid var(--jr-border);
-    border-radius: var(--radius-sm, 6px);
-    background: var(--jr-bg);
-}
-.jr-root table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.84rem;
-}
-.jr-root thead th {
-    background: var(--jr-subtle);
-    color: var(--jr-ink-2);
-    font-weight: 600;
-    font-size: 0.78rem;
-    text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--jr-border-strong);
-    white-space: nowrap;
-}
-.jr-root td {
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--jr-border);
-    color: var(--jr-ink);
-    vertical-align: top;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-}
-.jr-root tbody tr:last-child td {
-    border-bottom: none;
-}
-.jr-root .jr-allele {
-    font-family: var(--jr-mono);
-    font-size: 0.8rem;
-    background: var(--jr-subtle);
-    border: 1px solid var(--jr-border);
-    border-radius: 4px;
-    padding: 1px 5px;
-    display: inline-block;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-}
-.jr-root .jr-seq-full {
-    font-family: var(--jr-mono);
-    font-size: 0.78rem;
-    background: var(--jr-subtle);
-    border: 1px solid var(--jr-border);
-    border-radius: 4px;
-    padding: 4px 6px;
-    display: block;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    word-break: break-all;
-    max-height: 180px;
-    overflow-y: auto;
-}
-.jr-root .jr-empty-allele {
-    font-style: italic;
-    color: var(--jr-muted);
-    font-size: 0.8rem;
-}
-.jr-root .jr-stage-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.jr-root .jr-stage-item {
-    font-size: 0.79rem;
-    color: var(--jr-ink-2);
-    line-height: 1.4;
-}
-.jr-root .jr-stage-tag {
-    display: inline-block;
-    font-family: var(--jr-mono);
-    font-size: 0.74rem;
-    font-weight: 600;
-    padding: 1px 6px;
-    border-radius: 4px;
-    border: 1px solid var(--jr-border-strong);
-    background: var(--jr-subtle);
-    color: var(--jr-ink);
-    margin-right: 4px;
-}
-.jr-root .jr-stage-tag-full {
-    background: var(--jr-accent-soft);
-    border-color: var(--jr-accent-border);
-    color: var(--jr-accent);
-}
-.jr-root .jr-flank-pair {
-    display: inline-flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-items: center;
-}
-.jr-root .jr-policy-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 8px;
-}
-.jr-root .jr-policy-item {
-    border: 1px solid var(--jr-border);
-    border-radius: 5px;
-    padding: 8px 10px;
-    background: var(--jr-subtle);
-}
-.jr-root .jr-policy-key {
-    font-size: 0.74rem;
-    color: var(--jr-muted);
-    font-weight: 600;
-}
-.jr-root .jr-policy-val {
-    font-family: var(--jr-mono);
-    font-size: 0.84rem;
-    color: var(--jr-ink);
-    margin-top: 2px;
-}
-.jr-root .jr-artifacts {
-    margin-top: 12px;
-}
+.jr-root .jr-block { margin-top: 14px; }
+.jr-root .jr-block:first-child { margin-top: 0; }
+.jr-root .jr-subhead { margin: 0 0 8px 0; font-size: 0.88rem; font-weight: 600; color: var(--jr-ink); display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.jr-root .jr-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; padding: 8px 0; border-top: 1px solid var(--jr-border); border-bottom: 1px solid var(--jr-border); margin-bottom: 10px; font-size: 0.83rem; }
+.jr-root .jr-strip-item { display: inline-flex; align-items: baseline; gap: 6px; }
+.jr-root .jr-strip-label { color: var(--jr-muted); font-size: 0.79rem; }
+.jr-root .jr-strip-val { font-weight: 600; color: var(--jr-ink); font-variant-numeric: tabular-nums; }
+.jr-root .jr-strip-val.accent { color: var(--jr-accent); }
+.jr-root .jr-strip-val.ok { color: var(--jr-ok-ink); }
+.jr-root .jr-strip-val.warn { color: var(--jr-warn-ink); }
+.jr-root .jr-strip-val.err { color: var(--jr-err-ink); }
+.jr-root .jr-footnote { margin: 6px 0 10px; font-size: 0.79rem; color: var(--jr-muted); line-height: 1.5; }
+.jr-root .jr-warn { background: var(--jr-warn-bg); border-left: 2px solid var(--jr-warn-ink); color: var(--jr-warn-ink); padding: 7px 11px; border-radius: 0 4px 4px 0; margin: 8px 0 10px; font-size: 0.82rem; }
+.jr-root .jr-warn ul { margin: 3px 0 0; padding-left: 16px; }
+.jr-root .jr-warn p { margin: 0; }
+.jr-root .jr-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 10px; align-items: center; }
+.jr-root .jr-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 3px; border: 1px solid var(--jr-warn-border); background: var(--jr-warn-bg); color: var(--jr-warn-ink); font-size: 0.76rem; }
+.jr-root .jr-details { border-top: 1px solid var(--jr-border); margin-top: 10px; }
+.jr-root .jr-details > summary { list-style: none; cursor: pointer; padding: 8px 0; color: var(--jr-ink-2); font-size: 0.84rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; user-select: none; }
+.jr-root .jr-details > summary::-webkit-details-marker { display: none; }
+.jr-root .jr-details > summary::before { content: "\\25B8"; margin-right: 6px; font-size: 0.72rem; color: var(--jr-muted); }
+.jr-root .jr-details[open] > summary::before { content: "\\25BE"; }
+.jr-root .jr-details > summary:hover { color: var(--jr-ink); }
+.jr-root .jr-details > summary:focus-visible, .jr-root .jr-table-wrap:focus-visible, .jr-root a:focus-visible { outline: 2px solid var(--jr-accent); outline-offset: 2px; border-radius: 3px; }
+.jr-root .jr-details-summary-main { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.jr-root .jr-details-body { padding: 4px 0 10px; }
+.jr-root .jr-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.jr-root table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.jr-root thead th { background: transparent; color: var(--jr-muted); font-weight: 600; font-size: 0.76rem; text-align: left; padding: 7px 9px; border-top: 1px solid var(--jr-border-strong); border-bottom: 1px solid var(--jr-border-strong); white-space: nowrap; }
+.jr-root td { padding: 7px 9px; border-bottom: 1px solid var(--jr-border); color: var(--jr-ink); vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
+.jr-root tbody tr:last-child td { border-bottom: 1px solid var(--jr-border-strong); }
+.jr-root .jr-allele { font-family: var(--jr-mono); font-size: 0.79rem; background: var(--jr-subtle); border: 1px solid var(--jr-border); border-radius: 3px; padding: 1px 4px; display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.jr-root .jr-seq-full { font-family: var(--jr-mono); font-size: 0.76rem; background: var(--jr-subtle); border: 1px solid var(--jr-border); border-radius: 3px; padding: 4px 6px; display: block; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; max-height: 160px; overflow-y: auto; }
+.jr-root .jr-empty-allele { font-style: italic; color: var(--jr-muted); font-size: 0.79rem; }
+.jr-root .jr-stage-list { display: flex; flex-direction: column; gap: 3px; }
+.jr-root .jr-stage-item { font-size: 0.78rem; color: var(--jr-ink-2); }
+.jr-root .jr-stage-tag { display: inline-block; font-family: var(--jr-mono); font-size: 0.72rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--jr-border-strong); background: var(--jr-subtle); margin-right: 4px; }
+.jr-root .jr-stage-tag-full { background: var(--jr-accent-soft); border-color: var(--jr-accent-border); color: var(--jr-accent); }
+.jr-root .jr-flank-pair { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.jr-root .jr-policy-list { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.8rem; color: var(--jr-ink-2); }
+.jr-root .jr-policy-list span b { color: var(--jr-ink); font-family: var(--jr-mono); font-weight: 600; }
+.jr-root .jr-artifacts { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 0.81rem; }
+.jr-root .artifact-link { display: inline-flex; align-items: center; padding: 3px 9px; background: var(--jr-subtle); border: 1px solid var(--jr-border); border-radius: 4px; color: var(--jr-accent); font-size: 0.8rem; text-decoration: none; }
+.jr-root .artifact-link:hover { background: var(--jr-accent-soft); border-color: var(--jr-accent-border); }
 @media (max-width: 768px) {
-    .jr-root .jr-metrics {
-        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
-    }
-    .jr-root .jr-details > summary {
-        padding: 9px 11px;
-    }
-    .jr-root .jr-details-body {
-        padding: 10px 11px;
-    }
+    .jr-root .jr-strip { gap: 5px 14px; }
 }
 @media print {
-    .jr-root {
-        box-shadow: none;
-        border-color: #cbd5e1;
-    }
-    .jr-root .jr-table-wrap,
-    .jr-root .jr-seq-full {
-        max-height: none;
-        overflow: visible;
-    }
+    .jr-root .jr-table-wrap, .jr-root .jr-seq-full { max-height: none; overflow: visible; }
 }
 """
 
@@ -497,10 +160,9 @@ def _is_number(value) -> bool:
 def _fmt_bp(value, *, signed: bool = False) -> str:
     if not _is_number(value):
         return "—"
-    if _is_int(value):
-        prefix = "+" if signed and value > 0 else ""
-        return f"{prefix}{value:,} bp"
     prefix = "+" if signed and value > 0 else ""
+    if _is_int(value):
+        return f"{prefix}{value:,} bp"
     return f"{prefix}{value:,.2f} bp"
 
 
@@ -514,7 +176,7 @@ def _fmt_fraction(value) -> str:
     if not _is_number(value):
         return "—"
     val = float(value)
-    return f"{val * 100:.1f}% ({val:.3f})"
+    return f"{val * 100:.1f}%"
 
 
 def _truncate_sequence(seq: str, limit: int = _TRUNCATE_LIMIT):
@@ -602,29 +264,42 @@ def _has_anchor_retries_data(retries) -> bool:
     return any(isinstance(item, dict) for item in retries)
 
 
+def _strip_html(items) -> str:
+    parts = []
+    for label_html, val_html, tone in items:
+        tone_cls = f" {tone}" if tone in ("accent", "ok", "warn", "err") else ""
+        parts.append(
+            '<span class="jr-strip-item">'
+            f'<span class="jr-strip-label">{label_html}</span>'
+            f'<span class="jr-strip-val{tone_cls}">{val_html}</span>'
+            '</span>'
+        )
+    return f'<div class="jr-strip" role="group">{"".join(parts)}</div>'
+
+
 def _flank_badge(status) -> str:
     norm = str(status or "").strip().lower()
     if norm == "preserved":
-        return badge_html("Preserved / 原序列保持", "ok")
+        return badge_bi("Preserved", "原序列保持", "ok")
     if norm == "repaired":
-        return badge_html("Repaired (read-backed) / 有界读长修订", "info")
+        return badge_bi("Repaired (read-backed)", "读长修订", "info")
     if norm == "conflict":
-        return badge_html("Conflict (original retained) / 冲突（保留原序列）", "warn")
+        return badge_bi("Conflict (original retained)", "冲突（保留原序列）", "warn")
     if not norm:
-        return badge_html("Unspecified / 未提供", "muted")
+        return badge_bi("Unspecified", "未提供", "muted")
     return badge_html(str(status), "muted")
 
 
 def _repair_badge(status) -> str:
     norm = str(status or "").strip().lower()
     if norm == "accepted":
-        return badge_html("Accepted (applied) / 已采用（已应用）", "info")
+        return badge_bi("Accepted (applied)", "已采用", "info")
     if norm == "retained":
-        return badge_html("Retained (not applied) / 保留原序列（未应用）", "warn")
+        return badge_bi("Retained (not applied)", "未应用（保留）", "warn")
     if norm == "protected":
-        return badge_html("Protected (not applied) / 受保护（未应用）", "muted")
+        return badge_bi("Protected (not applied)", "受保护（未应用）", "muted")
     if not norm:
-        return badge_html("Unspecified / 未提供", "muted")
+        return badge_bi("Unspecified", "未提供", "muted")
     return badge_html(str(status), "muted")
 
 
@@ -634,23 +309,23 @@ def _diag_status_badge(status, reason="") -> str:
     if norm == "eligible" and not any(
         tok in reason_low for tok in ("insufficient", "conflict", "ambiguous", "unresolved", "reject", "fail")
     ):
-        return badge_html("Eligible / 合格", "info")
+        return badge_bi("Eligible", "合格", "info")
     if norm in ("rejected", "ineligible", "failed", "unclosed"):
-        return badge_html("Rejected / 未通过", "warn")
+        return badge_bi("Rejected", "未通过", "warn")
     if not norm:
-        return badge_html("Recorded / 已记录", "muted")
+        return badge_bi("Recorded", "已记录", "muted")
     return badge_html(str(status), "muted")
 
 
-def _mode_label(mode) -> str:
+def _mode_html(mode) -> str:
     norm = str(mode or "").strip().lower()
     if norm == "gap":
-        return "Gap fill / 缺口填补"
+        return bi("Gap fill", "缺口填补")
     if norm == "overlap":
-        return "Original overlap / 原始重叠去重"
+        return bi("Original overlap", "原始重叠去重")
     if not norm:
         return "—"
-    return str(mode)
+    return esc(str(mode))
 
 
 def _format_version_ref(family, version) -> str:
@@ -682,14 +357,11 @@ def _format_allele(value, *, full: bool = False) -> str:
     if full:
         return (
             f'<code class="jr-seq-full">{esc(text)}</code>'
-            f'<div class="muted num" style="font-size:0.74rem;margin-top:2px;">{length:,} bp</div>'
+            f'<span class="muted num" style="font-size:0.74rem;">{length:,} bp</span>'
         )
     preview, truncated = _truncate_sequence(text)
     if truncated:
-        return (
-            f'<code class="jr-allele">{esc(preview)}</code> '
-            f'<span class="muted num">({length:,} bp, truncated / 已截断)</span>'
-        )
+        return f'<code class="jr-allele">{esc(preview)}</code> <span class="muted num">({length:,} bp)</span>'
     return f'<code class="jr-allele">{esc(text)}</code> <span class="muted num">({length:,} bp)</span>'
 
 
@@ -703,7 +375,7 @@ def _format_strands(strands) -> str:
     else:
         return esc(strands)
     if not items:
-        return '<span class="muted">none / 无</span>'
+        return '<span class="muted"><span class="t-en">none</span><span class="t-sep">/</span><span class="t-zh">无</span></span>'
     return f'<span class="mono">{esc(", ".join(items))}</span>'
 
 
@@ -711,20 +383,20 @@ def _render_policy_details(policy) -> str:
     if not isinstance(policy, dict) or not policy:
         return ""
     preferred = [
-        ("repair_window", "Repair window / 末端修订窗口", "bp"),
-        ("min_support", "Min read support / 最小支持读长", "reads"),
-        ("min_fraction", "Min allele fraction / 最小支持比例", "fraction"),
-        ("min_mapq", "Min MAPQ / 最小比对质量", ""),
-        ("anchor", "Interior anchor / 内部锚定长度", "bp"),
-        ("read_margin", "Read margin / 读长覆盖边距", "bp"),
-        ("min_boundary_identity", "Min boundary identity / 边界最小一致性", "%"),
-        ("projection_padding", "Clipped-end context per side / 裁剪末端单侧定位长度", "bp"),
-        ("projection_max_context_edits", "Max differences per context / 单侧定位允许的最大差异", ""),
-        ("version", "Policy version / 策略版本", ""),
+        ("repair_window", "Window", "窗口", "bp"),
+        ("min_support", "Min support", "最小支持", "reads"),
+        ("min_fraction", "Min fraction", "最小比例", "fraction"),
+        ("min_mapq", "Min MAPQ", "最小 MAPQ", ""),
+        ("anchor", "Anchor", "锚定", "bp"),
+        ("read_margin", "Margin", "边距", "bp"),
+        ("min_boundary_identity", "Min identity", "最小一致性", "%"),
+        ("projection_padding", "Context pad", "定位边距", "bp"),
+        ("projection_max_context_edits", "Max ctx edits", "最大差异", ""),
+        ("version", "Version", "版本", ""),
     ]
     rendered_keys = set()
     items = []
-    for key, label, unit in preferred:
+    for key, en, zh, unit in preferred:
         if key not in policy or policy[key] is None:
             continue
         rendered_keys.add(key)
@@ -732,39 +404,25 @@ def _render_policy_details(policy) -> str:
         if unit == "bp" and _is_number(val):
             display = _fmt_bp(val)
         elif unit == "reads" and _is_int(val):
-            display = f"{val:,} reads"
+            display = f"{val:,}"
         elif unit == "fraction" and _is_number(val):
             display = _fmt_fraction(val)
         elif unit == "%" and _is_number(val):
             display = f"{float(val):.1f}%"
         else:
             display = str(val)
-        items.append(
-            '<div class="jr-policy-item">'
-            f'<div class="jr-policy-key">{esc(label)}</div>'
-            f'<div class="jr-policy-val">{esc(display)}</div>'
-            '</div>'
-        )
+        items.append(f'<span>{bi(en, zh)}: <b>{esc(display)}</b></span>')
     for key in sorted(policy):
         if key in rendered_keys or policy[key] is None:
             continue
-        items.append(
-            '<div class="jr-policy-item">'
-            f'<div class="jr-policy-key mono">{esc(key)}</div>'
-            f'<div class="jr-policy-val">{esc(policy[key])}</div>'
-            '</div>'
-        )
+        items.append(f'<span><code class="mono">{esc(key)}</code>: <b>{esc(policy[key])}</b></span>')
     if not items:
         return ""
     return (
         '<details class="jr-details">'
-        '<summary><span class="jr-details-summary-main">'
-        'Bounded Repair Policy Parameters <span class="bilingual-zh">/ 有界末端修订策略参数</span>'
-        f'<span class="muted num">({len(items)})</span>'
-        '</span></summary>'
-        '<div class="jr-details-body">'
-        f'<div class="jr-policy-grid">{"".join(items)}</div>'
-        '</div>'
+        f'<summary><span class="jr-details-summary-main">{bi("Repair policy parameters", "修订策略参数")}'
+        f' <span class="muted num">({len(items)})</span></span></summary>'
+        f'<div class="jr-details-body"><div class="jr-policy-list">{"".join(items)}</div></div>'
         '</details>'
     )
 
@@ -772,11 +430,7 @@ def _render_policy_details(policy) -> str:
 def _summarize_diagnostics(diagnostics: list) -> dict:
     entries = [d for d in diagnostics if isinstance(d, dict)]
     checked = len(entries)
-    eligible = 0
-    rejected = 0
-    other_status = 0
-    fast_checks = 0
-    full_checks = 0
+    eligible = rejected = other_status = fast_checks = full_checks = 0
     rejection_reasons = {}
 
     for entry in entries:
@@ -794,19 +448,9 @@ def _summarize_diagnostics(diagnostics: list) -> dict:
                 rejection_reasons[reason] = rejection_reasons.get(reason, 0) + 1
         stages = entry.get("stages")
         if isinstance(stages, (list, tuple)):
-            seen_fast = False
-            seen_full = False
-            for st in stages:
-                if not isinstance(st, dict):
-                    continue
-                sname = str(st.get("stage") or "").strip().lower()
-                if sname == "fast":
-                    seen_fast = True
-                elif sname == "full":
-                    seen_full = True
-            if seen_fast:
+            if any(isinstance(st, dict) and str(st.get("stage") or "").strip().lower() == "fast" for st in stages):
                 fast_checks += 1
-            if seen_full:
+            if any(isinstance(st, dict) and str(st.get("stage") or "").strip().lower() == "full" for st in stages):
                 full_checks += 1
 
     return {
@@ -826,23 +470,11 @@ def _render_diagnostics_section(diagnostics: list, *, heading_tag: str = "h3") -
     if stats["checked"] == 0:
         return ""
 
-    reason_chips = []
-    for reason, count in sorted(stats["rejection_reasons"].items(), key=lambda kv: (-kv[1], kv[0])):
-        reason_chips.append(
-            f'<span class="jr-chip jr-chip-warn">'
-            f'<span class="mono">{esc(reason)}</span>'
-            f'<strong class="num">&times;{count:,}</strong>'
-            f'</span>'
-        )
-    reasons_html = ""
-    if reason_chips:
-        reasons_html = (
-            '<div class="jr-chips" aria-label="Connection rejection reasons / 连接拒绝原因汇总">'
-            '<span class="muted" style="font-size:0.78rem;align-self:center;">'
-            'Rejection / non-eligible reasons <span class="bilingual-zh">/ 未通过原因</span>:</span>'
-            f'{"".join(reason_chips)}'
-            '</div>'
-        )
+    reason_chips = [
+        f'<span class="jr-chip"><span class="mono">{esc(reason)}</span><strong class="num">&times;{count:,}</strong></span>'
+        for reason, count in sorted(stats["rejection_reasons"].items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    reasons_html = f'<div class="jr-chips">{"".join(reason_chips)}</div>' if reason_chips else ""
 
     rows = []
     for entry in stats["entries"]:
@@ -855,18 +487,13 @@ def _render_diagnostics_section(diagnostics: list, *, heading_tag: str = "h3") -
                 if not isinstance(st, dict):
                     continue
                 sname = str(st.get("stage") or "unknown")
-                sname_low = sname.strip().lower()
-                tag_cls = "jr-stage-tag jr-stage-tag-full" if sname_low == "full" else "jr-stage-tag"
-                blocks = _fmt_int(st.get("blocks"))
-                candidates = _fmt_int(st.get("candidates"))
+                tag_cls = "jr-stage-tag jr-stage-tag-full" if sname.strip().lower() == "full" else "jr-stage-tag"
                 sreason = st.get("reason")
-                sreason_html = f' &middot; <span class="mono">{esc(sreason)}</span>' if sreason else ""
+                sreason_html = f' · <span class="mono">{esc(sreason)}</span>' if sreason else ""
                 stage_parts.append(
-                    '<div class="jr-stage-item">'
-                    f'<span class="{tag_cls}">{esc(sname)}</span>'
-                    f'<span class="num">{esc(blocks)} blocks, {esc(candidates)} cand</span>'
-                    f'{sreason_html}'
-                    '</div>'
+                    f'<div class="jr-stage-item"><span class="{tag_cls}">{esc(sname)}</span>'
+                    f'<span class="num">{esc(_fmt_int(st.get("blocks")))} blk, {esc(_fmt_int(st.get("candidates")))} cand</span>'
+                    f'{sreason_html}</div>'
                 )
         stages_html = f'<div class="jr-stage-list">{"".join(stage_parts)}</div>' if stage_parts else '<span class="muted">—</span>'
         reason_val = entry.get("reason")
@@ -881,52 +508,29 @@ def _render_diagnostics_section(diagnostics: list, *, heading_tag: str = "h3") -
             "</tr>"
         )
 
-    metrics = [
-        ("Checked pairs / 检查对数", _fmt_int(stats["checked"]), "", ""),
-        ("Fast-stage checks / 快速阶段检查", _fmt_int(stats["fast_checks"]), "", "Clipped terminal alignment / 末端截断比对"),
-        ("Full-stage checks / 全长回退检查", _fmt_int(stats["full_checks"]), "accent" if stats["full_checks"] else "", "Full-sequence fallback / 全长序列回退"),
-        ("Eligible / 合格连接", _fmt_int(stats["eligible"]), "accent" if stats["eligible"] else "", "Passed connection check / 通过连接检查"),
-        ("Rejected / 未通过", _fmt_int(stats["rejected"]), "warn" if stats["rejected"] else "", "Not accepted as eligible / 未接受为合格连接"),
-    ]
-    cards = []
-    for label, val, tone, note in metrics:
-        tone_cls = f" {tone}" if tone else ""
-        note_html = f'<div class="jr-metric-note">{esc(note)}</div>' if note else ""
-        cards.append(
-            '<div class="jr-metric">'
-            f'<div class="jr-metric-label">{esc(label)}</div>'
-            f'<div class="jr-metric-value{tone_cls}">{esc(val)}</div>'
-            f'{note_html}'
-            '</div>'
-        )
+    strip = _strip_html([
+        (bi("Checked pairs", "检查对数"), esc(_fmt_int(stats["checked"])), ""),
+        (bi("Fast", "快速"), esc(_fmt_int(stats["fast_checks"])), ""),
+        (bi("Full", "全长"), esc(_fmt_int(stats["full_checks"])), "accent" if stats["full_checks"] else ""),
+        (bi("Eligible", "合格"), esc(_fmt_int(stats["eligible"])), "accent" if stats["eligible"] else ""),
+        (bi("Rejected", "未通过"), esc(_fmt_int(stats["rejected"])), "warn" if stats["rejected"] else ""),
+    ])
 
     return (
         '<div class="jr-block">'
-        f'<{heading_tag} class="jr-subhead">Connection Diagnostics '
-        f'<span class="bilingual-zh">/ 连接检查诊断</span></{heading_tag}>'
-        f'<div class="jr-metrics" role="group" aria-label="Connection diagnostics metrics / 连接诊断统计">{"".join(cards)}</div>'
-        f'{reasons_html}'
+        f'<{heading_tag} class="jr-subhead">{bi("Connection Diagnostics", "连接检查诊断")}</{heading_tag}>'
+        f'{strip}{reasons_html}'
         '<details class="jr-details">'
-        '<summary><span class="jr-details-summary-main">'
-        'Pair-level Fast / Full Diagnostics &amp; Rejection Details '
-        '<span class="bilingual-zh">/ 逐对快速与全长检查及拒绝详情</span>'
-        f'<span class="muted num">({stats["checked"]:,} pairs / 对)</span>'
-        '</span></summary>'
-        '<div class="jr-details-body">'
-        '<div class="jr-table-wrap table-scroll" tabindex="0" role="region" '
-        'aria-label="Connection diagnostics table / 连接诊断明细表">'
-        '<table>'
-        '<thead><tr>'
-        '<th scope="col">Left / 左侧</th>'
-        '<th scope="col">Right / 右侧</th>'
-        '<th scope="col">Stages (fast / full) / 阶段</th>'
-        '<th scope="col">Status / 状态</th>'
-        '<th scope="col">Reason / 原因</th>'
-        '</tr></thead>'
-        f'<tbody>{"".join(rows)}</tbody>'
-        '</table>'
-        '</div>'
-        '</div>'
+        f'<summary><span class="jr-details-summary-main">{bi("Pair-level diagnostics", "逐对检查明细")}'
+        f' <span class="muted num">({stats["checked"]:,})</span></span></summary>'
+        '<div class="jr-details-body"><div class="jr-table-wrap table-scroll" tabindex="0" role="region">'
+        '<table><thead><tr>'
+        f'<th scope="col">{bi("Left", "左侧")}</th>'
+        f'<th scope="col">{bi("Right", "右侧")}</th>'
+        f'<th scope="col">{bi("Stages", "阶段")}</th>'
+        f'<th scope="col">{bi("Status", "状态")}</th>'
+        f'<th scope="col">{bi("Reason", "原因")}</th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div></div>'
         '</details>'
         '</div>'
     )
@@ -943,79 +547,35 @@ def _render_junction_details(junction: dict, *, heading_tag: str = "h3") -> str:
     overlap_trim = junction.get("overlap_trim")
     is_overlap = mode == "overlap" or (_is_number(overlap_trim) and overlap_trim > 0)
 
-    # Metrics: keep gap-only length strictly independent from flank length delta.
-    metrics = [
-        (
-            "Junction mode / 连接模式",
-            _mode_label(mode_raw),
-            "accent" if mode in ("gap", "overlap") else "",
-            (
-                "Deliberate overlap deduplication, not silent polishing / 明确重叠去重，非静默修饰"
-                if is_overlap
-                else "Boundary-aware composition / 边界感知拼接"
-            ),
-        ),
-        (
-            (
-                "Original overlap (gap_length) / 原始重叠长度"
-                if is_overlap or (_is_number(gap_length) and gap_length < 0)
-                else "Gap-only length / 纯缺口长度"
-            ),
-            _fmt_bp(gap_length, signed=False),
-            "accent" if _is_number(gap_length) else "",
-            (
-                "Signed original overlap; independent of flank delta / 有符号原始重叠；独立于末端修订变化"
-                if is_overlap or (_is_number(gap_length) and gap_length < 0)
-                else "New gap-only sequence; independent of flank delta / 仅新增缺口长度，不含末端修订净变化"
-            ),
-        ),
-        (
-            "Flank length delta / 末端修订净变化",
-            _fmt_bp(flank_delta, signed=True),
-            "warn" if (_is_number(flank_delta) and flank_delta != 0) else "",
-            "Net change from accepted bounded end edits only / 仅统计已采用的有界末端修订",
-        ),
-        (
-            "Overlap trim / 重叠去重裁剪",
-            _fmt_bp(overlap_trim, signed=False),
-            "accent" if (_is_number(overlap_trim) and overlap_trim > 0) else "",
-            (
-                "Deliberate deduplication (left copy retained) / 明确去重（保留左侧原序列副本）"
-                if (_is_number(overlap_trim) and overlap_trim > 0)
-                else "No original overlap trimmed / 无原始重叠裁剪"
-            ),
-        ),
-    ]
-    metric_cards = []
-    for label, val, tone, note in metrics:
-        tone_cls = f" {tone}" if tone else ""
-        metric_cards.append(
-            '<div class="jr-metric">'
-            f'<div class="jr-metric-label">{esc(label)}</div>'
-            f'<div class="jr-metric-value{tone_cls}">{esc(val)}</div>'
-            f'<div class="jr-metric-note">{esc(note)}</div>'
-            '</div>'
-        )
+    gap_label = (
+        bi("Original overlap", "原始重叠")
+        if is_overlap or (_is_number(gap_length) and gap_length < 0)
+        else bi("Gap-only length", "纯缺口长度")
+    )
+    strip = _strip_html([
+        (bi("Mode", "模式"), _mode_html(mode_raw), "accent" if mode in ("gap", "overlap") else ""),
+        (gap_label, esc(_fmt_bp(gap_length)), "accent" if _is_number(gap_length) else ""),
+        (bi("Flank delta", "末端变化"), esc(_fmt_bp(flank_delta, signed=True)), "warn" if (_is_number(flank_delta) and flank_delta != 0) else ""),
+        (bi("Overlap trim", "重叠裁剪"), esc(_fmt_bp(overlap_trim)), "accent" if (_is_number(overlap_trim) and overlap_trim > 0) else ""),
+    ])
 
-    notices = []
     if is_overlap:
-        notices.append(
-            '<div class="jr-notice jr-notice-info" role="note">'
-            '<p><strong>Original overlap deduplication / 原始重叠去重：</strong> '
-            'Overlap trim removes duplicated bases from the overlapping original end (retaining the left original copy). '
-            'This is deliberate deduplication, not silent polishing.</p>'
-            '<p class="bilingual-zh">重叠裁剪用于去除两侧原始序列重叠部分的重复碱基（保留左侧原序列副本），属于明确去重而非静默修饰。</p>'
-            '</div>'
+        footnote = (
+            '<p class="jr-footnote">'
+            + bi(
+                "Overlap trim is deliberate deduplication, not silent polishing (left copy retained).",
+                "重叠裁剪为明确去重而非静默修饰（保留左侧原序列副本）。",
+            )
+            + "</p>"
         )
     else:
-        notices.append(
-            '<div class="jr-notice" role="note">'
-            '<p>Original interior sequences remain protected; only read-supported edits inside the bounded terminal window may be applied. '
-            '<code>retained</code> means a proposed change was <strong>not applied</strong> and original sequence was kept; '
-            'applied edits are read-supported revisions, not proven biological corrections.</p>'
-            '<p class="bilingual-zh">原始内部序列受保护；仅在有界末端窗口内且满足独立读长支持阈值时应用修订。'
-            '<code>retained</code> 表示提议改动<strong>未应用</strong>并保留原序列；已采用修订为读长支持修订，不视为已证实的生物学校正。</p>'
-            '</div>'
+        footnote = (
+            '<p class="jr-footnote">'
+            + bi(
+                "Gap-only length and flank delta are separate; retained edits were not applied; applied edits are read-supported, not proven biological corrections.",
+                "纯缺口长度与末端修订变化独立统计；retained 未应用；已采用修订为读长支持修订，非已证实生物学校正。",
+            )
+            + "</p>"
         )
 
     raw_warnings = junction.get("warnings")
@@ -1024,57 +584,58 @@ def _render_junction_details(junction: dict, *, heading_tag: str = "h3") -> str:
         warning_items = [raw_warnings.strip()]
     elif isinstance(raw_warnings, (list, tuple)):
         warning_items = [str(w) for w in raw_warnings if w not in (None, "")]
+    warn_html = ""
     if warning_items:
         warn_li = "".join(f"<li>{esc(w)}</li>" for w in warning_items)
-        notices.append(
-            '<div class="jr-notice jr-notice-warn" role="note" aria-label="Junction warnings / 连接警示">'
-            '<p><strong>Warnings / 注意事项</strong></p>'
-            f'<ul>{warn_li}</ul>'
-            '</div>'
-        )
+        warn_html = f'<div class="jr-warn" role="note"><ul>{warn_li}</ul></div>'
 
-    # Flanks table
     flanks = junction.get("flanks")
     flanks_html = ""
     if isinstance(flanks, dict) and flanks:
         ordered_keys = [k for k in ("L", "R") if k in flanks] + sorted(k for k in flanks if k not in ("L", "R"))
+        flank_entries = [(side, flanks.get(side)) for side in ordered_keys if isinstance(flanks.get(side), dict)]
+        has_flank_counts = any(
+            (_is_int(info.get(k)) and info.get(k) > 0)
+            for _, info in flank_entries
+            for k in ("proposed_variants", "accepted_variants", "protected_variants")
+        )
         flank_rows = []
-        for side in ordered_keys:
-            info = flanks.get(side)
-            if not isinstance(info, dict):
-                continue
-            side_label = "L (Left / 左侧)" if side == "L" else ("R (Right / 右侧)" if side == "R" else str(side))
-            flank_rows.append(
-                "<tr>"
-                f'<td class="mono">{esc(side_label)}</td>'
-                f'<td>{_flank_badge(info.get("status"))}</td>'
-                f'<td class="num">{esc(_fmt_int(info.get("proposed_variants")))}</td>'
-                f'<td class="num">{esc(_fmt_int(info.get("accepted_variants")))}</td>'
-                f'<td class="num">{esc(_fmt_int(info.get("protected_variants")))}</td>'
-                "</tr>"
-            )
+        for side, info in flank_entries:
+            if has_flank_counts:
+                flank_rows.append(
+                    "<tr>"
+                    f'<td class="mono">{esc(side)}</td>'
+                    f'<td>{_flank_badge(info.get("status"))}</td>'
+                    f'<td class="num">{esc(_fmt_int(info.get("proposed_variants")))}</td>'
+                    f'<td class="num">{esc(_fmt_int(info.get("accepted_variants")))}</td>'
+                    f'<td class="num">{esc(_fmt_int(info.get("protected_variants")))}</td>'
+                    "</tr>"
+                )
+            else:
+                flank_rows.append(
+                    "<tr>"
+                    f'<td class="mono">{esc(side)}</td>'
+                    f'<td>{_flank_badge(info.get("status"))}</td>'
+                    "</tr>"
+                )
         if flank_rows:
+            extra_cols = (
+                f'<th scope="col">{bi("Proposed", "提议")}</th>'
+                f'<th scope="col">{bi("Accepted", "采用")}</th>'
+                f'<th scope="col">{bi("Protected", "保护")}</th>'
+                if has_flank_counts else ""
+            )
             flanks_html = (
                 '<div class="jr-block">'
-                f'<{heading_tag} class="jr-subhead">Terminal Flank Integrity '
-                f'<span class="bilingual-zh">/ 两侧原始末端状态</span></{heading_tag}>'
-                '<div class="jr-table-wrap table-scroll" tabindex="0" role="region" '
-                'aria-label="Terminal flank status table / 两侧末端状态表">'
-                '<table>'
-                '<thead><tr>'
-                '<th scope="col">Flank / 侧翼</th>'
-                '<th scope="col">Status / 状态</th>'
-                '<th scope="col">Proposed / 提议变异</th>'
-                '<th scope="col">Accepted / 已采用</th>'
-                '<th scope="col">Protected / 受保护</th>'
-                '</tr></thead>'
-                f'<tbody>{"".join(flank_rows)}</tbody>'
-                '</table>'
-                '</div>'
-                '</div>'
+                f'<{heading_tag} class="jr-subhead">{bi("Flanks", "两侧末端状态")}</{heading_tag}>'
+                '<div class="jr-table-wrap table-scroll" tabindex="0" role="region">'
+                '<table><thead><tr>'
+                f'<th scope="col">{bi("Flank", "侧翼")}</th>'
+                f'<th scope="col">{bi("Status", "状态")}</th>'
+                f'{extra_cols}'
+                f'</tr></thead><tbody>{"".join(flank_rows)}</tbody></table></div></div>'
             )
 
-    # Repairs: truncated overview + full safely escaped sequences & read counts in <details>
     raw_repairs = junction.get("repairs")
     repairs = [r for r in raw_repairs if isinstance(r, dict)] if isinstance(raw_repairs, (list, tuple)) else []
     repairs_html = ""
@@ -1085,14 +646,8 @@ def _render_junction_details(junction: dict, *, heading_tag: str = "h3") -> str:
 
         overview_rows = []
         for rep in repairs[:_OVERVIEW_REPAIR_LIMIT]:
-            alt_r = rep.get("alt_reads")
-            span_r = rep.get("spanning_reads")
-            if _is_int(alt_r) and _is_int(span_r):
-                support_summary = f"{alt_r:,} / {span_r:,}"
-            elif _is_int(alt_r):
-                support_summary = f"{alt_r:,}"
-            else:
-                support_summary = "—"
+            alt_r, span_r = rep.get("alt_reads"), rep.get("spanning_reads")
+            support_summary = f"{alt_r:,}/{span_r:,}" if (_is_int(alt_r) and _is_int(span_r)) else (f"{alt_r:,}" if _is_int(alt_r) else "—")
             overview_rows.append(
                 "<tr>"
                 f'<td class="mono">{esc(rep.get("side") or "—")}</td>'
@@ -1105,15 +660,10 @@ def _render_junction_details(junction: dict, *, heading_tag: str = "h3") -> str:
                 "</tr>"
             )
 
-        overflow_note = ""
-        if len(repairs) > _OVERVIEW_REPAIR_LIMIT:
-            overflow_note = (
-                f'<p class="section-note" style="margin-top:8px;">'
-                f'Showing first {_OVERVIEW_REPAIR_LIMIT} of {len(repairs):,} proposed edits in overview; '
-                f'expand details below for all records and full sequences. '
-                f'<span class="bilingual-zh">概览仅显示前 {_OVERVIEW_REPAIR_LIMIT} 条，共 {len(repairs):,} 条；展开下方详情查看全部记录与完整序列。</span>'
-                f'</p>'
-            )
+        overflow_note = (
+            f'<p class="jr-footnote">{bi(f"Showing {_OVERVIEW_REPAIR_LIMIT} of {len(repairs):,}; expand below for full records.", f"仅示前 {_OVERVIEW_REPAIR_LIMIT} / {len(repairs):,} 条；完整记录见下方。")}</p>'
+            if len(repairs) > _OVERVIEW_REPAIR_LIMIT else ""
+        )
 
         detail_rows = []
         for rep in repairs:
@@ -1137,76 +687,42 @@ def _render_junction_details(junction: dict, *, heading_tag: str = "h3") -> str:
                 "</tr>"
             )
 
-        counts_summary = (
-            f"{len(repairs):,} total / "
-            f"{accepted_n:,} accepted / {retained_n:,} retained / {protected_n:,} protected"
-        )
+        counts_summary = f"{len(repairs):,} ({accepted_n:,}A / {retained_n:,}R / {protected_n:,}P)"
         repairs_html = (
             '<div class="jr-block">'
-            f'<{heading_tag} class="jr-subhead">'
-            'Terminal Flank Edit Proposals (Overview) '
-            '<span class="bilingual-zh">/ 末端修订提议概览</span>'
-            f'<span class="muted num" style="font-size:0.78rem;font-weight:500;">{esc(counts_summary)}</span>'
-            f'</{heading_tag}>'
-            '<div class="jr-table-wrap table-scroll" tabindex="0" role="region" '
-            'aria-label="Terminal flank edits overview / 末端修订概览表">'
-            '<table>'
-            '<thead><tr>'
-            '<th scope="col">Side / 侧翼</th>'
-            '<th scope="col">Coords (0-based) / 坐标</th>'
-            '<th scope="col">Status / 状态</th>'
-            '<th scope="col">Original (preview) / 原序列</th>'
-            '<th scope="col">Proposed (preview) / 提议序列</th>'
-            '<th scope="col">Alt / Span</th>'
-            '<th scope="col">Reason / 原因</th>'
-            '</tr></thead>'
-            f'<tbody>{"".join(overview_rows)}</tbody>'
-            '</table>'
-            '</div>'
+            f'<{heading_tag} class="jr-subhead">{bi("Terminal Edits", "末端修订提议")}'
+            f'<span class="muted num" style="font-size:0.78rem;font-weight:500;">{esc(counts_summary)}</span></{heading_tag}>'
+            '<div class="jr-table-wrap table-scroll" tabindex="0" role="region">'
+            '<table><thead><tr>'
+            f'<th scope="col">{bi("Side", "侧翼")}</th>'
+            f'<th scope="col">{bi("Coords", "坐标")}</th>'
+            f'<th scope="col">{bi("Status", "状态")}</th>'
+            f'<th scope="col">{bi("Original", "原序列")}</th>'
+            f'<th scope="col">{bi("Proposed", "提议序列")}</th>'
+            '<th scope="col">Alt/Span</th>'
+            f'<th scope="col">{bi("Reason", "原因")}</th>'
+            f'</tr></thead><tbody>{"".join(overview_rows)}</tbody></table></div>'
             f'{overflow_note}'
             '<details class="jr-details">'
-            '<summary><span class="jr-details-summary-main">'
-            'Full Sequences &amp; Read-Support Evidence '
-            '<span class="bilingual-zh">/ 完整序列与读长支持证据</span>'
-            f'<span class="muted num">({len(repairs):,} entries / 条)</span>'
-            '</span></summary>'
-            '<div class="jr-details-body">'
-            '<div class="jr-table-wrap table-scroll" tabindex="0" role="region" '
-            'aria-label="Full terminal flank repair evidence table / 完整末端修订与读长证据表">'
-            '<table>'
-            '<thead><tr>'
-            '<th scope="col">Side / 侧翼</th>'
-            '<th scope="col">Coords / 坐标</th>'
-            '<th scope="col">Status / 状态</th>'
-            '<th scope="col">Original (full) / 完整原序列</th>'
-            '<th scope="col">Proposed (full) / 完整提议序列</th>'
-            '<th scope="col">Alt</th>'
-            '<th scope="col">Ref</th>'
-            '<th scope="col">Other</th>'
-            '<th scope="col">Span</th>'
-            '<th scope="col">Alt frac / 比例</th>'
-            '<th scope="col">Strands / 链向</th>'
-            '<th scope="col">Reason / 原因</th>'
-            '</tr></thead>'
-            f'<tbody>{"".join(detail_rows)}</tbody>'
-            '</table>'
-            '</div>'
-            '</div>'
-            '</details>'
-            '</div>'
+            f'<summary><span class="jr-details-summary-main">{bi("Full sequences & read support", "完整序列与读长证据")}'
+            f' <span class="muted num">({len(repairs):,})</span></span></summary>'
+            '<div class="jr-details-body"><div class="jr-table-wrap table-scroll" tabindex="0" role="region">'
+            '<table><thead><tr>'
+            f'<th scope="col">{bi("Side", "侧翼")}</th>'
+            f'<th scope="col">{bi("Coords", "坐标")}</th>'
+            f'<th scope="col">{bi("Status", "状态")}</th>'
+            f'<th scope="col">{bi("Original (full)", "完整原序列")}</th>'
+            f'<th scope="col">{bi("Proposed (full)", "完整提议序列")}</th>'
+            '<th scope="col">Alt</th><th scope="col">Ref</th><th scope="col">Other</th><th scope="col">Span</th>'
+            f'<th scope="col">{bi("Frac", "比例")}</th>'
+            f'<th scope="col">{bi("Strands", "链向")}</th>'
+            f'<th scope="col">{bi("Reason", "原因")}</th>'
+            f'</tr></thead><tbody>{"".join(detail_rows)}</tbody></table></div></div>'
+            '</details></div>'
         )
 
-    policy_html = _render_policy_details(junction.get("policy"))
-
-    return (
-        '<div class="jr-block">'
-        f'<div class="jr-metrics" role="group" aria-label="Junction metrics / 连接指标">{"".join(metric_cards)}</div>'
-        f'{"".join(notices)}'
-        f'{flanks_html}'
-        f'{repairs_html}'
-        f'{policy_html}'
-        '</div>'
-    )
+    policy_html = _render_policy_details(junction.get("policy")) if repairs else ""
+    return f'<div class="jr-block">{strip}{footnote}{warn_html}{flanks_html}{repairs_html}{policy_html}</div>'
 
 
 def _render_anchor_retries_section(retries, *, heading_tag: str = "h3") -> str:
@@ -1217,74 +733,64 @@ def _render_anchor_retries_section(retries, *, heading_tag: str = "h3") -> str:
     for entry in entries:
         fam = entry.get("family")
         fam_text = str(fam) if fam not in (None, "") else "—"
-        attempt_text = _fmt_int(entry.get("attempt"))
-        backoff_text = _fmt_bp(entry.get("backoff_bases"))
         reason = entry.get("reason")
         reason_html = f'<span class="mono">{esc(reason)}</span>' if reason not in (None, "") else '<span class="muted">—</span>'
         rows.append(
             "<tr>"
             f'<td class="mono">{esc(fam_text)}</td>'
-            f'<td class="num">{esc(attempt_text)}</td>'
-            f'<td class="num">{esc(backoff_text)}</td>'
+            f'<td class="num">{esc(_fmt_int(entry.get("attempt")))}</td>'
+            f'<td class="num">{esc(_fmt_bp(entry.get("backoff_bases")))}</td>'
             f'<td>{reason_html}</td>'
             "</tr>"
         )
     table_html = (
-        '<div class="jr-table-wrap table-scroll" tabindex="0" role="region" '
-        'aria-label="Terminal anchor backoff attempts table / 末端锚点回退尝试表">'
-        '<table>'
-        '<thead><tr>'
-        '<th scope="col">Family / 家族</th>'
-        '<th scope="col">Attempt / 轮次</th>'
-        '<th scope="col">Backoff / 回退长度</th>'
-        '<th scope="col">Reason / 原因</th>'
-        '</tr></thead>'
-        f'<tbody>{"".join(rows)}</tbody>'
-        '</table>'
-        '</div>'
+        '<div class="jr-table-wrap table-scroll" tabindex="0" role="region">'
+        '<table><thead><tr>'
+        f'<th scope="col">{bi("Family", "家族")}</th>'
+        f'<th scope="col">{bi("Attempt", "轮次")}</th>'
+        f'<th scope="col">{bi("Backoff", "回退")}</th>'
+        f'<th scope="col">{bi("Reason", "原因")}</th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
     )
     if len(entries) > 6:
         body_html = (
             '<details class="jr-details">'
-            '<summary><span class="jr-details-summary-main">'
-            'Scheduled Anchor Backoff Attempts <span class="bilingual-zh">/ 已调度的末端锚点回退尝试</span>'
-            f'<span class="muted num">({len(entries):,})</span>'
-            '</span></summary>'
-            f'<div class="jr-details-body">{table_html}</div>'
-            '</details>'
+            f'<summary><span class="jr-details-summary-main">{bi("Anchor backoff attempts", "末端回退尝试")}'
+            f' <span class="muted num">({len(entries):,})</span></span></summary>'
+            f'<div class="jr-details-body">{table_html}</div></details>'
         )
     else:
         body_html = table_html
     return (
         '<div class="jr-block">'
-        f'<{heading_tag} class="jr-subhead">Terminal Anchor Backoff Attempts '
-        '<span class="bilingual-zh">/ 末端锚点回退尝试</span>'
-        f'<span class="muted num" style="font-size:0.78rem;font-weight:500;">({len(entries):,})</span>'
-        f'</{heading_tag}>'
-        '<div class="jr-notice" role="note">'
-        '<p>Terminal anchor backoff retries are <strong>separate scheduled attempts counted in the shared round budget</strong> '
-        '— not free hidden retries and not proven corrections.</p>'
-        '<p class="bilingual-zh">末端锚点回退重试属于<strong>计入共享轮次预算的独立调度尝试</strong>，'
-        '并非免费隐藏重试，也不视为已证实校正。</p>'
-        '</div>'
-        f'{body_html}'
-        '</div>'
+        f'<{heading_tag} class="jr-subhead">{bi("Anchor Backoff", "末端锚点回退")}'
+        f' <span class="muted num" style="font-size:0.78rem;font-weight:500;">({len(entries):,})</span></{heading_tag}>'
+        '<p class="jr-footnote">'
+        + bi(
+            "Counted in the shared round budget — not free hidden retries and not proven corrections.",
+            "计入共享轮次预算，非免费重试，也不视为已证实校正。",
+        )
+        + '</p>'
+        f'{body_html}</div>'
     )
+
+
+def _format_artifact_label(label: str) -> str:
+    if " / " in label:
+        en, zh = label.split(" / ", 1)
+        if en.strip() and zh.strip() and any("\u4e00" <= ch <= "\u9fff" for ch in zh):
+            return bi(en.strip(), zh.strip())
+    return esc(label)
 
 
 def _render_artifacts_bar(artifacts: list) -> str:
     if not artifacts:
         return ""
     links = "".join(
-        f'<li><a class="artifact-link" href="{esc(href)}">{esc(label)}</a></li>'
+        f'<a class="artifact-link" href="{esc(href)}">{_format_artifact_label(label)}</a>'
         for label, href in artifacts
     )
-    return (
-        '<nav class="jr-artifacts" aria-label="Junction evidence artifacts / 连接证据文件">'
-        '<div class="artifact-bar-title">Evidence Artifacts <span class="bilingual-zh">/ 相对路径证据文件</span></div>'
-        f'<ul class="artifact-list">{links}</ul>'
-        '</nav>'
-    )
+    return f'<nav class="jr-artifacts" aria-label="Evidence artifacts">{links}</nav>'
 
 
 def _junction_header_badge(junction, diagnostics, anchor_retries=None) -> str:
@@ -1293,23 +799,23 @@ def _junction_header_badge(junction, diagnostics, anchor_retries=None) -> str:
         statuses = {str(v.get("status") or "").strip().lower() for v in flanks.values() if isinstance(v, dict)}
         mode = str(junction.get("mode") or "").strip().lower()
         if "conflict" in statuses:
-            return badge_html("Flank conflict (original retained) / 末端冲突（保留原序列）", "warn")
+            return badge_bi("Flank conflict (original retained)", "末端冲突（保留原序列）", "warn")
         if "repaired" in statuses:
-            return badge_html("Bounded end edit applied / 已应用有界末端修订", "info")
+            return badge_bi("Bounded end edit applied", "已应用末端修订", "info")
         if mode == "overlap":
-            return badge_html("Overlap deduplicated / 原始重叠去重", "info")
+            return badge_bi("Overlap deduplicated", "重叠去重", "info")
         if "preserved" in statuses:
-            return badge_html("Original flanks preserved / 原始末端保持", "ok")
-        return badge_html(_mode_label(junction.get("mode")), "info")
+            return badge_bi("Original flanks preserved", "原末端保持", "ok")
+        return badge_html(str(junction.get("mode") or "—"), "info")
     stats = _summarize_diagnostics(diagnostics or [])
     if stats["eligible"] > 0:
-        return badge_html(f'{stats["eligible"]} eligible / 合格', "info")
+        return badge_bi(f'{stats["eligible"]} eligible', f'{stats["eligible"]} 合格', "info")
     if stats["rejected"] > 0:
-        return badge_html("No eligible connection / 无合格连接", "warn")
+        return badge_bi("No eligible connection", "无合格连接", "warn")
     if _has_anchor_retries_data(anchor_retries):
         count = sum(1 for item in anchor_retries if isinstance(item, dict))
-        return badge_html(f"{count:,} anchor backoff attempt(s) / 末端回退尝试", "warn")
-    return badge_html("Diagnostics recorded / 已记录诊断", "muted")
+        return badge_bi(f"{count:,} anchor backoff", f"{count:,} 末端回退", "warn")
+    return badge_bi("Diagnostics", "诊断记录", "muted")
 
 
 def _render_junction_body(junction, diagnostics, *, anchor_retries=None, artifacts=None, heading_tag: str = "h3") -> str:
@@ -1352,11 +858,10 @@ def render_junction_report(result) -> str:
     )
 
     return (
-        '<section class="section jr-root" aria-label="Junction evidence and connection diagnostics / 连接与末端修订证据">'
+        '<section class="section jr-root" aria-label="Junction evidence and connection diagnostics">'
         f'<style>{_JUNCTION_CSS}</style>'
         '<div class="section-header">'
-        '<h2>Junction Composition &amp; Connection Diagnostics '
-        '<span class="bilingual-zh">/ 连接边界与诊断证据</span></h2>'
+        f'<h2>{bi("Junction & Connection Diagnostics", "连接边界与诊断")}</h2>'
         f'<div>{header_badge}</div>'
         '</div>'
         f'<div class="section-body">{body}</div>'
@@ -1384,15 +889,23 @@ def _event_status_badge(status) -> str:
         return '<span class="muted">—</span>'
     text = str(status)
     norm = text.strip().lower()
-    if norm == "closed":
-        return badge_html(text, "ok")
+    if norm in ("closed", "filled"):
+        return badge_bi(text, "已填补" if norm == "filled" else "已闭合", "ok")
+    if norm in ("unfilled", "unclosed"):
+        return badge_bi(text, "未填补" if norm == "unfilled" else "未闭合", "err")
+    if norm == "exhausted":
+        return badge_bi(text, "延伸耗尽", "warn")
+    if norm == "round_limit":
+        return badge_bi(text, "轮次上限", "warn")
+    if norm == "length_limit":
+        return badge_bi(text, "长度上限", "warn")
     tone = status_tone(text)
     if norm != "closed" and tone == "info":
         tone = "warn"
     return badge_html(text, tone)
 
 
-def render_project_junctions(result) -> str:
+def render_project_junctions(result, *, include_event_details: bool = True, event_href_fn=None) -> str:
     """Aggregate junction and connection diagnostics across project events.
 
     Accepts a project result dict (reading result.get('events') or
@@ -1425,8 +938,7 @@ def render_project_junctions(result) -> str:
         has_r = _has_anchor_retries_data(anchor_retries)
         if has_j or has_d or has_r:
             evidenced.append((
-                idx,
-                item,
+                idx, item,
                 junction if has_j else None,
                 diagnostics if has_d else None,
                 anchor_retries if has_r else None,
@@ -1437,23 +949,18 @@ def render_project_junctions(result) -> str:
 
     total_events = sum(1 for item in raw_events if isinstance(item, dict))
     has_any_anchor_retries = any(retries is not None for _, _, _, _, retries in evidenced)
-    junction_count = 0
-    gap_mode_count = 0
-    overlap_mode_count = 0
-    flanks_preserved = 0
-    flanks_repaired = 0
-    flanks_conflict = 0
-    repairs_accepted = 0
-    repairs_retained = 0
-    repairs_protected = 0
-    diag_checked = 0
-    diag_fast = 0
-    diag_full = 0
-    diag_eligible = 0
-    diag_rejected = 0
-    anchor_retry_total = 0
-    anchor_retry_events = 0
-    warning_events = 0
+    has_any_flank_delta = any(
+        _is_number(j.get("flank_length_delta")) and j.get("flank_length_delta") != 0
+        for _, _, j, _, _ in evidenced if isinstance(j, dict)
+    )
+    has_any_overlap_trim = any(
+        _is_number(j.get("overlap_trim")) and j.get("overlap_trim") > 0
+        for _, _, j, _, _ in evidenced if isinstance(j, dict)
+    )
+    junction_count = flanks_preserved = flanks_repaired = flanks_conflict = 0
+    repairs_accepted = repairs_retained = repairs_protected = 0
+    diag_checked = diag_eligible = diag_rejected = 0
+    anchor_retry_total = anchor_retry_events = 0
 
     summary_rows = []
     detail_blocks = []
@@ -1461,21 +968,12 @@ def render_project_junctions(result) -> str:
     for idx, event, junction, diagnostics, anchor_retries in evidenced:
         label = _event_label(event, idx)
         mode_display = "—"
-        gap_len_display = "—"
-        delta_display = "—"
-        trim_display = "—"
+        gap_len_display = delta_display = trim_display = repair_cell = "—"
         flank_badges = []
-        repair_cell = "—"
 
         if junction:
             junction_count += 1
-            mode_norm = str(junction.get("mode") or "").strip().lower()
-            mode_display = _mode_label(junction.get("mode"))
-            if mode_norm == "gap":
-                gap_mode_count += 1
-            elif mode_norm == "overlap":
-                overlap_mode_count += 1
-
+            mode_display = _mode_html(junction.get("mode"))
             gap_len_display = _fmt_bp(junction.get("gap_length"))
             delta_display = _fmt_bp(junction.get("flank_length_delta"), signed=True)
             trim_display = _fmt_bp(junction.get("overlap_trim"))
@@ -1507,27 +1005,17 @@ def render_project_junctions(result) -> str:
                 repairs_accepted += acc
                 repairs_retained += ret
                 repairs_protected += prot
-                repair_cell = f"{acc:,} / {ret:,} / {prot:,}"
+                repair_cell = f"{acc:,}/{ret:,}/{prot:,}"
             elif isinstance(raw_repairs, (list, tuple)):
-                repair_cell = "0 / 0 / 0"
-
-            raw_warnings = junction.get("warnings")
-            has_warn = (
-                (isinstance(raw_warnings, str) and bool(raw_warnings.strip()))
-                or (isinstance(raw_warnings, (list, tuple)) and any(w not in (None, "") for w in raw_warnings))
-            )
-            if has_warn:
-                warning_events += 1
+                repair_cell = "0/0/0"
 
         diag_cell = "—"
         if diagnostics:
             ds = _summarize_diagnostics(diagnostics)
             diag_checked += ds["checked"]
-            diag_fast += ds["fast_checks"]
-            diag_full += ds["full_checks"]
             diag_eligible += ds["eligible"]
             diag_rejected += ds["rejected"]
-            diag_cell = f'{ds["checked"]:,} ({ds["fast_checks"]:,}F/{ds["full_checks"]:,}Full, {ds["rejected"]:,} rej)'
+            diag_cell = f'{ds["checked"]:,} ({ds["fast_checks"]:,}F/{ds["full_checks"]:,}Full)'
 
         retry_cell_html = ""
         if has_any_anchor_retries:
@@ -1540,14 +1028,24 @@ def render_project_junctions(result) -> str:
                 retry_cell_html = '<td class="num">—</td>'
 
         flanks_cell = f'<div class="jr-flank-pair">{" ".join(flank_badges)}</div>' if flank_badges else '<span class="muted">—</span>'
+        ev_href = _safe_relative_href(event_href_fn(event)) if callable(event_href_fn) else None
+        if ev_href:
+            label_html = f'<a href="{esc(ev_href)}" target="_blank" rel="noopener">{esc(label)}</a>'
+        else:
+            label_html = esc(label)
+        delta_td = f'<td class="num">{esc(delta_display)}</td>' if has_any_flank_delta else ""
+        trim_td = f'<td class="num">{esc(trim_display)}</td>' if has_any_overlap_trim else ""
+        ev_status = event.get("status")
+        if ev_status in (None, "") and "filled" in event:
+            ev_status = "filled" if event.get("filled") else "unfilled"
         summary_rows.append(
             "<tr>"
-            f'<td class="mono">{esc(label)}</td>'
-            f'<td>{_event_status_badge(event.get("status"))}</td>'
-            f'<td>{esc(mode_display)}</td>'
+            f'<td class="mono">{label_html}</td>'
+            f'<td>{_event_status_badge(ev_status)}</td>'
+            f'<td>{mode_display}</td>'
             f'<td class="num">{esc(gap_len_display)}</td>'
-            f'<td class="num">{esc(delta_display)}</td>'
-            f'<td class="num">{esc(trim_display)}</td>'
+            f'{delta_td}'
+            f'{trim_td}'
             f'<td>{flanks_cell}</td>'
             f'<td class="num">{esc(repair_cell)}</td>'
             f'<td class="num">{esc(diag_cell)}</td>'
@@ -1555,137 +1053,100 @@ def render_project_junctions(result) -> str:
             "</tr>"
         )
 
-        ev_artifacts = _extract_artifacts(event, junction if isinstance(junction, dict) else None)
-        ev_body = _render_junction_body(
-            junction, diagnostics, anchor_retries=anchor_retries, artifacts=ev_artifacts, heading_tag="h4"
-        )
-        ev_badge = _junction_header_badge(junction, diagnostics, anchor_retries)
-        detail_blocks.append(
-            '<details class="jr-details">'
-            '<summary>'
-            f'<span class="jr-details-summary-main"><span class="mono">{esc(label)}</span></span>'
-            f'<span>{ev_badge}</span>'
-            '</summary>'
-            f'<div class="jr-details-body">{ev_body}</div>'
-            '</details>'
-        )
+        if include_event_details:
+            ev_artifacts = _extract_artifacts(event, junction if isinstance(junction, dict) else None)
+            ev_body = _render_junction_body(
+                junction, diagnostics, anchor_retries=anchor_retries, artifacts=ev_artifacts, heading_tag="h4"
+            )
+            ev_badge = _junction_header_badge(junction, diagnostics, anchor_retries)
+            detail_blocks.append(
+                '<details class="jr-details">'
+                f'<summary><span class="jr-details-summary-main"><span class="mono">{esc(label)}</span></span><span>{ev_badge}</span></summary>'
+                f'<div class="jr-details-body">{ev_body}</div>'
+                '</details>'
+            )
 
-    metrics = [
-        (
-            "Events with evidence / 含证据事件",
-            f"{len(evidenced):,} / {total_events:,}",
-            "accent",
-            f"Junctions: {junction_count:,} (gap: {gap_mode_count:,}, overlap: {overlap_mode_count:,})",
-        ),
-    ]
+    strip_items = [(bi("Events", "含证据事件"), esc(f"{len(evidenced):,} / {total_events:,}"), "accent")]
     if junction_count:
-        metrics.append((
-            "Flank integrity / 末端状态汇总",
-            f"{flanks_preserved:,}P / {flanks_repaired:,}R / {flanks_conflict:,}C",
-            "warn" if flanks_conflict else ("info" if flanks_repaired else "ok"),
-            "Preserved / Repaired (read-backed) / Conflict (retained)",
+        strip_items.append((
+            bi("Flanks (P/R/C)", "末端 (保持/修订/冲突)"),
+            esc(f"{flanks_preserved:,}/{flanks_repaired:,}/{flanks_conflict:,}"),
+            "warn" if flanks_conflict else ("ok" if not flanks_repaired else ""),
         ))
-        metrics.append((
-            "End edit proposals / 末端修订统计",
-            f"{repairs_accepted:,} / {repairs_retained:,} / {repairs_protected:,}",
-            "warn" if repairs_retained else "",
-            "Accepted (applied) / Retained (not applied) / Protected",
-        ))
+        if repairs_accepted or repairs_retained or repairs_protected:
+            strip_items.append((
+                bi("Edits (A/R/P)", "修订 (采用/保留/保护)"),
+                esc(f"{repairs_accepted:,}/{repairs_retained:,}/{repairs_protected:,}"),
+                "warn" if repairs_retained else "",
+            ))
     if diag_checked:
-        metrics.append((
-            "Connection checks / 连接诊断汇总",
-            f"{diag_checked:,} checked",
+        strip_items.append((
+            bi("Checks", "连接检查"),
+            esc(f"{diag_checked:,} ({diag_eligible:,}✓/{diag_rejected:,}×)"),
             "warn" if (diag_rejected and not diag_eligible) else "",
-            f"Fast: {diag_fast:,}, Full: {diag_full:,}, Eligible: {diag_eligible:,}, Rejected: {diag_rejected:,}",
         ))
     if anchor_retry_total:
-        metrics.append((
-            "Anchor backoff attempts / 末端回退尝试",
-            f"{anchor_retry_total:,} ({anchor_retry_events:,} evt)",
+        strip_items.append((
+            bi("Anchor backoff", "末端回退"),
+            bi(f"{anchor_retry_total:,} ({anchor_retry_events:,} evt)", f"{anchor_retry_total:,} 次（{anchor_retry_events:,} 缺口）"),
             "warn",
-            "Counted in shared round budget; not free hidden retries / 计入共享轮次预算，非免费重试",
         ))
-    metric_cards = []
-    for mlabel, mval, mtone, mnote in metrics:
-        tone_cls = f" {mtone}" if mtone in ("accent", "ok", "warn", "err") else ""
-        metric_cards.append(
-            '<div class="jr-metric">'
-            f'<div class="jr-metric-label">{esc(mlabel)}</div>'
-            f'<div class="jr-metric-value{tone_cls}">{esc(mval)}</div>'
-            f'<div class="jr-metric-note">{esc(mnote)}</div>'
-            '</div>'
-        )
 
-    notices = [
-        '<div class="jr-notice" role="note">'
-        '<p>Gap-only lengths, original overlap trims, and bounded flank deltas are reported separately per event. '
-        'Overlap trim is deliberate deduplication, not silent polishing; <code>retained</code> edits were not applied.</p>'
-        '<p class="bilingual-zh">纯缺口长度、原始重叠去重裁剪与有界末端修订净变化按事件独立列出；'
-        '重叠裁剪为明确去重而非静默修饰，<code>retained</code> 修订未应用且保留原序列。</p>'
-        '</div>'
+    footnote_parts = [
+        bi(
+            "Gap-only lengths, overlap trims (deliberate deduplication, not silent polishing), and flank deltas are separate; retained edits were not applied.",
+            "纯缺口长度、重叠裁剪（去重而非静默修饰）与末端变化分开统计；保留项未修改原序列。",
+        )
     ]
     if anchor_retry_total:
-        notices.append(
-            '<div class="jr-notice" role="note">'
-            '<p>Terminal anchor backoff retries are <strong>separate scheduled attempts counted in the shared round budget</strong> '
-            '— not free hidden retries and not proven corrections.</p>'
-            '<p class="bilingual-zh">末端锚点回退重试属于<strong>计入共享轮次预算的独立调度尝试</strong>，'
-            '并非免费隐藏重试，也不视为已证实校正。</p>'
-            '</div>'
-        )
-    if warning_events or flanks_conflict or repairs_retained:
-        notices.append(
-            '<div class="jr-notice jr-notice-warn" role="note">'
-            f'<p>Attention / 复核提示: {warning_events:,} event(s) reported warnings, '
-            f'{flanks_conflict:,} flank(s) had unconfirmed conflicts (original retained), '
-            f'and {repairs_retained:,} proposed edit(s) were retained without modification.</p>'
-            '</div>'
+        footnote_parts.append(
+            bi(
+                "Anchor backoff retries count in the shared round budget — not free hidden retries and not proven corrections.",
+                "末端回退计入共享轮次预算，不视为已证实校正。",
+            )
         )
 
     header_badge = (
-        badge_html(f"{flanks_conflict:,} conflict(s) retained / 冲突保留", "warn")
+        badge_bi(f"{flanks_conflict:,} conflict(s)", f"{flanks_conflict:,} 末端冲突", "warn")
         if flanks_conflict
-        else (
-            badge_html(f"{len(evidenced):,} event(s) with evidence / 含证据事件", "info")
-        )
+        else badge_bi(f"{len(evidenced):,} event(s)", f"{len(evidenced):,} 事件", "info")
     )
-    retry_th = '<th scope="col">Anchor retries / 末端回退</th>' if has_any_anchor_retries else ""
+    delta_th = f'<th scope="col">{bi("Flank delta", "末端变化")}</th>' if has_any_flank_delta else ""
+    trim_th = f'<th scope="col">{bi("Overlap trim", "重叠裁剪")}</th>' if has_any_overlap_trim else ""
+    retry_th = '<th scope="col"><span class="t-en">Anchor retries</span><span class="t-sep">/</span><span class="t-zh">末端回退</span></th>' if has_any_anchor_retries else ""
+    per_event_html = (
+        '<details class="jr-details">'
+        f'<summary><span class="jr-details-summary-main">{bi("Per-event details", "逐事件明细")}'
+        f' <span class="muted num">({len(detail_blocks):,})</span></span></summary>'
+        f'<div class="jr-details-body">{"".join(detail_blocks)}</div>'
+        '</details>'
+        if detail_blocks else ""
+    )
 
     return (
-        '<section class="section jr-root" aria-label="Project junction and connection summary / 项目连接与末端修订汇总">'
+        '<section class="section jr-root" aria-label="Project junction and connection summary">'
         f'<style>{_JUNCTION_CSS}</style>'
         '<div class="section-header">'
-        '<h2>Project Junctions &amp; Connection Diagnostics '
-        '<span class="bilingual-zh">/ 项目连接边界与诊断汇总</span></h2>'
+        f'<h2>{bi("Junction & Connection Summary", "连接边界与诊断汇总")}</h2>'
         f'<div>{header_badge}</div>'
         '</div>'
         '<div class="section-body">'
-        f'<div class="jr-metrics" role="group" aria-label="Project junction summary metrics / 项目连接汇总指标">{"".join(metric_cards)}</div>'
-        f'{"".join(notices)}'
-        '<div class="jr-table-wrap table-scroll" tabindex="0" role="region" '
-        'aria-label="Project junctions overview table / 项目连接概览表">'
-        '<table>'
-        '<thead><tr>'
-        '<th scope="col">Event / 事件</th>'
-        '<th scope="col">Status / 状态</th>'
-        '<th scope="col">Mode / 模式</th>'
-        '<th scope="col">Gap-only / 纯缺口</th>'
-        '<th scope="col">Flank delta / 末端变化</th>'
-        '<th scope="col">Overlap trim / 重叠裁剪</th>'
-        '<th scope="col">Flanks / 两侧末端</th>'
-        '<th scope="col">Repairs (A/R/P)</th>'
-        '<th scope="col">Diagnostics / 诊断</th>'
+        f'{_strip_html(strip_items)}'
+        f'<p class="jr-footnote">{" ".join(footnote_parts)}</p>'
+        '<div class="jr-table-wrap table-scroll" tabindex="0" role="region">'
+        '<table><thead><tr>'
+        f'<th scope="col">{bi("Event", "事件")}</th>'
+        f'<th scope="col">{bi("Status", "状态")}</th>'
+        f'<th scope="col">{bi("Mode", "模式")}</th>'
+        f'<th scope="col">{bi("Gap-only", "纯缺口")}</th>'
+        f'{delta_th}'
+        f'{trim_th}'
+        f'<th scope="col">{bi("Flanks", "末端")}</th>'
+        f'<th scope="col" title="Accepted / Retained / Protected">{bi("A/R/P", "采用/保留/保护")}</th>'
+        f'<th scope="col">{bi("Diagnostics", "诊断")}</th>'
         f'{retry_th}'
-        '</tr></thead>'
-        f'<tbody>{"".join(summary_rows)}</tbody>'
-        '</table>'
-        '</div>'
-        '<div class="jr-block">'
-        '<h3 class="jr-subhead">Per-Event Evidence Details '
-        '<span class="bilingual-zh">/ 逐事件详细证据</span></h3>'
-        f'{"".join(detail_blocks)}'
-        '</div>'
+        f'</tr></thead><tbody>{"".join(summary_rows)}</tbody></table></div>'
+        f'{per_event_html}'
         f'{_render_artifacts_bar(project_artifacts)}'
-        '</div>'
-        '</section>'
+        '</div></section>'
     )

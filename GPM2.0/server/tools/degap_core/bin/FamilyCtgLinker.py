@@ -20,7 +20,16 @@ from FamilyResult import atomic_text, publish_search
 from FamilyRound import SingleRound
 from FamilyTools import content_hash
 from N50Check import N50Check
-from ReportStyle import badge_html, esc, report_css, status_tone
+from ReportStyle import (
+    badge_html,
+    bi,
+    esc,
+    lang_switcher_html,
+    lang_switcher_js,
+    report_css,
+    status_tone,
+    summary_strip_html,
+)
 
 SCHEMA = "degap-ctg-families-v1"
 
@@ -473,13 +482,13 @@ def render_ctg_report(result):
         rows.append(
             "<tr>"
             f'<td class="mono">{esc(assembly["scaffold_id"])}</td>'
-            f'<td class="num">{esc(assembly["length"])} bp</td>'
+            f'<td class="num">{assembly["length"]:,} bp</td>'
             f'<td class="num">{len(assembly["members"])}</td>'
             f'<td class="mono">{esc(members)}</td>'
             "</tr>"
         )
     if not rows:
-        rows.append('<tr><td colspan="4" class="empty-state">No scaffolds recorded / 暂无组装结果</td></tr>')
+        rows.append(f'<tr><td colspan="4" class="empty-state">{bi("No scaffolds recorded", "暂无组装结果")}</td></tr>')
 
     events = []
     closed_events = 0
@@ -491,8 +500,8 @@ def render_ctg_report(result):
         if event_status != "closed" and tone == "info":
             tone = "warn"
         link = (
-            f'<a class="artifact-link" href="{esc(event["result_dir"])}/family-report.html">Family evidence / 家族证据</a>'
-            if event["result_dir"] else '<span class="muted">No candidates / 无候选</span>'
+            f'<a class="artifact-link" href="{esc(event["result_dir"])}/family-report.html">{bi("Report", "报告")}</a>'
+            if event["result_dir"] else f'<span class="muted">{bi("No candidates", "无候选")}</span>'
         )
         selected = event["selected"]
         target = f'{selected["assembly"]}({selected["strand"]})' if selected else "—"
@@ -509,42 +518,42 @@ def render_ctg_report(result):
             "</tr>"
         )
     if not events:
-        events.append('<tr><td colspan="7" class="empty-state">No endpoint searches recorded / 暂无端点搜索记录</td></tr>')
+        events.append(f'<tr><td colspan="7" class="empty-state">{bi("No endpoint searches recorded", "暂无端点搜索记录")}</td></tr>')
 
     total_rounds = result.get("total_rounds", sum(e.get("total_rounds", 0) for e in events_data))
-    metrics = [
-        ("Original contigs / 输入 contig", str(len(input_contigs)), ""),
-        ("Scaffolds / 最终 Scaffold", str(len(scaffolds)), "accent"),
-        ("Endpoint searches / 端点搜索", str(len(events_data)), ""),
-        ("Closed links / 成功连接", str(closed_events), "ok" if closed_events else ""),
-        ("Total attempts / 总尝试轮数", str(total_rounds), ""),
+    strip_items = [
+        (bi("Contigs", "输入"), str(len(input_contigs)), "", ""),
+        (bi("Scaffolds", "Scaffold"), str(len(scaffolds)), "accent", ""),
+        (bi("Closed / Searches", "连接 / 搜索"), f"{closed_events}/{len(events_data)}", "ok" if closed_events else "", ""),
+        (bi("Attempts", "轮数"), f"{total_rounds:,}", "", ""),
     ]
     if "total_extension_length" in result:
-        metrics.append(("Total extension / 总延伸长度", f'{result["total_extension_length"]} bp', ""))
+        strip_items.append((bi("Extension", "总延伸"), f'{result["total_extension_length"]:,} bp', "", ""))
 
-    metric_cards = []
-    for label, value, value_tone in metrics:
-        tone_class = f" {value_tone}" if value_tone else ""
-        metric_cards.append(
-            f'<div class="metric-card">'
-            f'<div class="metric-label">{esc(label)}</div>'
-            f'<div class="metric-value{tone_class}">{esc(value)}</div>'
-            f'</div>'
-        )
-
-    header_badge = ""
-    if result.get("status"):
-        header_badge = f'<div>{badge_html(result["status"], status_tone(result["status"]))}</div>'
+    header_badge = badge_html(result["status"], status_tone(result["status"])) if result.get("status") else ""
 
     from JunctionReport import render_project_junctions
-    junction_html = render_project_junctions(dict(result, events=events_data))
-    css = report_css()
+    junction_html = render_project_junctions(
+        dict(result, events=events_data),
+        include_event_details=False,
+        event_href_fn=lambda ev: f'{ev["result_dir"]}/family-report.html' if ev.get("result_dir") else None,
+    )
+    junction_drawer = ""
+    if junction_html:
+        junction_drawer = (
+            '<details class="fold">'
+            f'<summary><span class="fold-title">{bi("Junction & Connection Summary", "连接边界与诊断汇总")}</span></summary>'
+            f'<div class="fold-body">{junction_html}</div>'
+            '</details>'
+        )
+
+    css = report_css(".fold-body > .jr-root { border: 0; margin: 0; } .fold-body > .jr-root > .section-header { display: none; } .fold-body > .jr-root > .section-body { padding: 4px 0 0; }")
     return f'''<!doctype html>
-<html lang="en">
+<html lang="en" data-lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CtgLinker family results / 候选家族连接</title>
+<title>DEGAP · CtgLinker</title>
 <style>
 {css}
 </style>
@@ -554,44 +563,25 @@ def render_ctg_report(result):
   <header class="report-header">
     <div class="header-top">
       <div class="header-info">
-        <div class="report-eyebrow">DEGAP · CtgLinker Extension Families</div>
-        <h1>CtgLinker families <span class="bilingual-zh">/ 候选家族连接</span></h1>
+        <div class="report-eyebrow">DEGAP · CtgLinker</div>
+        <h1>{bi("CtgLinker Families", "候选家族连接")}</h1>
       </div>
-      {header_badge}
+      <div class="header-actions">{header_badge}{lang_switcher_html("en")}</div>
     </div>
+    {summary_strip_html(strip_items)}
   </header>
 
-  <section class="metrics-grid metrics-grid-six" aria-label="Summary metrics">
-    {''.join(metric_cards)}
-  </section>
-
-  <div class="notice notice-neutral" role="note">
-    <p>Each endpoint search shares one budget across the primary and all candidates. Unclosed histories remain available but are not inserted into scaffolds.</p>
-    <p>每次端点搜索由主家族与全部候选共用预算；未闭合历史保留，不强行拼入 scaffold。</p>
-  </div>
-
-  <nav class="artifact-bar" aria-label="Downloadable artifacts">
-    <div class="artifact-bar-title">Artifacts and Provenance <span class="bilingual-zh">/ 输出与溯源文件</span></div>
-    <ul class="artifact-list">
-      <li><a class="artifact-link" href="DG.scaffold.fa">Scaffold FASTA</a></li>
-      <li><a class="artifact-link" href="DG.scaffold.agp">AGP</a></li>
-      <li><a class="artifact-link" href="DG.scaffold.components.fa">AGP components / 组成序列</a></li>
-      <li><a class="artifact-link" href="ctglinker-result.json">Provenance / 溯源清单</a></li>
-      <li><a class="artifact-link" href="ctg-families.json">Assembly history / 组装历史</a></li>
-    </ul>
-  </nav>
-
   <section class="section">
-    <div class="section-header"><h2>Scaffolds <span class="bilingual-zh">/ 组装结果</span></h2></div>
+    <div class="section-header"><h2>{bi("Scaffolds", "组装结果")}</h2></div>
     <div class="section-body">
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
               <th>Scaffold</th>
-              <th>Length / 长度</th>
-              <th>Members / 成员数</th>
-              <th>Original members and strands / 原始 contig 及方向</th>
+              <th>{bi("Length", "长度")}</th>
+              <th>{bi("Members", "成员数")}</th>
+              <th>{bi("Original contigs & strands", "原始 contig 及方向")}</th>
             </tr>
           </thead>
           <tbody>{''.join(rows)}</tbody>
@@ -601,19 +591,19 @@ def render_ctg_report(result):
   </section>
 
   <section class="section">
-    <div class="section-header"><h2>Endpoint searches <span class="bilingual-zh">/ 端点搜索</span></h2></div>
+    <div class="section-header"><h2>{bi("Endpoint Searches", "端点搜索")}</h2></div>
     <div class="section-body">
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>Search / 编号</th>
-              <th>Primary / 主序列</th>
-              <th>End / 端点</th>
-              <th>Status / 状态</th>
-              <th>Selected candidate / 选用候选</th>
-              <th>Attempts / 尝试轮数</th>
-              <th>Evidence / 证据</th>
+              <th>#</th>
+              <th>{bi("Primary", "主序列")}</th>
+              <th>{bi("End", "端点")}</th>
+              <th>{bi("Status", "状态")}</th>
+              <th>{bi("Selected", "选用候选")}</th>
+              <th>{bi("Attempts", "轮数")}</th>
+              <th>{bi("Evidence", "证据")}</th>
             </tr>
           </thead>
           <tbody>{''.join(events)}</tbody>
@@ -621,6 +611,25 @@ def render_ctg_report(result):
       </div>
     </div>
   </section>
+
+  <div class="fold-panel">
+    {junction_drawer}
+    <details class="fold">
+      <summary><span class="fold-title">{bi("Files & Provenance", "输出与溯源文件")}</span></summary>
+      <div class="fold-body">
+        <nav aria-label="Downloadable artifacts">
+          <ul class="artifact-list">
+            <li><a class="artifact-link" href="DG.scaffold.fa">Scaffold FASTA</a></li>
+            <li><a class="artifact-link" href="DG.scaffold.agp">AGP</a></li>
+            <li><a class="artifact-link" href="DG.scaffold.components.fa">{bi("AGP components", "组成序列")}</a></li>
+            <li><a class="artifact-link" href="ctglinker-result.json">{bi("Provenance", "溯源清单")}</a></li>
+            <li><a class="artifact-link" href="ctg-families.json">{bi("Assembly history", "组装历史")}</a></li>
+          </ul>
+        </nav>
+      </div>
+    </details>
+  </div>
 </main>
+<script>{lang_switcher_js()}</script>
 </body>
 </html>'''

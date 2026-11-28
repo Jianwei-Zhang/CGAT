@@ -11,6 +11,7 @@ import sys
 import json
 import subprocess
 import time
+from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from GapFillDefaults import add_options, format_options
@@ -795,6 +796,7 @@ class JobExecutor:
         run_script = job_dir / "run.sh"
 
         start_time = time.time()
+        start_iso = datetime.now().isoformat()
 
         try:
             # 执行 run.sh
@@ -807,6 +809,7 @@ class JobExecutor:
             )
 
             elapsed_time = time.time() - start_time
+            end_iso = datetime.now().isoformat()
 
             # 保存 stdout 和 stderr 到日志文件
             stdout_log = job_dir / "run.stdout.log"
@@ -828,6 +831,8 @@ class JobExecutor:
                     'job_name': job_name,
                     'status': 'error' if bidirectional else 'failed',
                     'elapsed_time': elapsed_time,
+                    'start_time': start_iso,
+                    'end_time': end_iso,
                     'job_dir': str(job_dir),
                     'error': error_msg,
                     'exit_code': result.returncode
@@ -845,6 +850,8 @@ class JobExecutor:
                     'job_name': job_name,
                     'status': 'success',
                     'elapsed_time': elapsed_time,
+                    'start_time': start_iso,
+                    'end_time': end_iso,
                     'job_dir': str(job_dir)
                 }
             else:
@@ -852,6 +859,8 @@ class JobExecutor:
                     'job_name': job_name,
                     'status': 'failed',
                     'elapsed_time': elapsed_time,
+                    'start_time': start_iso,
+                    'end_time': end_iso,
                     'job_dir': str(job_dir),
                     'error': (f"Family search ended: {family_result['status']}" if bidirectional
                               else 'Job execution completed but did not produce expected results')
@@ -859,20 +868,26 @@ class JobExecutor:
 
         except subprocess.TimeoutExpired:
             elapsed_time = time.time() - start_time
+            end_iso = datetime.now().isoformat()
             return {
                 'job_name': job_name,
                 'status': 'timeout',
                 'elapsed_time': elapsed_time,
+                'start_time': start_iso,
+                'end_time': end_iso,
                 'job_dir': str(job_dir),
                 'error': 'Job execution timeout'
             }
 
         except Exception as e:
             elapsed_time = time.time() - start_time
+            end_iso = datetime.now().isoformat()
             return {
                 'job_name': job_name,
                 'status': 'error',
                 'elapsed_time': elapsed_time,
+                'start_time': start_iso,
+                'end_time': end_iso,
                 'job_dir': str(job_dir),
                 'error': str(e)
             }

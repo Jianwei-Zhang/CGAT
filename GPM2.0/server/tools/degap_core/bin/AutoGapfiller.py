@@ -317,7 +317,7 @@ class AutoGapfiller:
         
         step_start = datetime.now()
         
-        visualizer = GapFillingVisualizer(self.output_dir)
+        visualizer = GapFillingVisualizer(self.output_dir, pipeline_summary=self._build_summary_dict(step_start))
         result = visualizer.generate_report()
         
         step_end = datetime.now()
@@ -367,12 +367,11 @@ class AutoGapfiller:
 
         return params
     
-    def _generate_summary(self):
-        """生成总结报告"""
-        end_time = datetime.now()
+    def _build_summary_dict(self, end_time=None):
+        """Build the pipeline summary payload (usable before Step 5 and for final persistence)."""
+        end_time = end_time or datetime.now()
         total_duration = end_time - self.start_time
-        
-        summary = {
+        return {
             'version': '2.0',
             'start_time': self.start_time.isoformat(),
             'end_time': end_time.isoformat(),
@@ -397,6 +396,10 @@ class AutoGapfiller:
             },
             'steps': self.results
         }
+
+    def _generate_summary(self):
+        """生成总结报告"""
+        summary = self._build_summary_dict()
         
         # 保存到文件
         summary_file = self.output_dir / 'autogapfiller_summary.json'
