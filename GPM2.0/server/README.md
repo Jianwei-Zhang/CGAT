@@ -340,12 +340,10 @@ See the parent repository's `README.md` for the complete options and desktop wor
 
 ### Initial-reference mapping speed and memory
 
-Initial reference mappings share `--threads` by default. For memory-heavy assemblies,
-add `--reference-schedule exclusive` to `run.sh` or `prepare.sh`: run one assembly at a
-time in `--ds` order, with the full thread budget capped by CPU affinity. This does not
-guarantee full CPU utilization or change Q0 and downstream LGZ scheduling. To resume
-an idle, compatible workspace in this mode, use `bash run.sh -o <workspace> --reference-schedule exclusive`.
-Use `shared` to switch back. Valid reference checkpoints are retained.
+Initial reference mappings run one assembly at a time in `--ds` order. Each gets the full
+`-t` thread budget, capped by the CPUs available to the process. This avoids overlapping
+memory peaks across assemblies; it does not guarantee full CPU utilization. Resume skips
+validated reference mappings. Q0 and later LGZ stages keep their existing scheduling.
 
 New workspaces default to `-K 1G` (query batch size, **not a RAM limit**).
 If memory is insufficient, try `-K 500M`; this does not guarantee the task will fit.

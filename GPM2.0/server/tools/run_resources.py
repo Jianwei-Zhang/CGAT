@@ -19,7 +19,7 @@ except ModuleNotFoundError:
     from .run_orchestration import atomic_write_json
 
 RESOURCE_OPTIONS = {"--threads": "threads", "--grt-qc-memory-gb": "qc_memory_gb",
-                    "--minimap-batch": "minimap_batch", "--reference-schedule": "reference_schedule"}
+                    "--minimap-batch": "minimap_batch"}
 ENV_KEYS = {"threads": "GPM_RUN_THREADS", "qc_memory_gb": "GPM_RUN_QC_MEMORY_GB",
             "minimap_batch": BATCH_ENV}
 
@@ -28,12 +28,6 @@ def positive(value, name: str) -> int:
     if isinstance(value, bool) or not str(value).isascii() or not str(value).isdecimal() or int(value) < 1:
         raise ValueError(f"{name} must be a positive integer")
     return int(value)
-
-
-def reference_schedule(value: str) -> str:
-    if value not in ("shared", "exclusive"):
-        raise ValueError("--reference-schedule must be shared or exclusive")
-    return value
 
 
 def read_resources(root: Path) -> dict:
@@ -45,13 +39,17 @@ def read_resources(root: Path) -> dict:
     value = json.loads(path.read_text(encoding="utf-8"))
     if (not isinstance(value, dict) or value.get("schema_version") != 1
             or not isinstance(value.get("effective"), dict)
-            or not isinstance(value.get("history"), list)
-            or set(value["effective"]) - set(RESOURCE_OPTIONS.values())):
+            or not isinstance(value.get("history"), list)):
         raise ValueError("Invalid workspace resource settings")
-    for key, budget in value["effective"].items():
-        if key == "reference_schedule":
-            reference_schedule(budget)
-        elif key == "minimap_batch":
+    effective = value["effective"]
+    # Older launchers persisted this policy alongside real resource budgets.
+    # Validate it on read without applying it or rewriting the original receipt.
+    if "reference_schedule" in effective and effective.pop("reference_schedule") not in ("shared", "exclusive"):
+        raise ValueError("Invalid saved reference schedule")
+    if effective.keys() - ENV_KEYS.keys():
+        raise ValueError("Invalid workspace resource settings")
+    for key, budget in effective.items():
+        if key == "minimap_batch":
             if type(budget) is not str or batch_size(budget) != budget:
                 raise ValueError("Invalid minimap2 batch size")
         else:
@@ -66,24 +64,15 @@ def prepared_resources(root: Path) -> dict:
     with path.open(newline="", encoding="utf-8") as handle:
         options = {row["key"]: row["value"] for row in csv.DictReader(handle, delimiter="\t")}
     return {"threads": positive(options["threads"], "threads"),
-            "reference_schedule": reference_schedule(options.get("reference_schedule", "shared")),
             "qc_memory_gb": positive(options.get("grt_qc_memory_gb", "80"), "QC memory"),
             "minimap_batch": batch_size(options.get("minimap_batch", "500M"))}
 
 
 def update_resources(root: Path, options: dict, run_id: str) -> None:
     """Called only while the launcher holds the workspace lock; one atomic receipt."""
-    requested = {}
-    for flag, name in RESOURCE_OPTIONS.items():
-        if flag not in options:
-            continue
-        value = options[flag][-1][0]
-        if name == "reference_schedule":
-            requested[name] = reference_schedule(value)
-        elif name == "minimap_batch":
-            requested[name] = batch_size(value)
-        else:
-            requested[name] = positive(value, flag)
+    requested = {name: (batch_size(options[key][-1][0]) if name == "minimap_batch"
+                        else positive(options[key][-1][0], key))
+                 for key, name in RESOURCE_OPTIONS.items() if key in options}
     if not requested:
         return
     state = read_resources(root)
@@ -95,10 +84,6 @@ def update_resources(root: Path, options: dict, run_id: str) -> None:
     runtime = workspace_path(root, ".prepare_lib")
     if runtime.is_dir() and not (runtime / "tools/run_resources.py").is_file():
         raise ValueError("This workspace runtime predates resource-only resume; update its Server runtime first")
-    if "reference_schedule" in changes and runtime.is_dir():
-        runner = runtime / "tools/run_all_runner.py"
-        if not runner.is_file() or "--reference-schedule" not in runner.read_text(encoding="utf-8"):
-            raise ValueError("This workspace runner predates --reference-schedule; update its runtime first")
     if "minimap_batch" in requested and runtime.is_dir():
         for command in (workspace_path(root, "runs")).glob("*_vs_ref/command.sh"):
             text = command.read_text(encoding="utf-8")
@@ -120,8 +105,7 @@ def update_resources(root: Path, options: dict, run_id: str) -> None:
 def resource_environment(root: Path) -> dict[str, str]:
     environment = {key: value for key, value in os.environ.items() if key not in ENV_KEYS.values()}
     for key, budget in read_resources(root)["effective"].items():
-        if key in ENV_KEYS:  # reference scheduling is owned by the runner, not its children
-            environment[ENV_KEYS[key]] = str(budget)
+        environment[ENV_KEYS[key]] = str(budget)
     return environment
 
 

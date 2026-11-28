@@ -154,7 +154,7 @@ printf 'stale_ds\t1\t0\t1\t2\n' > "${output_root}/01_inputs/02_assemblies/ds_add
     --ref ref_add_options "$ref" \
     --ds ds_add "$ds" \
     --skip-self \
-    --score 71 --reference-schedule exclusive \
+    --score 71 \
     --minimap-preset asm5 \
     --tel TTAGGG 2 \
     --cen "$cen" \
@@ -174,8 +174,11 @@ if grep -Eq '^(blastn_|winnowmap_)' "$metadata_path"; then
   exit 1
 fi
 assert_prepare_option "$metadata_path" minimap_preset asm5
+if grep -q '^reference_schedule[[:space:]]' "$metadata_path"; then
+  echo "internal scheduler must not be recorded as a prepare option" >&2
+  exit 1
+fi
 assert_prepare_option "$metadata_path" threads 10
-assert_prepare_option "$metadata_path" reference_schedule exclusive
 assert_prepare_option "$metadata_path" skip_self true
 assert_prepare_option "$metadata_path" self_alignment_scope none
 assert_prepare_option "$metadata_path" tel_enabled true
@@ -402,6 +405,7 @@ help_output="$("$PREPARE_BASH" "$SCRIPT" --help)"
 grep -F -- '--ref [<reference_name>] <reference_fasta_path>' <<<"$help_output" >/dev/null
 grep -F -- '--ds [<dataset_name>] <dataset_fasta_path>' <<<"$help_output" >/dev/null
 for removed_option in \
+  --reference-schedule \
   --grt-meryl \
   --grt-merqury \
   --grt-craq \

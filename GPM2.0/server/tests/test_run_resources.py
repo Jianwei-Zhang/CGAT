@@ -66,21 +66,25 @@ class ResourceResumeTests(unittest.TestCase):
             self.assertEqual(direct.returncode, 0, direct.stdout + direct.stderr)
             self.assertEqual((workspace / "budgets.txt").read_text().split()[1], "120")
 
-    def test_reference_schedule_is_persisted_validated_and_resettable_on_resume(self):
+    def test_retired_reference_schedule_is_read_only_and_not_a_launch_option(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            workspace = self.workspace(root)
-            options = workspace / "metadata/prepare_options.tsv"
-            initial = options.read_bytes()
-            (workspace / "commands/only.sh").write_text("exit 0\n")
-            with self.assertRaisesRegex(server_run.RunnerError, "reference-schedule"):
-                server_run.parse_options(["--reference-schedule", "typo"], root)
-            for mode in ("exclusive", "shared"):
-                args = ["-o", str(workspace), "--reference-schedule", mode]
-                with redirect_stdout(io.StringIO()):
-                    self.assertEqual(server_run.execute(args, root), 0)
-                self.assertEqual(resources.read_resources(workspace)["effective"]["reference_schedule"], mode)
-                self.assertEqual(options.read_bytes(), initial)
+            workspace = self.workspace(Path(tmp))
+            receipt = workspace / ".run_all/resources.json"
+            for mode in ("shared", "exclusive"):
+                with self.assertRaisesRegex(server_run.RunnerError, "Unknown argument"):
+                    server_run.parse_options(["--reference-schedule", mode], workspace)
+                history = [{"changes": {"reference_schedule": {"to": mode}}}]
+                receipt.write_text(json.dumps({"schema_version": 1, "history": history,
+                    "effective": {"reference_schedule": mode, "threads": 4}}))
+                original = receipt.read_bytes()
+                state = resources.read_resources(workspace)
+                self.assertEqual(state["effective"], {"threads": 4})
+                self.assertEqual(state["history"], history)
+                self.assertEqual(resources.resource_environment(workspace)["GPM_RUN_THREADS"], "4")
+                self.assertEqual(receipt.read_bytes(), original)
+            receipt.write_text(receipt.read_text().replace('"exclusive"', '"typo"'))
+            with self.assertRaisesRegex(ValueError, "Invalid saved reference schedule"):
+                resources.read_resources(workspace)
 
     def test_busy_workspace_cannot_change_resources(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -104,9 +108,6 @@ class ResourceResumeTests(unittest.TestCase):
                 resources.update_resources(workspace, {"--threads": [["64"]]}, "old-runtime")
             self.assertFalse((workspace / ".run_all/resources.json").exists())
             (runtime / "run_resources.py").write_text("# staged helper\n")
-            with self.assertRaisesRegex(ValueError, "predates --reference-schedule"):
-                resources.update_resources(workspace, {"--reference-schedule": [["exclusive"]]}, "old-runner")
-            self.assertFalse((workspace / ".run_all/resources.json").exists())
             plan = workspace / ".run_all/plan.tsv"
             plan.write_text(plan.read_text().replace("only", "grt_step23"))
             with self.assertRaisesRegex(ValueError, "legacy combined"):

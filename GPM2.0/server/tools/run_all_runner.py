@@ -32,7 +32,7 @@ from pathlib import Path
 
 from run_progress import ProgressDisplay, plain
 from workspace_layout import WorkspaceLayout, workspace_path
-from run_resources import execution_threads, read_resources, reference_schedule, resource_environment
+from run_resources import execution_threads, read_resources, resource_environment
 from minimap2_diagnostics import (CIGAR_ASSERTION_CODE, CIGAR_ASSERTION_HINT,
                                   changed_log_hint, cigar_assertion_hint, log_identity, runtime_snapshot)
 from run_outer_checkpoints import OuterCheckpointManager, PreparedOuterCheckpoint
@@ -80,6 +80,11 @@ class PlanUnit:
 
 def timestamp() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _available_threads(threads: int) -> int:
+    available = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+    return max(1, min(threads, available))
 
 
 def _checkpoint_timing(started: float, inputs_checked: float) -> str:
@@ -484,10 +489,9 @@ class Runner:
             self.refinement_stop_timer = None
         self.refinement_child = None
 
-    def _run_alignment_group(self, units: list[PlanUnit], plans: dict[str, AlignmentPlan], threads: int, *, exclusive_ref: bool = False) -> int:
+    def _run_alignment_group(self, units: list[PlanUnit], plans: dict[str, AlignmentPlan], threads: int) -> int:
         """Run independent leaf commands; publish checkpoints per original unit."""
-        cpu_count = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
-        budget = max(1, min(threads, cpu_count))
+        budget = _available_threads(threads)
         by_id = {unit.unit_id: unit for unit in units}
         prepared = {}
         remaining = {}
@@ -543,10 +547,11 @@ class Runner:
             tasks.extend(unit_tasks)
         if not tasks:
             return 0
+        exclusive_ref = units[0].unit_id.startswith("ref:")
         if exclusive_ref:
             # Only this DS is admitted. Ignore the prepared query-count CPU cap,
             # not the allocation affinity, task lifecycle or checkpoint contract.
-            assert len(units) == 1 and units[0].unit_id.startswith("ref:")
+            assert len(units) == 1
             tasks = [replace(task, max_threads=budget, max_concurrent=1) for task in tasks]
         dispatcher = AdaptiveDispatcher() if not exclusive_ref and any(
             task.largest_fraction is not None for task in tasks
@@ -758,9 +763,6 @@ class Runner:
             self.progress.header(self.run_id, mode, self.server_dir, threads)
             log_handle.write(separator + "\n")
             resources = read_resources(self.server_dir)
-            ref_mode = reference_schedule(resources["effective"].get("reference_schedule", options.get("reference_schedule", "shared")))
-            if ref_mode == "exclusive":
-                self._event("RESOURCES", None, "initial reference alignments: exclusive, one dataset at a time in plan order")
             if resources["effective"]:
                 self._event("RESOURCES", None, json.dumps(resources, sort_keys=True))
             if mode == "resume":
@@ -812,8 +814,8 @@ class Runner:
                     if first_plan is not None:
                         group = [unit]
                         plans = {unit.unit_id: first_plan}
-                        exclusive_ref = kind == "ref" and ref_mode == "exclusive"
-                        for candidate in (() if exclusive_ref else self.units[unit_index + 1:]):
+                        # Admit only the current reference dataset; other stages share the pool.
+                        for candidate in (() if kind == "ref" else self.units[unit_index + 1:]):
                             if candidate.unit_id.split(":", 1)[0] != kind:
                                 break
                             candidate_plan = load_task_plan(self.server_dir, candidate.unit_id, candidate.command_relpath)
@@ -821,7 +823,7 @@ class Runner:
                                 break
                             group.append(candidate)
                             plans[candidate.unit_id] = candidate_plan
-                        result = self._run_alignment_group(group, plans, int(threads), exclusive_ref=exclusive_ref)
+                        result = self._run_alignment_group(group, plans, int(threads))
                         handled.update(candidate.unit_id for candidate in group)
                         if result:
                             return result
@@ -902,6 +904,9 @@ class Runner:
                     self._event("START", unit, f"attempt={attempt} command={unit.command_relpath}")
                     self.child_cache_markers.clear()
                     failure_logs = self._failure_logs(unit, workspace_join(self.server_dir, unit.command_relpath))
+                    child_threads = int(threads) if threads != "unknown" else 1
+                    if kind == "ref":  # Legacy workspace without a leaf-task manifest.
+                        child_threads = _available_threads(child_threads)
                     child = subprocess.Popen(
                         ["bash", str(workspace_join(self.server_dir, unit.command_relpath))],
                         cwd=self.server_dir,
@@ -915,14 +920,13 @@ class Runner:
                         env={**dispatch_environment(
                                 {**self.child_environment, "GPM_REPORT_RUN_ID": self.run_id},
                                 AlignmentTask(unit.unit_id, workspace_join(self.server_dir, unit.command_relpath),
-                                              int(threads) if threads != "unknown" else 1),
-                                int(threads) if threads != "unknown" else 1, exclusive=True),
+                                              child_threads), child_threads, exclusive=True),
                              "GPM_APP_PROJECTION_PAIR": self._app_pair_channel(unit_index),
                              DEFER_ENV: "1" if self.contract_channel and unit.unit_id == "finalize_evidence" else "",
                              CHANNEL_ENV: str(self.contract_channel) if (self.contract_channel and unit.unit_id == "refinement"
                                  and unit_index > 0 and self.units[unit_index - 1].unit_id == "finalize_evidence") else "",
                              "GPM_REPORT_UNIT_ID": unit.unit_id,
-                             **({"GPM_TASK_THREADS": str(threads)} if threads != "unknown" else {})},
+                             **({"GPM_TASK_THREADS": str(child_threads)} if threads != "unknown" else {})},
                     )
                     self.active_child = child
                     self.refinement_child = child if unit.unit_id == "refinement" else None
@@ -1102,7 +1106,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ont", nargs="+", action="extend")
     parser.add_argument("--gapfill-tools")
     parser.add_argument("--threads", "-t", type=int)
-    parser.add_argument("--reference-schedule", choices=("shared", "exclusive"))
     return parser.parse_args()
 
 
@@ -1127,16 +1130,11 @@ def main() -> int:
             supplied["--gapfill-tools"] = [[args.gapfill_tools]]
         _, request = resolve(server_dir, supplied)
         preflight(request)
-        changes = {}
         if args.threads is not None:
             if args.threads < 1:
                 raise RunnerError("--threads must be positive")
-            changes["--threads"] = [[str(args.threads)]]
-        if args.reference_schedule is not None:
-            changes["--reference-schedule"] = [[args.reference_schedule]]
-        if changes:
             from run_resources import update_resources
-            update_resources(server_dir, changes, run_id)
+            update_resources(server_dir, {"--threads": [[str(args.threads)]]}, run_id)
         save_request(server_dir, supplied, run_id)
         ensure_plan(server_dir)
         units = load_plan(server_dir)

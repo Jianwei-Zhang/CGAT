@@ -169,9 +169,12 @@ class ServerRunTests(unittest.TestCase):
                 self.assertEqual(legacy["options"].pop("--q0-supplement-scope"), [["auto"]])
                 offset = legacy["argv"].index("--q0-supplement-scope")
                 del legacy["argv"][offset:offset + 2]
+                expected = [*legacy["argv"], "--q0-supplement-scope", "full"]
+                legacy["options"]["--reference-schedule"] = [["shared"]]
+                legacy["argv"][2:2] = ["--reference-schedule", "shared"]
                 manifest.write_text(json.dumps(legacy))
                 self.assertEqual(server_run.execute(["-o", str(output)], root), 7)
-                self.assertEqual(prepare.call_args.args[1], [*legacy["argv"], "--q0-supplement-scope", "full"])
+                self.assertEqual(prepare.call_args.args[1], expected)
                 self.assertEqual(json.loads(manifest.read_text()), legacy)
 
     def test_q0_supplement_scope_is_explicit_and_not_a_resume_resource(self):

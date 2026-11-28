@@ -132,9 +132,7 @@ class RunAllRunnerTests(unittest.TestCase):
             server = self.make_workspace(root, [(f"chr:{name}", "exit 99") for name in names])
             environment = self.configure_chromosome_inputs(server, root, names)
             options = server / "metadata/prepare_options.tsv"
-            # Even when references are exclusive, chromosome-local jobs still overlap.
-            options.write_text(options.read_text().replace("threads\t12", "threads\t2")
-                               + "reference_schedule\texclusive\n")
+            options.write_text(options.read_text().replace("threads\t12", "threads\t2"))
             worker = root / "alignment.py"
             worker.write_text('''import os, time
 from pathlib import Path
@@ -223,10 +221,10 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
                                          "--log-style", "detailed", *args], env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
                 return result.stdout
-            launch("--reference-schedule", "exclusive", "--threads", "4")
+            launch("--threads", "4")
             budget = min(4, len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1)
             self.assertEqual((server/"calls").read_text().splitlines(), [f"{n}:{budget}" for n in names])
-            self.assertEqual(launch("--reference-schedule", "shared").count("[SKIP_VALID]"), 2)
+            self.assertEqual(launch().count("[SKIP_VALID]"), 2)
             self.assertEqual(len((server/"calls").read_text().splitlines()), 2)
 
     def test_minimap2_assertion_keeps_failure_and_partial_paf_in_serial_and_parallel(self):
@@ -237,14 +235,19 @@ Path('result.paf').write_text('query\\t10\\t0\\t10\\t+\\ttarget\\t12\\t1\\t11\\t
                 server = self.make_workspace(root, [("ref:ds", "exit 134"), ("last", "touch should_not_run")])
                 environment = self.configure_reference_inputs(server, root, ["ds"])
                 command = server / "commands/ref:ds.sh"
+                options = server / "metadata/prepare_options.tsv"
+                options.write_text(options.read_text().replace("threads\t12", "threads\t99999"))
+                available = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1
                 partial = server / "partial.paf"
                 stderr = command.parent / "stderr.log"
                 command.write_text(f"#!/bin/bash\nprintf partial > '{partial}'\n"
+                                   f'echo "$GPM_TASK_THREADS" > "{server / "grant"}"\n'
                                    f"printf '%s\\n' '{assertion}' > '{stderr}'\nexit 134\n")
                 if parallel:
                     (command.parent / "alignment_tasks.json").write_text(json.dumps({"version": 1, "tasks": [
                         {"command": command.relative_to(server).as_posix(), "max_threads": 1}]}))
                 result = self.run_runner(server, env=environment)
+                self.assertEqual(int((server / "grant").read_text()), min(99999, available))
                 self.assertEqual(result.returncode, 134, result.stdout + result.stderr)
                 self.assertIn("MINIMAP2_CIGAR_ASSERTION", result.stdout)
                 self.assertIn("not a confirmed diagnosis", result.stdout)
