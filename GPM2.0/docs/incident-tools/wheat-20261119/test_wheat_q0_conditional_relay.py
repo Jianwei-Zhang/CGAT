@@ -98,6 +98,38 @@ class GateTests(unittest.TestCase):
         source["path_policy"]["reference_locus_padding_bp"]=1000000
         with self.assertRaisesRegex(ValueError,"engine/padding"):gate.verify_validation_source(config,source)
 
+    def test_final_revision_transfers_once_only_after_verified_go(self):
+        for passed in (True, False):
+            with self.subTest(passed=passed), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                entry = root / "entry.py"; entry.write_text("# formal owner fixture\n")
+                def ref(path):
+                    return {"path":str(path), "sha256":gate.digest(path)}
+                manifest = root / "transition.json"
+                manifest.write_text(json.dumps({"dependencies":{"entry":ref(entry)}}))
+                cfg = root / "relay-config.json"
+                cfg.write_text(json.dumps(dict(schema="wheat_continuity_conditional_relay_v1",
+                    engine_revision="2064cb4cfd51b5c886f60af19f020caf0b18950f",runtime_revision=gate.FINAL_REVISION,
+                    transition=ref(manifest))))
+                (root/"relay-kit.sha256").write_text(gate.digest(cfg)+"  "+cfg.name+"\n")
+                with patch.object(gate, "__file__", str(root/"relay.py")), \
+                     patch.object(gate.sys, "argv", ["relay", "--config", str(cfg)]), \
+                     patch.object(gate, "verify",return_value=({"status":"GO"}, {}),
+                                  side_effect=None if passed else ValueError("actual scientific gate")), \
+                     patch.object(gate.os, "execve") as launch:
+                    rc = gate.main()
+                    if passed:
+                        launch.assert_called_once()
+                        self.assertEqual(launch.call_args.args[1][3:], [str(entry),"--transition",str(manifest),"--threads","32"])
+                        self.assertTrue((root/"formal-start.intent.json").is_file())
+                    else:
+                        self.assertEqual(rc,42); launch.assert_not_called()
+                        self.assertFalse((root/"formal-start.intent.json").exists())
+                    self.assertEqual((root/"gate-go.json").exists(),passed)
+                    self.assertNotEqual((root/"gate-hold.json").exists(),passed)
+                    with self.assertRaisesRegex(ValueError,"already consumed"): gate.main()
+                    self.assertEqual(launch.call_count, int(passed))
+
     def test_source_boolean_is_not_a_length(self):
         m = self.metrics(); m["Un"]["selected_source_bp"] = True
         with self.assertRaisesRegex(ValueError, "invalid source"): gate.hard_gates(m, [], [])
